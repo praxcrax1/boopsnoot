@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../contexts/AuthContext';
-import { InputField, Button } from '../../components';
 import { validateName, validateEmail, validatePassword, validatePasswordMatch } from '../../utils/validation';
+import InputField from '../../components/InputField';
+import Button from '../../components/Button';
 
 const RegisterScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({

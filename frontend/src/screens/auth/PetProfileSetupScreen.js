@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'react-native-image-picker';
 import { petService } from '../../api/api';
 import { AuthContext } from '../../contexts/AuthContext';
-import { InputField, Button, CustomDropdown } from '../../components';
 import { validateName, validateBreed, validateAge, validatePhotos } from '../../utils/validation';
 import { 
   petTypeOptions, 
@@ -21,6 +20,9 @@ import {
   sizeOptions, 
   TEMPERAMENTS
 } from '../../constants/petConstants';
+import InputField from '../../components/InputField';
+import CustomDropdown from '../../components/CustomDropdown';
+import Button from '../../components/Button';
 
 const PetProfileSetupScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);

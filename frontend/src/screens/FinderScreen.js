@@ -1,27 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
   Alert,
-  Modal,
-  ScrollView,
+  Animated,
+  PanResponder,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import { matchService, petService } from '../api/api';
-import { PET_TYPES_ARRAY } from '../constants/petConstants';
+import * as Haptics from 'expo-haptics';
+
+// Import extracted components
+import Header from '../components/finder/Header';
+import EmptyState from '../components/finder/EmptyState';
+import FilterModal from '../components/finder/FilterModal';
+import PetSelectorModal from '../components/finder/PetSelectorModal';
+import PetCard from '../components/finder/PetCard';
+import SkeletonLoader from '../components/finder/SkeletonLoader';
 
 const { width } = Dimensions.get('window');
-const cardWidth = width * 0.85;
+const SWIPE_THRESHOLD = width * 0.25;
 
 const FinderScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [potentialMatches, setPotentialMatches] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filterVisible, setFilterVisible] = useState(false);
@@ -32,11 +40,83 @@ const FinderScreen = ({ navigation }) => {
   const [selectedPetId, setSelectedPetId] = useState(null);
   const [selectedPet, setSelectedPet] = useState(null);
   const [petSelectorVisible, setPetSelectorVisible] = useState(false);
-  const [page, setPage] = useState(0); // For pagination
+  const [page, setPage] = useState(0);
   const [hasMorePets, setHasMorePets] = useState(true);
+  const [swipingEnabled, setSwipingEnabled] = useState(true);
+  const [isSwipingBack, setIsSwipingBack] = useState(false);
+  
+  // Animation values
+  const position = useRef(new Animated.ValueXY()).current;
+  const swipeDirection = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Additional animation values for smoothness
+  const cardOpacity = useRef(new Animated.Value(1)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  
+  const nextCardOpacity = position.x.interpolate({
+    inputRange: [-width / 2, 0, width / 2],
+    outputRange: [1, 0.5, 1],
+    extrapolate: 'clamp',
+  });
+  
+  const nextCardScale = position.x.interpolate({
+    inputRange: [-width / 2, 0, width / 2],
+    outputRange: [1, 0.9, 1],
+    extrapolate: 'clamp',
+  });
+
+  // Pan responder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => swipingEnabled,
+      onPanResponderMove: (_, gesture) => {
+        if (!swipingEnabled) return;
+        
+        position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 }); // Reduce vertical movement
+        
+        if (gesture.dx > 0) {
+          swipeDirection.setValue(gesture.dx / SWIPE_THRESHOLD > 1 ? 1 : gesture.dx / SWIPE_THRESHOLD);
+        } else {
+          swipeDirection.setValue(gesture.dx / SWIPE_THRESHOLD < -1 ? -1 : gesture.dx / SWIPE_THRESHOLD);
+        }
+
+        // Provide haptic feedback when crossing the threshold
+        if (Math.abs(gesture.dx) === Math.round(SWIPE_THRESHOLD)) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (!swipingEnabled) return;
+        
+        if (gesture.dx > SWIPE_THRESHOLD) {
+          swipeRight();
+        } else if (gesture.dx < -SWIPE_THRESHOLD) {
+          swipeLeft();
+        } else {
+          resetPosition();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
+    StatusBar.setBarStyle('dark-content');
     fetchUserPets();
+
+    // Fade in content when the component mounts
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+      delay: 100,
+    }).start();
+
+    return () => {
+      // Reset any animation when component unmounts
+      position.setValue({ x: 0, y: 0 });
+      swipeDirection.setValue(0);
+    };
   }, []);
   
   useEffect(() => {
@@ -53,6 +133,17 @@ const FinderScreen = ({ navigation }) => {
       setSelectedPet(pet);
     }
   }, [selectedPetId, userPets]);
+
+  // Animate content opacity when new cards are shown
+  useEffect(() => {
+    if (!initialLoading && potentialMatches.length > 0) {
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [initialLoading, potentialMatches]);
 
   const fetchUserPets = async () => {
     setLoading(true);
@@ -98,13 +189,27 @@ const FinderScreen = ({ navigation }) => {
       };
 
       const response = await matchService.getPotentialMatches(apiFilters, selectedPetId);
+      const newPets = response.pets || [];
 
       if (reset) {
-        setPotentialMatches(response.pets || []);
+        // Fade out and in for smoother transitions when resetting
+        Animated.sequence([
+          Animated.timing(contentOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+            delay: 100,
+          }),
+        ]).start();
+
+        setPotentialMatches(newPets);
         setCurrentIndex(0);
       } else {
-        // Ensure no duplicate pets are added to the list
-        const newPets = response.pets || [];
         setPotentialMatches(prev => {
           const existingIds = new Set(prev.map(pet => pet._id));
           const uniquePets = newPets.filter(pet => !existingIds.has(pet._id));
@@ -112,8 +217,8 @@ const FinderScreen = ({ navigation }) => {
         });
       }
 
-      setHasMorePets((response.pets || []).length > 0);
-      if (response.pets && response.pets.length > 0) {
+      setHasMorePets(newPets.length > 0);
+      if (newPets.length > 0) {
         setPage(reset ? 1 : page + 1);
       }
     } catch (error) {
@@ -121,24 +226,108 @@ const FinderScreen = ({ navigation }) => {
       Alert.alert('Error', 'Failed to fetch potential matches. Please try again.');
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
+  const swipeRight = () => {
+    setSwipingEnabled(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    Animated.timing(position, {
+      toValue: { x: width + 100, y: 0 },
+      duration: 400,
+      useNativeDriver: false,
+    }).start(() => {
+      handleLike();
+      position.setValue({ x: 0, y: 0 });
+      swipeDirection.setValue(0);
+      setSwipingEnabled(true);
+    });
+  };
+
+  const swipeLeft = () => {
+    setSwipingEnabled(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    Animated.timing(position, {
+      toValue: { x: -width - 100, y: 0 },
+      duration: 400,
+      useNativeDriver: false,
+    }).start(() => {
+      handlePass();
+      position.setValue({ x: 0, y: 0 });
+      swipeDirection.setValue(0);
+      setSwipingEnabled(true);
+    });
+  };
+
+  const resetPosition = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    Animated.spring(position, {
+      toValue: { x: 0, y: 0 },
+      friction: 5,
+      tension: 40,
+      useNativeDriver: false,
+    }).start();
+    
+    Animated.spring(swipeDirection, {
+      toValue: 0,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // Swipe back to previous pet 
+  const swipeBack = () => {
+    if (currentIndex === 0 || isSwipingBack) return;
+    
+    setIsSwipingBack(true);
+    setSwipingEnabled(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // First fade out current card
+    Animated.timing(cardOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      // Go to previous card
+      setCurrentIndex(currentIndex - 1);
+      position.setValue({ x: -width, y: 0 });
+      
+      // Immediate reset of opacity
+      cardOpacity.setValue(1);
+      
+      // Animate the card back in from the left
+      Animated.spring(position, {
+        toValue: { x: 0, y: 0 },
+        friction: 5,
+        tension: 40,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsSwipingBack(false);
+        setSwipingEnabled(true);
+      });
+    });
+  };
+
   const handleLike = async () => {
-    if (currentIndex >= potentialMatches.length) {
-      return;
-    }
+    if (currentIndex >= potentialMatches.length) return;
 
     const pet = potentialMatches[currentIndex];
     const currentPetIndex = currentIndex;
     
-    // Update UI immediately to show the next pet
     goToNextPet();
     
     try {
       const response = await matchService.likeProfile(selectedPetId, pet._id);
       
       if (response.isMatch) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
         Alert.alert(
           'New Match!',
           `You matched with ${pet.name}!`,
@@ -157,20 +346,16 @@ const FinderScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error liking profile:', error);
       Alert.alert('Error', 'Failed to like profile. Please try again.');
-      // In case of error, revert the UI change
       setCurrentIndex(currentPetIndex);
     }
   };
 
   const handlePass = async () => {
-    if (currentIndex >= potentialMatches.length) {
-      return;
-    }
+    if (currentIndex >= potentialMatches.length) return;
 
     const pet = potentialMatches[currentIndex];
     const currentPetIndex = currentIndex;
     
-    // Update UI immediately to show the next pet
     goToNextPet();
     
     try {
@@ -178,7 +363,6 @@ const FinderScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error passing profile:', error);
       Alert.alert('Error', 'Failed to pass profile. Please try again.');
-      // In case of error, revert the UI change
       setCurrentIndex(currentPetIndex);
     }
   };
@@ -199,226 +383,133 @@ const FinderScreen = ({ navigation }) => {
     });
   };
 
-  const renderFilters = () => {
-    return (
-      <Modal
-        visible={filterVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setFilterVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.filterModal}>
-            <View style={styles.filterHeader}>
-              <Text style={styles.filterTitle}>Filter Pets</Text>
-              <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Maximum Distance</Text>
-              <Text style={styles.filterValue}>{filters.maxDistance} miles</Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={50}
-                step={1}
-                value={filters.maxDistance}
-                onValueChange={(value) => handleFilterChange('maxDistance', value)}
-                minimumTrackTintColor="#FF6B6B"
-                maximumTrackTintColor="#D1D1D1"
-                thumbTintColor="#FF6B6B"
+  const renderCards = () => {
+    if (potentialMatches.length === 0 || currentIndex >= potentialMatches.length) {
+      return (
+        <EmptyState onRefresh={() => fetchPotentialMatches(true)} />
+      );
+    }
+
+    return potentialMatches
+      .map((pet, i) => {
+        if (i < currentIndex) return null;
+
+        if (i === currentIndex) {
+          return (
+            <Animated.View key={pet._id} style={{ opacity: cardOpacity }}>
+              <PetCard
+                pet={pet}
+                position={position}
+                swipeDirection={swipeDirection}
+                panHandlers={panResponder.panHandlers}
+                isActive={true}
+                cardStyle={{ zIndex: potentialMatches.length - i }}
+                onCardPress={() => navigation.navigate('PetProfileScreen', { petId: pet._id })}
               />
-              
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={() => setFilterVisible(false)}
-              >
-                <Text style={styles.applyButtonText}>Apply Filters</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
+            </Animated.View>
+          );
+        }
+        
+        if (i === currentIndex + 1) {
+          return (
+            <PetCard
+              key={pet._id}
+              pet={pet}
+              isActive={false}
+              nextCardStyle={{
+                opacity: nextCardOpacity,
+                transform: [{ scale: nextCardScale }],
+                zIndex: potentialMatches.length - i,
+              }}
+            />
+          );
+        }
+        
+        return null;
+      })
+      .reverse();
   };
 
-  const renderPetSelector = () => {
+  if (initialLoading) {
     return (
-      <Modal
-        visible={petSelectorVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPetSelectorVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.filterModal}>
-            <View style={styles.filterHeader}>
-              <Text style={styles.filterTitle}>Select Pet</Text>
-              <TouchableOpacity onPress={() => setPetSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.filterContent}>
-              {userPets.map((pet) => (
-                <TouchableOpacity
-                  key={pet._id}
-                  style={[
-                    styles.petSelectItem,
-                  ]}
-                  onPress={() => {
-                    setSelectedPetId(pet._id);
-                    setPetSelectorVisible(false);
-                  }}
-                >
-                  <Image
-                    source={
-                      pet.photos && pet.photos.length > 0
-                        ? { uri: pet.photos[0] }
-                        : require('../assets/default-pet.png')
-                    }
-                    style={styles.petSelectorImage}
-                  />
-                  <View style={styles.petSelectorInfo}>
-                    <Text style={styles.petSelectorName}>{pet.name}</Text>
-                    <Text style={styles.petSelectorBreed}>{pet.breed}</Text>
-                    <Text style={styles.petSelectorType}>{pet.type}</Text>
-                  </View>
-                  {selectedPetId === pet._id && (
-                    <Ionicons name="checkmark-circle" size={24} color="#FF6B6B" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
-  if (loading && !potentialMatches.length) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <Header 
+          title="Find Playmates"
+          selectedPet={selectedPet}
+          onFilterPress={() => {}}
+          onPetSelectorPress={() => {}}
+        />
+        <SkeletonLoader />
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Find Playmates</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={styles.petSwitchButton}
-            onPress={() => setPetSelectorVisible(true)}
-          >
-            {selectedPet && (
-              <View style={styles.selectedPetPreview}>
-                <View style={styles.selectedPetPreviewContent}>
-                  <Image
-                    source={
-                      selectedPet.photos && selectedPet.photos.length > 0
-                        ? { uri: selectedPet.photos[0] }
-                        : require('../assets/default-pet.png')
-                    }
-                    style={styles.selectedPetImage}
-                  />
-                  <Text style={styles.selectedPetName}>{selectedPet.name}</Text>
-                  <Ionicons name="chevron-down" size={14} color="#666" />
-                </View>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setFilterVisible(true)}
-          >
-            <Ionicons name="options" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+      
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <Header 
+          title="Find Playmates"
+          selectedPet={selectedPet}
+          onFilterPress={() => setFilterVisible(true)}
+          onPetSelectorPress={() => setPetSelectorVisible(true)}
+        />
 
-      {potentialMatches.length > 0 && currentIndex < potentialMatches.length ? (
-        <View style={styles.cardContainer}>
-          <View style={styles.card}>
-            <Image
-              source={
-                potentialMatches[currentIndex].photos && 
-                potentialMatches[currentIndex].photos.length > 0
-                  ? { uri: potentialMatches[currentIndex].photos[0] }
-                  : require('../assets/default-pet.png')
-              }
-              style={styles.petImage}
-            />
-            <View style={styles.petInfoContainer}>
-              <View style={styles.nameRow}>
-                <Text style={styles.petName}>{potentialMatches[currentIndex].name}</Text>
-                <Text style={styles.petDistance}>
-                  {potentialMatches[currentIndex].distance ? 
-                    `${potentialMatches[currentIndex].distance.toFixed(1)} mi away` : 
-                    'Nearby'}
-                </Text>
-              </View>
-              <Text style={styles.petBreed}>{potentialMatches[currentIndex].breed}</Text>
-              <Text style={styles.petDescription}>{potentialMatches[currentIndex].description}</Text>
-              
-              <View style={styles.detailsRow}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Age</Text>
-                  <Text style={styles.detailValue}>{potentialMatches[currentIndex].age}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Size</Text>
-                  <Text style={styles.detailValue}>{potentialMatches[currentIndex].size}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Vaccinated</Text>
-                  <Text style={styles.detailValue}>{potentialMatches[currentIndex].vaccinated === 'yes' ? 'Yes' : 'No'}</Text>
-                </View>
-              </View>
-              
-              {potentialMatches[currentIndex].temperament && potentialMatches[currentIndex].temperament.length > 0 && (
-                <View style={styles.tagsContainer}>
-                  {potentialMatches[currentIndex].temperament.map((tag, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-          
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={handlePass}>
-              <Ionicons name="close-circle" size={64} color="#E74C3C" />
+        <Animated.View style={[styles.cardsContainer, { opacity: contentOpacity }]}>
+          {loading && !initialLoading && currentIndex === 0 ? (
+            <SkeletonLoader />
+          ) : (
+            renderCards()
+          )}
+        </Animated.View>
+
+        {potentialMatches.length > 0 && currentIndex < potentialMatches.length && !loading && (
+          <View style={styles.buttonsContainer}>
+            <TouchableOpacity 
+              style={[styles.roundButton, styles.undoButton]} 
+              onPress={swipeBack}
+              disabled={currentIndex === 0 || isSwipingBack}
+            >
+              <Ionicons name="arrow-undo" size={22} color={currentIndex === 0 ? "#CCCCCC" : "#666"} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
-              <Ionicons name="heart-circle" size={64} color="#FF6B6B" />
+            
+            <TouchableOpacity 
+              style={[styles.button, styles.passButton]} 
+              onPress={swipeLeft}
+              disabled={!swipingEnabled}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.button, styles.likeButton]} 
+              onPress={swipeRight}
+              disabled={!swipingEnabled}
+            >
+              <Ionicons name="heart" size={28} color="#fff" />
             </TouchableOpacity>
           </View>
-        </View>
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="paw" size={64} color="#DDD" />
-          <Text style={styles.emptyTitle}>No more pets</Text>
-          <Text style={styles.emptyDescription}>
-            Try adjusting your filters or check back later for new matches
-          </Text>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={() => fetchPotentialMatches(true)}
-          >
-            <Text style={styles.refreshButtonText}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
 
-      {renderFilters()}
-      {renderPetSelector()}
+        <FilterModal 
+          visible={filterVisible}
+          filters={filters}
+          onClose={() => setFilterVisible(false)}
+          onFilterChange={handleFilterChange}
+        />
+        
+        <PetSelectorModal
+          visible={petSelectorVisible}
+          pets={userPets}
+          selectedPetId={selectedPetId}
+          onClose={() => setPetSelectorVisible(false)}
+          onSelectPet={(id) => {
+            setSelectedPetId(id);
+            setPetSelectorVisible(false);
+          }}
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -426,267 +517,74 @@ const FinderScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F8F9FA',
   },
-  loadingContainer: {
+  cardsContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom: 24,
+    paddingTop: 12,
+    top: 30,
   },
-  header: {
-    flexDirection: 'row',
+  button: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filterButton: {
-    padding: 8,
-  },
-  petSwitchButton: {
-    marginRight: 10,
-  },
-  selectedPetPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-    borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-  },
-  selectedPetPreviewContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 5,
-  },
-  selectedPetImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 5,
-  },
-  selectedPetName: {
-    fontSize: 14,
-    color: '#333',
-  },
-  cardContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 20,
-  },
-  card: {
-    width: cardWidth,
-    backgroundColor: '#FFF',
-    borderRadius: 15,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    marginHorizontal: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.16,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
-  petImage: {
-    width: '100%',
-    height: 300,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-  },
-  petInfoContainer: {
-    padding: 15,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  petName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  petDistance: {
-    fontSize: 14,
-    color: '#666',
-  },
-  petBreed: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-  },
-  petDescription: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 15,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  detailItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 3,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tag: {
-    backgroundColor: '#F0F0F0',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 15,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginTop: 20,
-  },
-  actionButton: {
-    padding: 10,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
+  roundButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
-    padding: 30,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  emptyDescription: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  refreshButton: {
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 10,
-  },
-  refreshButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  filterModal: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  filterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginHorizontal: 10,
+    backgroundColor: '#F0F0F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  filterTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+  undoButton: {
+    position: 'absolute',
+    left: 20,
   },
-  filterContent: {
-    maxHeight: '90%',
-    paddingBottom: 20,
+  passButton: {
+    backgroundColor: '#FF5252',
   },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
-  },
-  filterValue: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-    marginBottom: 20,
-  },
-  applyButton: {
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  applyButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  petSelectItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  petSelectorImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  petSelectorInfo: {
-    marginLeft: 15,
-    flex: 1,
-  },
-  petSelectorName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  petSelectorBreed: {
-    fontSize: 14,
-    color: '#666',
-  },
-  petSelectorType: {
-    fontSize: 12,
-    color: '#888',
+  likeButton: {
+    backgroundColor: '#4CAF50',
   },
 });
 

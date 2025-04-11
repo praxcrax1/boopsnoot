@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { petService } from '../api/api';
-import { Button } from '../components';
+import Button from '../components/Button';
 
 const PetProfileScreen = ({ route, navigation }) => {
   const { petId } = route.params;
