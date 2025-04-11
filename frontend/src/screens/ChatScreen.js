@@ -84,6 +84,14 @@ const ChatScreen = ({ route, navigation }) => {
                   <Text style={styles.headerTitle}>{otherPet.pet.name}</Text>
                 </View>
               ),
+              headerRight: () => (
+                <TouchableOpacity 
+                  style={styles.headerButton}
+                  onPress={() => navigation.navigate('PetProfile', { petId: otherPet.pet._id })}
+                >
+                  <Ionicons name="information-circle-outline" size={24} color="#333" />
+                </TouchableOpacity>
+              ),
             });
           }
         }
@@ -264,15 +272,26 @@ const ChatScreen = ({ route, navigation }) => {
     }
   };
 
-  const renderMessage = ({ item }) => {
+  const renderMessage = ({ item, index }) => {
     // Get the message alignment based on who sent it
     const isCurrentUser = item.sender && item.sender.isCurrentUser;
+    
+    // Check if this message is from the same sender as the previous one
+    const isConsecutive = index > 0 && 
+      messages[index - 1].sender?.isCurrentUser === isCurrentUser;
+    
+    // Format timestamp
+    const messageTime = new Date(item.createdAt).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
     
     return (
       <View
         style={[
           styles.messageContainer,
           isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage,
+          isConsecutive && styles.consecutiveMessage
         ]}
       >
         <View
@@ -289,15 +308,29 @@ const ChatScreen = ({ route, navigation }) => {
           ]}>
             {item.content}
           </Text>
-          <Text style={[
-            styles.messageTime,
-            isCurrentUser ? styles.currentUserTime : styles.otherUserTime
-          ]}>
-            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          
+          <View style={styles.messageFooter}>
+            {item.pending && (
+              <Ionicons name="time-outline" size={12} color={isCurrentUser ? "rgba(255,255,255,0.7)" : "#999"} />
+            )}
+            {item.failed && (
+              <Ionicons name="alert-circle-outline" size={12} color="#FF4444" />
+            )}
+            <Text style={[
+              styles.messageTime,
+              isCurrentUser ? styles.currentUserTime : styles.otherUserTime
+            ]}>
+              {messageTime}
+            </Text>
+          </View>
         </View>
       </View>
     );
+  };
+
+  const renderDateSeparator = () => {
+    // This would be implemented to group messages by date
+    return null; // Placeholder for future implementation
   };
 
   if (loading) {
@@ -312,20 +345,31 @@ const ChatScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.messagesContainer}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        showsVerticalScrollIndicator={false}
-      />
+      {messages.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="chatbubble-ellipses-outline" size={64} color="#DDDDDD" />
+          <Text style={styles.emptyText}>No messages yet</Text>
+          <Text style={styles.emptySubtext}>Start the conversation!</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.messagesContainer}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+        />
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
         <View style={styles.inputContainer}>
           <TextInput
@@ -333,6 +377,7 @@ const ChatScreen = ({ route, navigation }) => {
             value={inputText}
             onChangeText={setInputText}
             placeholder="Type a message..."
+            placeholderTextColor="#999"
             multiline
             maxHeight={80}
           />
@@ -344,7 +389,11 @@ const ChatScreen = ({ route, navigation }) => {
             onPress={sendMessage}
             disabled={!inputText.trim() || isSending}
           >
-            <Ionicons name="send" size={24} color="#FFF" />
+            {isSending ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Ionicons name="send" size={20} color="#FFF" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -366,6 +415,10 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     padding: 5,
   },
+  headerButton: {
+    marginRight: 10,
+    padding: 5,
+  },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -383,14 +436,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#AAAAAA',
+    marginTop: 8,
+  },
   messagesContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingBottom: 20,
   },
   messageContainer: {
-    marginVertical: 6,
-    maxWidth: '75%',
+    marginVertical: 4,
+    maxWidth: '80%',
+  },
+  consecutiveMessage: {
+    marginTop: 2,
   },
   currentUserMessage: {
     alignSelf: 'flex-end',
@@ -402,6 +475,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 18,
     minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
   },
   currentUserBubble: {
     backgroundColor: '#FF6B6B',
@@ -430,9 +508,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFDDDD',
     borderColor: '#FFAAAA',
   },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+    gap: 4,
+  },
   messageTime: {
     fontSize: 11,
-    marginTop: 6,
     alignSelf: 'flex-end',
   },
   currentUserTime: {
@@ -456,15 +540,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 12, 
-    paddingRight: 40,
     fontSize: 16,
     maxHeight: 80,
     marginRight: 10,
+    color: '#333',
   },
   sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FF6B6B',
     justifyContent: 'center',
     alignItems: 'center',
