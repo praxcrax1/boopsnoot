@@ -334,4 +334,121 @@ router.post('/:id/messages', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/chats/for-match
+// @desc    Get or create a chat for a specific match
+// @access  Private
+router.post('/for-match', protect, async (req, res) => {
+  try {
+    const { matchId } = req.body;
+    
+    if (!matchId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Match ID is required'
+      });
+    }
+
+    // First, check if a chat already exists for this match
+    let chat = await Chat.findOne({ 
+      match: matchId,
+      isActive: true 
+    });
+
+    if (!chat) {
+      // If no chat exists, get the match to create one
+      const match = await Match.findById(matchId);
+      
+      if (!match) {
+        return res.status(404).json({
+          success: false,
+          message: 'Match not found'
+        });
+      }
+
+      // Ensure current user is a participant in this match
+      if (!match.participants.includes(req.user.id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not a participant in this match'
+        });
+      }
+
+      // Create a new chat for this match
+      chat = new Chat({
+        match: matchId,
+        participants: match.participants,
+        isActive: true
+      });
+
+      await chat.save();
+    }
+
+    // Get full chat details with participants
+    const populatedChat = await Chat.findById(chat._id)
+      .populate('match')
+      .populate({
+        path: 'lastMessage',
+        select: 'content createdAt sender'
+      });
+
+    // Format response similar to the getChats endpoint
+    const otherParticipantId = populatedChat.participants.find(
+      p => p.toString() !== req.user.id
+    );
+
+    // Get user's pet info
+    const myPet = await Pet.findOne({ owner: req.user.id });
+    
+    // Get other user's pet info
+    const otherPet = await Pet.findOne({ owner: otherParticipantId });
+
+    const chatData = {
+      _id: populatedChat._id,
+      matchId: populatedChat.match._id,
+      participants: [
+        {
+          pet: {
+            _id: myPet._id,
+            name: myPet.name,
+            photos: myPet.photos
+          },
+          isCurrentUser: true
+        },
+        {
+          pet: {
+            _id: otherPet._id,
+            name: otherPet.name,
+            photos: otherPet.photos
+          },
+          isCurrentUser: false
+        }
+      ],
+      lastMessage: populatedChat.lastMessage ? {
+        content: populatedChat.lastMessage.content,
+        createdAt: populatedChat.lastMessage.createdAt,
+        unread: false
+      } : null,
+      createdAt: populatedChat.createdAt
+    };
+
+    // Get messages
+    const messages = await Message.find({ chat: chat._id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.json({
+      success: true,
+      chat: chatData,
+      messages: messages.reverse() // reverse to get chronological order
+    });
+  } catch (error) {
+    console.error('Error in get/create chat for match:', error);
+    res.status(500).json({
+      success: false, 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 module.exports = router;

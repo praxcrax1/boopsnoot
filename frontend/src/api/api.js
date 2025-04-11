@@ -537,6 +537,16 @@ export const chatService = {
       throw handleApiError(error);
     }
   },
+
+  async getOrCreateChatForMatch(matchId) {
+    try {
+      // First try to find an existing chat for this match
+      const response = await apiClient.post('/chats/for-match', { matchId });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
 };
 
 // Helper function to standardize error handling

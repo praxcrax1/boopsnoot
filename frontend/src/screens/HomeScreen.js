@@ -8,11 +8,12 @@ import {
   Image,
   ActivityIndicator,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
-import { petService, matchService } from '../api/api';
+import { petService, matchService, chatService } from '../api/api';
 
 const HomeScreen = ({ navigation, route }) => {
   const { user } = useContext(AuthContext);
@@ -251,7 +252,32 @@ const HomeScreen = ({ navigation, route }) => {
                   <TouchableOpacity
                     key={match.matchId}
                     style={styles.matchCard}
-                    onPress={() => navigation.navigate('Chat', { chatId: match.chatId })}
+                    onPress={async () => {
+                      try {
+                        // Show loading indicator for better UX
+                        setMatchesLoading(true);
+                        
+                        // Get or create chat for this match
+                        const chatResponse = await chatService.getOrCreateChatForMatch(match.matchId);
+                        
+                        if (chatResponse.success && chatResponse.chat) {
+                          // Navigate to the chat with the returned chat ID
+                          navigation.navigate('Chat', { chatId: chatResponse.chat._id });
+                        } else {
+                          console.error('Failed to get or create chat:', chatResponse);
+                          // Fallback to direct navigation with match ID (though this likely won't work)
+                          navigation.navigate('Chat', { chatId: match.matchId });
+                        }
+                      } catch (error) {
+                        console.error('Error navigating to chat:', error);
+                        Alert.alert(
+                          'Error',
+                          'Failed to open chat. Please try again.'
+                        );
+                      } finally {
+                        setMatchesLoading(false);
+                      }
+                    }}
                   >
                     <Image
                       source={
