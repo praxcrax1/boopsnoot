@@ -50,23 +50,102 @@ app.get('/', (req, res) => {
 });
 
 // Socket.io setup for real-time chat
+// Track users and their socket IDs
+const connectedUsers = new Map();
+const userSockets = new Map();
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
   
+  // Handle user authentication
+  socket.on('authenticate', (data) => {
+    if (data && data.userId) {
+      // Store both mappings for quick lookup
+      connectedUsers.set(data.userId, socket.id); 
+      userSockets.set(socket.id, data.userId);
+      
+      console.log(`User ${data.userId} authenticated with socket ${socket.id}`);
+      socket.userId = data.userId; // Store userId in socket object for reference
+    }
+  });
+  
   // Join a chat room
   socket.on('join_chat', (chatId) => {
-    socket.join(chatId);
-    console.log(`User ${socket.id} joined chat: ${chatId}`);
+    // Make sure chatId is a string
+    const roomId = typeof chatId === 'object' ? chatId.chatId : chatId;
+    socket.join(roomId);
+    console.log(`User ${socket.id} (userId: ${socket.userId || 'unknown'}) joined chat: ${roomId}`);
+  });
+  
+  // Also support the alternate event name format
+  socket.on('join-chat', (data) => {
+    const roomId = typeof data === 'object' ? data.chatId : data;
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined chat: ${roomId} (alt format)`);
   });
   
   // Send message
   socket.on('send_message', (data) => {
-    socket.to(data.chatId).emit('receive_message', data);
+    console.log('Message received from client:', data);
+    
+    // Get the sender's user ID
+    const senderId = data.senderId || socket.userId || (data.sender && data.sender._id);
+    
+    // Make sure we have the sender's user ID stored in the message data
+    const messageData = {
+      ...data,
+      senderSocketId: socket.id,
+      senderUserId: senderId,
+      // When sending to others, explicitly mark as NOT from the current user (receiver's perspective)
+      sender: {
+        ...data.sender,
+        isCurrentUser: false  // This is critical - when someone else receives a message, it's not from them
+      }
+    };
+    
+    console.log('Broadcasting message to room:', messageData.chatId, 'Message data:', messageData);
+    
+    // Broadcast to all clients in the chat room including the sender ID
+    const chatId = data.chatId;
+    socket.to(chatId).emit('receive_message', messageData);
+  });
+  
+  // Support alternate event name format
+  socket.on('message', (data) => {
+    console.log('Message received (alt format):', data);
+    
+    // Get the sender's user ID
+    const senderId = data.senderId || socket.userId || (data.sender && data.sender._id);
+    
+    const messageData = {
+      ...data,
+      senderSocketId: socket.id,
+      senderUserId: senderId,
+      // When sending to others, explicitly mark as NOT from the current user (receiver's perspective)
+      sender: {
+        ...data.sender,
+        isCurrentUser: false  // When receiving a message, it's always from someone else
+      }
+    };
+    
+    const chatId = data.chatId;
+    socket.to(chatId).emit('receive_message', messageData);
   });
   
   // Disconnect
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    
+    // Remove user from connected users maps
+    if (socket.userId) {
+      connectedUsers.delete(socket.userId);
+    }
+    
+    const userId = userSockets.get(socket.id);
+    if (userId) {
+      userSockets.delete(socket.id);
+      connectedUsers.delete(userId);
+    }
   });
 });
 
