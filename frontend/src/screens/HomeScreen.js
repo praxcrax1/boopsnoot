@@ -95,36 +95,39 @@ const HomeScreen = ({ navigation, route }) => {
 
       {/* Pet Selection Tabs (Only show if user has multiple pets) */}
       {pets.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.petTabsContainer}
-        >
-          {pets.map(pet => (
-            <TouchableOpacity
-              key={pet._id}
-              style={[
-                styles.petTab,
-                selectedPetId === pet._id && styles.activePetTab
-              ]}
-              onPress={() => handlePetChange(pet._id)}
-            >
-              <Image
-                source={pet.photos && pet.photos.length > 0
-                  ? { uri: pet.photos[0] }
-                  : require('../assets/default-pet.png')
-                }
-                style={styles.petTabImage}
-              />
-              <Text style={[
-                styles.petTabName,
-                selectedPetId === pet._id && styles.activePetTabName
-              ]}>
-                {pet.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={styles.petTabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.petTabsContainer}
+            contentContainerStyle={styles.petTabsContent}
+          >
+            {pets.map(pet => (
+              <TouchableOpacity
+                key={pet._id}
+                style={[
+                  styles.petTab,
+                  selectedPetId === pet._id && styles.activePetTab
+                ]}
+                onPress={() => handlePetChange(pet._id)}
+              >
+                <Image
+                  source={pet.photos && pet.photos.length > 0
+                    ? { uri: pet.photos[0] }
+                    : require('../assets/default-pet.png')
+                  }
+                  style={styles.petTabImage}
+                />
+                <Text style={[
+                  styles.petTabName,
+                  selectedPetId === pet._id && styles.activePetTabName
+                ]}>
+                  {pet.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       <ScrollView style={styles.scrollContainer}>
@@ -219,25 +222,6 @@ const HomeScreen = ({ navigation, route }) => {
           )}
         </View>
 
-        {/* Nearby Pets */}
-        <View style={styles.section}>
-          <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionTitle}>Nearby Pets</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Finder')}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={styles.nearbyPetsCard}
-            onPress={() => navigation.navigate('Finder')}
-          >
-            <Text style={styles.nearbyPetsText}>
-              Discover pets nearby for playdates!
-            </Text>
-            <Ionicons name="arrow-forward" size={20} color="#FF6B6B" />
-          </TouchableOpacity>
-        </View>
-
         {/* App Stats */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Activity</Text>
@@ -274,8 +258,8 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
+    paddingBottom: 5, // Reduced from 15 to 5
+    borderBottomWidth: 0, // Removed border
     borderBottomColor: '#F0F0F0',
   },
   welcomeText: {
@@ -288,26 +272,34 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
+  petTabsWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
   petTabsContainer: {
     backgroundColor: '#F8F8F8',
-    paddingVertical: 10,
+    paddingVertical: 5, // Reduced from 10 to 5
     paddingHorizontal: 15,
+  },
+  petTabsContent: {
+    alignItems: 'center',
   },
   petTab: {
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 10, // Reduced from 15 to 10
     paddingHorizontal: 5,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 5, // Reduced from 8 to 5
+    borderRadius: 15, // Changed from 20 to 15
+    flexDirection: 'row', // Changed to row to make it more compact
   },
   activePetTab: {
     backgroundColor: '#FFE9E9',
   },
   petTabImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginBottom: 5,
+    width: 30, // Reduced from 40 to 30
+    height: 30, // Reduced from 40 to 30
+    borderRadius: 15, // Adjusted for new size
+    marginRight: 5, // Add margin to separate from text
     borderWidth: 2,
     borderColor: '#FFF',
   },
