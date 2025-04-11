@@ -3,67 +3,70 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
-  Alert,
+  TouchableOpacity,
   Image,
-  Platform,
-  Modal,
-  FlatList,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'react-native-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'react-native-image-picker';
 import { petService } from '../../api/api';
-import { 
-  PET_TYPES, 
-  GENDER_OPTIONS, 
-  SIZE_OPTIONS, 
-  ACTIVITY_LEVELS, 
-  VACCINATION_STATUS, 
-  TEMPERAMENTS,
-  DOG_PLAYMATE_PREFERENCES,
-  CAT_PLAYMATE_PREFERENCES
-} from '../../constants/petConstants';
-import CustomDropdown from '../../components/CustomDropdown';
+import { AuthContext } from '../../contexts/AuthContext';
+import { InputField, Button, CustomDropdown } from '../../components';
 
 const PetProfileSetupScreen = ({ navigation }) => {
+  const { user } = useContext(AuthContext);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [petData, setPetData] = useState({
     name: '',
     breed: '',
-    type: PET_TYPES.DOG, // Default type is dog
+    type: 'dog',
     age: '',
-    gender: GENDER_OPTIONS.MALE,
-    size: SIZE_OPTIONS.MEDIUM,
-    vaccinated: VACCINATION_STATUS.YES,
+    gender: 'male',
+    size: 'medium',
     photos: [],
     description: '',
-    activityLevel: ACTIVITY_LEVELS.MODERATE,
     temperament: [],
     preferredPlaymates: [],
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get the appropriate playmate preferences based on pet type
-  const getPlaymateOptions = () => {
-    return petData.type === PET_TYPES.DOG
-      ? DOG_PLAYMATE_PREFERENCES
-      : CAT_PLAYMATE_PREFERENCES;
-  };
+  // Pre-defined options for dropdowns
+  const typeOptions = [
+    { label: 'Dog', value: 'dog' },
+    { label: 'Cat', value: 'cat' },
+  ];
+  
+  const genderOptions = [
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' },
+  ];
+  
+  const sizeOptions = [
+    { label: 'Small', value: 'small' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'Large', value: 'large' },
+  ];
 
   const handleInputChange = (field, value) => {
-    const updatedData = {
+    setPetData({
       ...petData,
       [field]: value,
-    };
+    });
+  };
 
-    // If pet type changes, reset the preferredPlaymates array
-    if (field === 'type') {
-      updatedData.preferredPlaymates = [];
+  const toggleArrayItem = (field, item) => {
+    const array = petData[field] || [];
+    const exists = array.includes(item);
+    
+    let newArray;
+    if (exists) {
+      newArray = array.filter(i => i !== item);
+    } else {
+      newArray = [...array, item];
     }
     
-    setPetData(updatedData);
+    setPetData({ ...petData, [field]: newArray });
   };
 
   const pickImage = async () => {
@@ -77,6 +80,8 @@ const PetProfileSetupScreen = ({ navigation }) => {
     try {
       const result = await ImagePicker.launchImageLibrary(options);
       if (!result.didCancel && !result.errorCode) {
+        // For simplicity, we'll just store the image URI in the state
+        // In a real app, you would upload to a server and store the URL
         const newPhotos = [...petData.photos, result.assets[0].uri];
         setPetData({ ...petData, photos: newPhotos });
       }
@@ -92,85 +97,62 @@ const PetProfileSetupScreen = ({ navigation }) => {
   };
 
   const handleSubmit = async () => {
+    // Basic validation
     if (!petData.name || !petData.breed || !petData.age) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
+    if (petData.photos.length === 0) {
+      Alert.alert('Error', 'Please add at least one photo of your pet');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await petService.createPet(petData);
-      Alert.alert(
-        'Success',
-        'Pet profile created successfully!',
-        [
-          {
-            text: 'Continue',
-            onPress: () => {
-              // Check if we're in auth flow or main flow
-              const routeName = navigation.getState().routes[0].name;
-              if (routeName === 'Splash' || routeName === 'Login' || routeName === 'Register') {
-                // Auth flow - navigate to Main/Home
-                navigation.reset({
-                  index: 0,
-                  routes: [{ 
-                    name: 'Main', 
-                    params: { screen: 'Home', params: { refresh: true } }
-                  }],
-                });
-              } else {
-                // Already in main flow - navigate to MainTabs/Home
-                navigation.navigate('MainTabs', {
-                  screen: 'Home',
-                  params: { refresh: true }
-                });
-              }
-            },
-          },
-        ],
-        { cancelable: false }
-      );
+      // Add user ID to pet data
+      const petWithOwner = {
+        ...petData,
+        ownerId: user.id,
+      };
+      
+      await petService.createPet(petWithOwner);
+      
+      // Navigate to Home tab
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
     } catch (error) {
+      console.error('Error creating pet:', error);
       Alert.alert('Error', error.message || 'Failed to create pet profile');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const toggleArrayItem = (field, item) => {
-    const array = petData[field];
-    const exists = array.includes(item);
-    
-    let newArray;
-    if (exists) {
-      newArray = array.filter(i => i !== item);
-    } else {
-      newArray = [...array, item];
-    }
-    
-    setPetData({ ...petData, [field]: newArray });
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerContainer}>
-          <Text style={styles.headerText}>Set Up Your Pet Profile</Text>
-          <Text style={styles.subHeaderText}>Let's get to know your furry friend</Text>
+          <Text style={styles.headerText}>Set Up Pet Profile</Text>
+          <Text style={styles.subHeaderText}>
+            Let's create a profile for your pet to help find playmates!
+          </Text>
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Pet Name *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Pet Name"
+            required
             placeholder="e.g., Buddy"
             value={petData.name}
             onChangeText={(value) => handleInputChange('name', value)}
           />
 
-          <Text style={styles.label}>Breed *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Breed"
+            required
             placeholder="e.g., Golden Retriever"
             value={petData.breed}
             onChangeText={(value) => handleInputChange('breed', value)}
@@ -178,18 +160,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
 
           <Text style={styles.label}>Type</Text>
           <CustomDropdown
-            label="Type"
-            options={[
-              { label: 'Dog', value: PET_TYPES.DOG },
-              { label: 'Cat', value: PET_TYPES.CAT },
-            ]}
+            label="Select Type"
+            options={typeOptions}
             selectedValue={petData.type}
             onValueChange={(value) => handleInputChange('type', value)}
           />
 
-          <Text style={styles.label}>Age *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Age"
+            required
             placeholder="e.g., 2 years"
             value={petData.age}
             onChangeText={(value) => handleInputChange('age', value)}
@@ -198,65 +177,35 @@ const PetProfileSetupScreen = ({ navigation }) => {
 
           <Text style={styles.label}>Gender</Text>
           <CustomDropdown
-            label="Gender"
-            options={[
-              { label: 'Male', value: GENDER_OPTIONS.MALE },
-              { label: 'Female', value: GENDER_OPTIONS.FEMALE },
-            ]}
+            label="Select Gender"
+            options={genderOptions}
             selectedValue={petData.gender}
             onValueChange={(value) => handleInputChange('gender', value)}
           />
 
           <Text style={styles.label}>Size</Text>
           <CustomDropdown
-            label="Size"
-            options={[
-              { label: 'Small', value: SIZE_OPTIONS.SMALL },
-              { label: 'Medium', value: SIZE_OPTIONS.MEDIUM },
-              { label: 'Large', value: SIZE_OPTIONS.LARGE },
-            ]}
+            label="Select Size"
+            options={sizeOptions}
             selectedValue={petData.size}
             onValueChange={(value) => handleInputChange('size', value)}
           />
 
-          <Text style={styles.label}>Vaccinated</Text>
-          <CustomDropdown
-            label="Vaccinated"
-            options={[
-              { label: 'Yes', value: VACCINATION_STATUS.YES },
-              { label: 'No', value: VACCINATION_STATUS.NO },
-            ]}
-            selectedValue={petData.vaccinated}
-            onValueChange={(value) => handleInputChange('vaccinated', value)}
-          />
-
-          <Text style={styles.label}>Activity Level</Text>
-          <CustomDropdown
-            label="Activity Level"
-            options={[
-              { label: 'Low', value: ACTIVITY_LEVELS.LOW },
-              { label: 'Moderate', value: ACTIVITY_LEVELS.MODERATE },
-              { label: 'High', value: ACTIVITY_LEVELS.HIGH },
-            ]}
-            selectedValue={petData.activityLevel}
-            onValueChange={(value) => handleInputChange('activityLevel', value)}
-          />
-
           <Text style={styles.label}>Temperament (Select all that apply)</Text>
           <View style={styles.optionsContainer}>
-            {TEMPERAMENTS.map((item) => (
+            {['Friendly', 'Shy', 'Energetic', 'Calm', 'Playful'].map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
                   styles.optionItem,
-                  petData.temperament.includes(item) && styles.selectedOption,
+                  petData.temperament?.includes(item) && styles.selectedOption,
                 ]}
                 onPress={() => toggleArrayItem('temperament', item)}
               >
                 <Text
                   style={[
                     styles.optionText,
-                    petData.temperament.includes(item) && styles.selectedOptionText,
+                    petData.temperament?.includes(item) && styles.selectedOptionText,
                   ]}
                 >
                   {item}
@@ -265,38 +214,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
             ))}
           </View>
 
-          <Text style={styles.label}>Preferred Playmates (Select all that apply)</Text>
-          <View style={styles.optionsContainer}>
-            {getPlaymateOptions().map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.optionItem,
-                  petData.preferredPlaymates.includes(item) && styles.selectedOption,
-                ]}
-                onPress={() => toggleArrayItem('preferredPlaymates', item)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    petData.preferredPlaymates.includes(item) && styles.selectedOptionText,
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
+          <InputField
+            label="Description"
             placeholder="Tell us a bit about your pet..."
             value={petData.description}
             onChangeText={(value) => handleInputChange('description', value)}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            style={styles.textArea}
           />
 
           <Text style={styles.label}>Pet Photos</Text>
@@ -306,7 +232,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <View style={styles.photoContainer}>
-            {petData.photos.map((photo, index) => (
+            {petData.photos?.map((photo, index) => (
               <View key={index} style={styles.photoItem}>
                 <Image source={{ uri: photo }} style={styles.photo} />
                 <TouchableOpacity
@@ -319,15 +245,20 @@ const PetProfileSetupScreen = ({ navigation }) => {
             ))}
           </View>
 
-          <TouchableOpacity
-            style={styles.submitButton}
+          <Button
+            title={isSubmitting ? 'Creating Profile...' : 'Create Pet Profile'}
             onPress={handleSubmit}
             disabled={isSubmitting}
-          >
-            <Text style={styles.submitButtonText}>
-              {isSubmitting ? 'Creating Profile...' : 'Create Pet Profile'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSubmitting}
+          />
+
+          <Button
+            title="Skip for Now"
+            onPress={() => navigation.navigate('MainTabs')}
+            type="secondary"
+            style={styles.skipButton}
+            textStyle={styles.skipButtonText}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -339,22 +270,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  scrollContainer: {
+  scrollContent: {
     padding: 20,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 30,
   },
   headerText: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   subHeaderText: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
   },
   formContainer: {
     marginBottom: 20,
@@ -365,60 +297,9 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: '#F5F5F5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-    fontSize: 16,
-  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-  },
-  dropdownButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalHeaderText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  pickerContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  picker: {
-    height: 50,
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -490,17 +371,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  submitButton: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+  skipButton: {
     marginTop: 10,
   },
-  submitButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+  skipButtonText: {
+    fontWeight: '500',
   },
 });
 

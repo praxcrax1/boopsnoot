@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { petService } from '../api/api';
+import { Button } from '../components';
 
 const PetProfileScreen = ({ route, navigation }) => {
   const { petId } = route.params;
@@ -81,12 +82,12 @@ const PetProfileScreen = ({ route, navigation }) => {
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle-outline" size={64} color="#FF6B6B" />
         <Text style={styles.errorText}>Pet not found</Text>
-        <TouchableOpacity
-          style={styles.goBackButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.goBackButtonText}>Go Back</Text>
-        </TouchableOpacity>
+        <Button 
+          title="Go Back" 
+          onPress={() => navigation.goBack()} 
+          style={styles.goBackButton} 
+          textStyle={styles.goBackButtonText}
+        />
       </View>
     );
   }

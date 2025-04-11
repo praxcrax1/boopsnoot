@@ -3,8 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -12,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../contexts/AuthContext';
+import { InputField, Button } from '../../components';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -59,47 +58,46 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.formContainer}>
-          <TextInput
-            style={styles.input}
+          <InputField
             placeholder="Email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <TextInput
-            style={styles.input}
+          
+          <InputField
             placeholder="Password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
 
-          <TouchableOpacity
-            style={styles.button}
+          <Button
+            title={isSubmitting ? 'Logging in...' : 'Login'}
             onPress={handleLogin}
             disabled={isSubmitting}
-          >
-            <Text style={styles.buttonText}>
-              {isSubmitting ? 'Logging in...' : 'Login'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSubmitting}
+          />
 
-          <TouchableOpacity
-            style={[styles.button, styles.googleButton]}
+          <Button
+            title="Continue with Google"
             onPress={handleGoogleLogin}
-          >
-            <Text style={[styles.buttonText, styles.googleButtonText]}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
+            type="secondary"
+            style={styles.googleButton}
+            textStyle={styles.googleButtonText}
+          />
         </View>
 
         <View style={styles.footerContainer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.footerLink}>Register</Text>
-          </TouchableOpacity>
+          <Button
+            title="Register"
+            onPress={() => navigation.navigate('Register')}
+            type="secondary"
+            style={styles.textButton}
+            textStyle={styles.footerLink}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -138,25 +136,6 @@ const styles = StyleSheet.create({
   formContainer: {
     marginBottom: 30,
   },
-  input: {
-    backgroundColor: '#F5F5F5',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   googleButton: {
     backgroundColor: '#FFF',
     borderWidth: 1,
@@ -168,6 +147,7 @@ const styles = StyleSheet.create({
   footerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   footerText: {
     fontSize: 16,
@@ -177,6 +157,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF6B6B',
     fontWeight: 'bold',
+  },
+  textButton: {
+    backgroundColor: 'transparent',
+    padding: 0,
+    marginBottom: 0,
+    height: 20,
   },
 });
 

@@ -3,8 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -12,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../contexts/AuthContext';
+import { InputField, Button } from '../../components';
 
 const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');
@@ -69,52 +68,52 @@ const RegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.formContainer}>
-            <TextInput
-              style={styles.input}
+            <InputField
               placeholder="Full Name"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
             />
-            <TextInput
-              style={styles.input}
+            
+            <InputField
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TextInput
-              style={styles.input}
+            
+            <InputField
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
-            <TextInput
-              style={styles.input}
+            
+            <InputField
               placeholder="Confirm Password"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
             />
 
-            <TouchableOpacity
-              style={styles.button}
+            <Button
+              title={isSubmitting ? 'Creating Account...' : 'Register'}
               onPress={handleRegister}
               disabled={isSubmitting}
-            >
-              <Text style={styles.buttonText}>
-                {isSubmitting ? 'Creating Account...' : 'Register'}
-              </Text>
-            </TouchableOpacity>
+              loading={isSubmitting}
+            />
           </View>
 
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={styles.footerLink}>Login</Text>
-            </TouchableOpacity>
+            <Button
+              title="Login"
+              onPress={() => navigation.navigate('Login')}
+              type="secondary"
+              style={styles.textButton}
+              textStyle={styles.footerLink}
+            />
           </View>
         </KeyboardAvoidingView>
       </ScrollView>
@@ -153,28 +152,10 @@ const styles = StyleSheet.create({
   formContainer: {
     marginBottom: 30,
   },
-  input: {
-    backgroundColor: '#F5F5F5',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   footerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   footerText: {
     fontSize: 16,
@@ -184,6 +165,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF6B6B',
     fontWeight: 'bold',
+  },
+  textButton: {
+    backgroundColor: 'transparent',
+    padding: 0,
+    marginBottom: 0,
+    height: 20,
   },
 });
 

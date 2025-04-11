@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   Image,
   ActivityIndicator,
@@ -16,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'react-native-image-picker';
 import { petService } from '../api/api';
-import CustomDropdown from '../components/CustomDropdown';
+import { InputField, Button, CustomDropdown } from '../components';
 
 const EditPetProfileScreen = ({ route, navigation }) => {
   const { petId } = route.params;
@@ -236,17 +235,17 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Pet Name *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Pet Name"
+            required
             placeholder="e.g., Buddy"
             value={petData.name}
             onChangeText={(value) => handleInputChange('name', value)}
           />
 
-          <Text style={styles.label}>Breed *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Breed"
+            required
             placeholder="e.g., Golden Retriever"
             value={petData.breed}
             onChangeText={(value) => handleInputChange('breed', value)}
@@ -260,9 +259,9 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             onValueChange={(value) => handleInputChange('type', value)}
           />
 
-          <Text style={styles.label}>Age *</Text>
-          <TextInput
-            style={styles.input}
+          <InputField
+            label="Age"
+            required
             placeholder="e.g., 2 years"
             value={petData.age}
             onChangeText={(value) => handleInputChange('age', value)}
@@ -347,15 +346,15 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             ))}
           </View>
 
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
+          <InputField
+            label="Description"
             placeholder="Tell us a bit about your pet..."
             value={petData.description}
             onChangeText={(value) => handleInputChange('description', value)}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            style={styles.textArea}
           />
 
           <Text style={styles.label}>Pet Photos</Text>
@@ -378,13 +377,14 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             ))}
           </View>
 
-          <TouchableOpacity
-            style={styles.deleteButton}
+          <Button
+            title="Delete Pet"
             onPress={handleDeletePet}
-          >
-            <Ionicons name="trash-outline" size={20} color="#FFF" />
-            <Text style={styles.deleteButtonText}>Delete Pet</Text>
-          </TouchableOpacity>
+            type="danger"
+            icon="trash-outline"
+            iconPosition="left"
+            style={styles.deleteButton}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -421,52 +421,9 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: '#F5F5F5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-    fontSize: 16,
-  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-  },
-  dropdownButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalHeaderText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -539,19 +496,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E74C3C',
-    padding: 15,
-    borderRadius: 8,
     marginTop: 10,
-  },
-  deleteButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
   },
 });
 

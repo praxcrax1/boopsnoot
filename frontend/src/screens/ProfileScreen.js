@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
 import { petService } from '../api/api';
+import { Button } from '../components';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
@@ -21,25 +22,27 @@ const ProfileScreen = ({ navigation }) => {
 
   useEffect(() => {
     const fetchUserPets = async () => {
+      if (!user) return;
+
       try {
-        setLoading(true);
-        const response = await petService.getUserPets();
+        const response = await petService.getUserPets(user.id);
         setPets(response.pets || []);
       } catch (error) {
-        console.error('Error fetching pets:', error);
-        Alert.alert('Error', 'Failed to load pets. Please try again.');
+        console.error('Error fetching user pets:', error);
+        Alert.alert('Error', 'Failed to load your pets. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchUserPets();
+  }, [user]);
 
-    const unsubscribe = navigation.addListener('focus', fetchUserPets);
-    return unsubscribe;
-  }, [navigation]);
+  const handleAddPet = () => {
+    navigation.navigate('PetProfileSetup');
+  };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -47,19 +50,25 @@ const ProfileScreen = ({ navigation }) => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (error) {
-              console.error('Logout failed:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
+          onPress: () => {
+            logout();
           },
         },
-      ],
+      ]
     );
   };
+
+  if (!user) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Please login to view your profile</Text>
+        <Button 
+          title="Login" 
+          onPress={() => navigation.navigate('Login')} 
+        />
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -71,112 +80,113 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>My Profile</Text>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => {
-              // Open settings or edit user profile screen in future updates
-              Alert.alert('Info', 'Settings will be available in a future update.');
-            }}
-          >
-            <Ionicons name="settings-outline" size={24} color="#333" />
-          </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.title}>Profile</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content}>
+        <View style={styles.userInfoSection}>
+          <View style={styles.userInfoHeader}>
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+            </View>
+          </View>
+          <Button
+            title="Edit Profile"
+            onPress={() => Alert.alert('Info', 'Edit profile functionality would be implemented here.')}
+            type="secondary"
+            icon="create-outline"
+            style={styles.editProfileButton}
+          />
         </View>
 
-        {/* User Info */}
-        <View style={styles.userInfoContainer}>
-          <View style={styles.userImageContainer}>
-            <Text style={styles.userImagePlaceholder}>{user?.name?.charAt(0) || 'U'}</Text>
-          </View>
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'No email'}</Text>
-          </View>
-        </View>
-
-        {/* My Pets Section */}
-        <View style={styles.section}>
+        <View style={styles.petSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Pets</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.navigate('PetProfileSetup')}
-            >
-              <Ionicons name="add" size={20} color="#FF6B6B" />
-              <Text style={styles.addButtonText}>Add Pet</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Your Pets</Text>
+            <Button
+              title="Add Pet"
+              onPress={handleAddPet}
+              type="secondary"
+              icon="add"
+              style={styles.addPetButton}
+              textStyle={styles.addPetButtonText}
+            />
           </View>
 
           {pets.length > 0 ? (
-            <View style={styles.petsContainer}>
-              {pets.map((pet) => (
-                <TouchableOpacity
-                  key={pet._id}
-                  style={styles.petCard}
-                  onPress={() => navigation.navigate('PetProfile', { petId: pet._id })}
-                >
-                  <Image
-                    source={
-                      pet.photos && pet.photos.length > 0
-                        ? { uri: pet.photos[0] }
-                        : require('../assets/default-pet.png')
-                    }
-                    style={styles.petImage}
-                  />
+            pets.map((pet) => (
+              <TouchableOpacity
+                key={pet._id}
+                style={styles.petCard}
+                onPress={() => navigation.navigate('PetProfile', { petId: pet._id })}
+              >
+                <Image
+                  source={
+                    pet.photos && pet.photos.length > 0
+                      ? { uri: pet.photos[0] }
+                      : require('../assets/default-pet.png')
+                  }
+                  style={styles.petImage}
+                />
+                <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name}</Text>
                   <Text style={styles.petBreed}>{pet.breed}</Text>
-                  <TouchableOpacity
-                    style={styles.editPetButton}
-                    onPress={() => navigation.navigate('EditPetProfile', { petId: pet._id })}
-                  >
-                    <Ionicons name="pencil" size={16} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyPetsContainer}>
-              <Ionicons name="paw" size={40} color="#DDD" />
-              <Text style={styles.emptyPetsText}>You haven't added any pets yet</Text>
-              <TouchableOpacity
-                style={styles.addPetButton}
-                onPress={() => navigation.navigate('PetProfileSetup')}
-              >
-                <Text style={styles.addPetButtonText}>Add Your First Pet</Text>
+                  <Text style={styles.petDetails}>
+                    {pet.age} • {pet.gender} • {pet.size}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#DDD" />
               </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.noPetsContainer}>
+              <Ionicons name="paw" size={48} color="#DDD" />
+              <Text style={styles.noPetsText}>You haven't added any pets yet</Text>
+              <Button
+                title="Add Your First Pet"
+                onPress={handleAddPet}
+                icon="add-circle"
+              />
             </View>
           )}
         </View>
 
-        {/* Additional Sections */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="person-outline" size={20} color="#666" />
-            <Text style={styles.menuItemText}>Edit Profile</Text>
-            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('Info', 'Notifications settings would be implemented here.')}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#666" />
+            <Text style={styles.settingText}>Notifications</Text>
+            <Ionicons name="chevron-forward" size={20} color="#DDD" style={styles.settingChevron} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="notifications-outline" size={20} color="#666" />
-            <Text style={styles.menuItemText}>Notifications</Text>
-            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('Info', 'Privacy settings would be implemented here.')}
+          >
+            <Ionicons name="shield-outline" size={24} color="#666" />
+            <Text style={styles.settingText}>Privacy</Text>
+            <Ionicons name="chevron-forward" size={20} color="#DDD" style={styles.settingChevron} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="shield-outline" size={20} color="#666" />
-            <Text style={styles.menuItemText}>Privacy</Text>
-            <Ionicons name="chevron-forward" size={20} color="#CCC" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#666" />
-            <Text style={styles.menuItemText}>Logout</Text>
-            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => Alert.alert('Info', 'Help center would be implemented here.')}
+          >
+            <Ionicons name="help-circle-outline" size={24} color="#666" />
+            <Text style={styles.settingText}>Help & Support</Text>
+            <Ionicons name="chevron-forward" size={20} color="#DDD" style={styles.settingChevron} />
           </TouchableOpacity>
         </View>
-
-        {/* Version Info */}
-        <Text style={styles.versionText}>BoopSnoot v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -192,60 +202,76 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollContainer: {
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  settingsButton: {
-    padding: 5,
-  },
-  userInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-    paddingBottom: 20,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  userImageContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  content: {
+    flex: 1,
+  },
+  userInfoSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  userInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#FF6B6B',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 20,
   },
-  userImagePlaceholder: {
-    fontSize: 36,
+  avatarText: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFF',
   },
   userDetails: {
+    marginLeft: 15,
     flex: 1,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 5,
   },
   userEmail: {
-    fontSize: 14,
     color: '#666',
+    fontSize: 14,
+    marginTop: 3,
   },
-  section: {
-    marginBottom: 25,
+  editProfileButton: {
+    marginTop: 15,
+  },
+  petSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -258,38 +284,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  addPetButton: {
+    height: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 0,
+    marginBottom: 0,
   },
-  addButtonText: {
-    fontSize: 14,
-    color: '#FF6B6B',
-    marginLeft: 5,
+  addPetButtonText: {
+    fontWeight: '500',
   },
-  petsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  loader: {
+    marginVertical: 30,
   },
   petCard: {
-    width: '45%',
-    marginRight: '5%',
-    marginBottom: 15,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
     borderRadius: 10,
     padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    position: 'relative',
+    marginBottom: 10,
   },
   petImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 10,
-    marginBottom: 10,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  petInfo: {
+    flex: 1,
+    marginLeft: 15,
   },
   petName: {
     fontSize: 16,
@@ -300,57 +322,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  editPetButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+  petDetails: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 3,
   },
-  emptyPetsContainer: {
+  noPetsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 10,
+    paddingVertical: 30,
   },
-  emptyPetsText: {
-    fontSize: 16,
+  noPetsText: {
     color: '#666',
-    marginVertical: 15,
+    marginVertical: 10,
   },
-  addPetButton: {
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
+  settingsSection: {
+    padding: 20,
   },
-  addPetButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
-  menuItem: {
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  menuItemText: {
+  settingText: {
+    marginLeft: 15,
     flex: 1,
     fontSize: 16,
     color: '#333',
-    marginLeft: 15,
   },
-  versionText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 10,
+  settingChevron: {
+    marginLeft: 'auto',
   },
 });
 
