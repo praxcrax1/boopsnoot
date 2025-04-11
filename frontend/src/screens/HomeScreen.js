@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,36 +16,54 @@ import { petService, matchService } from '../api/api';
 
 const HomeScreen = ({ navigation, route }) => {
   const { user } = useContext(AuthContext);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [pets, setPets] = useState([]);
   const [matches, setMatches] = useState([]);
   const [selectedPetId, setSelectedPetId] = useState(null);
+  
+  // Animation value for the matches section
+  const matchesOpacity = new Animated.Value(1);
 
-  const fetchUserData = async () => {
-    setLoading(true);
+  const fetchUserData = useCallback(async () => {
+    setInitialLoading(true);
     try {
       // Fetch user's pets
       const petsResponse = await petService.getUserPets();
-      setPets(petsResponse.pets || []);
+      const petsList = petsResponse.pets || [];
+      setPets(petsList);
 
       // Set the first pet as the selected pet if available
-      if (petsResponse.pets && petsResponse.pets.length > 0) {
-        setSelectedPetId(petsResponse.pets[0]._id);
+      if (petsList.length > 0) {
+        setSelectedPetId(petsList[0]._id);
         
         // Fetch matches for the selected pet
-        const matchesResponse = await matchService.getUserMatches(petsResponse.pets[0]._id);
+        const matchesResponse = await matchService.getUserMatches(petsList[0]._id);
         setMatches(matchesResponse.matches || []);
+        
+        // Preload matches for other pets in the background to make switching smoother
+        if (petsList.length > 1) {
+          const otherPetIds = petsList
+            .slice(1)
+            .map(pet => pet._id);
+          
+          // Run preloading in the background without awaiting it
+          setTimeout(() => {
+            matchService.preloadMatchesForPets(otherPetIds)
+              .catch(err => console.error('Error preloading pet matches:', err));
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUserData();
-  }, []);
+  }, [fetchUserData]);
 
   // Listen for route.params changes to refresh data
   useEffect(() => {
@@ -54,25 +73,53 @@ const HomeScreen = ({ navigation, route }) => {
       // Refresh data
       fetchUserData();
     }
-  }, [route.params]);
+  }, [route.params, fetchUserData]);
 
-  // Function to handle pet selection change
-  const handlePetChange = async (petId) => {
+  // Function to handle pet selection change with smooth transitions
+  const handlePetChange = useCallback(async (petId) => {
     if (petId === selectedPetId) return;
     
     setSelectedPetId(petId);
-    setLoading(true);
+    setMatchesLoading(true);
+    
+    // Fade out the matches section
+    Animated.timing(matchesOpacity, {
+      toValue: 0.3,
+      duration: 200,
+      useNativeDriver: true
+    }).start();
+    
     try {
       const matchesResponse = await matchService.getUserMatches(petId);
+      
+      // Fade in the new matches
+      Animated.timing(matchesOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true
+      }).start();
+      
       setMatches(matchesResponse.matches || []);
     } catch (error) {
       console.error('Error fetching matches for pet:', error);
+      
+      // Fade back in even if there's an error
+      Animated.timing(matchesOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true
+      }).start();
     } finally {
-      setLoading(false);
+      setMatchesLoading(false);
     }
-  };
+  }, [selectedPetId]);
 
-  if (loading) {
+  // Memoize the selected pet to avoid unnecessary calculations
+  const selectedPet = useMemo(() => {
+    return pets.find(pet => pet._id === selectedPetId) || (pets.length > 0 ? pets[0] : null);
+  }, [pets, selectedPetId]);
+
+  if (initialLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FF6B6B" />
@@ -86,9 +133,9 @@ const HomeScreen = ({ navigation, route }) => {
         <Text style={styles.welcomeText}>
           Welcome, {user?.name || 'Pet Lover'}!
         </Text>
-        {pets.length > 0 && (
+        {selectedPet && (
           <Text style={styles.petWelcome}>
-            & {pets.find(pet => pet._id === selectedPetId)?.name || pets[0].name}
+            & {selectedPet.name}
           </Text>
         )}
       </View>
@@ -189,37 +236,47 @@ const HomeScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             )}
           </View>
-          {matches.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {matches.map((match) => (
+          
+          {/* Animated matches container */}
+          <Animated.View style={{ opacity: matchesOpacity }}>
+            {matchesLoading && (
+              <View style={styles.matchesLoadingContainer}>
+                <ActivityIndicator size="small" color="#FF6B6B" />
+              </View>
+            )}
+            
+            {!matchesLoading && matches.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {matches.map((match) => (
+                  <TouchableOpacity
+                    key={match.matchId}
+                    style={styles.matchCard}
+                    onPress={() => navigation.navigate('Chat', { chatId: match.chatId })}
+                  >
+                    <Image
+                      source={
+                        match.pet.photos && match.pet.photos.length
+                          ? { uri: match.pet.photos[0] }
+                          : require('../assets/default-pet.png')
+                      }
+                      style={styles.matchImage}
+                    />
+                    <Text style={styles.matchName}>{match.pet.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : !matchesLoading && (
+              <View style={styles.emptyStateContainer}>
+                <Text style={styles.emptyStateText}>No matches yet</Text>
                 <TouchableOpacity
-                  key={match.matchId}
-                  style={styles.matchCard}
-                  onPress={() => navigation.navigate('Chat', { chatId: match.chatId })}
+                  style={styles.emptyStateButton}
+                  onPress={() => navigation.navigate('Finder')}
                 >
-                  <Image
-                    source={
-                      match.pet.photos && match.pet.photos.length
-                        ? { uri: match.pet.photos[0] }
-                        : require('../assets/default-pet.png')
-                    }
-                    style={styles.matchImage}
-                  />
-                  <Text style={styles.matchName}>{match.pet.name}</Text>
+                  <Text style={styles.emptyStateButtonText}>Find Matches Now</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateText}>No matches yet</Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => navigation.navigate('Finder')}
-              >
-                <Text style={styles.emptyStateButtonText}>Find Matches Now</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+              </View>
+            )}
+          </Animated.View>
         </View>
 
         {/* App Stats */}
@@ -246,6 +303,11 @@ const HomeScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+  matchesLoadingContainer: {
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
