@@ -267,7 +267,6 @@ const FinderScreen = ({ navigation }) => {
                   key={pet._id}
                   style={[
                     styles.petSelectItem,
-                    selectedPetId === pet._id && styles.selectedPetItem,
                   ]}
                   onPress={() => {
                     setSelectedPetId(pet._id);
@@ -657,11 +656,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  selectedPetItem: {
-    backgroundColor: '#F8F8F8',
   },
   petSelectorImage: {
     width: 40,
