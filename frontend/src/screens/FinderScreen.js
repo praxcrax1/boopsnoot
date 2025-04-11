@@ -62,19 +62,28 @@ const FinderScreen = ({ navigation }) => {
   
   const nextCardScale = position.x.interpolate({
     inputRange: [-width / 2, 0, width / 2],
-    outputRange: [1, 0.9, 1],
+    outputRange: [1, 0.5, 1],
     extrapolate: 'clamp',
   });
 
-  // Pan responder for swipe gestures
+  // Improved Pan responder for swipe gestures
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => swipingEnabled,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => swipingEnabled,
+      onPanResponderGrant: () => {
+        position.setOffset({
+          x: position.x._value,
+          y: position.y._value
+        });
+        position.setValue({ x: 0, y: 0 });
+      },
       onPanResponderMove: (_, gesture) => {
         if (!swipingEnabled) return;
         
         position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 }); // Reduce vertical movement
         
+        // Update swipe direction indicator
         if (gesture.dx > 0) {
           swipeDirection.setValue(gesture.dx / SWIPE_THRESHOLD > 1 ? 1 : gesture.dx / SWIPE_THRESHOLD);
         } else {
@@ -89,6 +98,8 @@ const FinderScreen = ({ navigation }) => {
       onPanResponderRelease: (_, gesture) => {
         if (!swipingEnabled) return;
         
+        position.flattenOffset();
+        
         if (gesture.dx > SWIPE_THRESHOLD) {
           swipeRight();
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
@@ -96,6 +107,9 @@ const FinderScreen = ({ navigation }) => {
         } else {
           resetPosition();
         }
+      },
+      onPanResponderTerminate: () => {
+        resetPosition();
       },
     })
   ).current;
@@ -236,7 +250,7 @@ const FinderScreen = ({ navigation }) => {
     
     Animated.timing(position, {
       toValue: { x: width + 100, y: 0 },
-      duration: 400,
+      duration: 300,
       useNativeDriver: false,
     }).start(() => {
       handleLike();
@@ -252,7 +266,7 @@ const FinderScreen = ({ navigation }) => {
     
     Animated.timing(position, {
       toValue: { x: -width - 100, y: 0 },
-      duration: 400,
+      duration: 300,
       useNativeDriver: false,
     }).start(() => {
       handlePass();

@@ -183,6 +183,29 @@ const PetCard = ({
         </View>
         
         <Text style={styles.petBreed}>{pet.breed}</Text>
+        
+        <View style={styles.detailsRow}>
+          <DetailBadge label="Age" value={pet.age} />
+          <DetailBadge label="Size" value={pet.size} />
+          <DetailBadge 
+            label="Vaccinated" 
+            value={pet.vaccinated === 'yes' ? 'Yes' : 'No'} 
+          />
+        </View>
+        
+        {pet.temperament && pet.temperament.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {pet.temperament.slice(0, 3).map((tag, index) => (
+              <View key={index} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        <Text style={styles.petDescription} numberOfLines={2}>
+          {pet.description}
+        </Text>
       </View>
     </Animated.View>
   );
@@ -202,7 +225,9 @@ const styles = StyleSheet.create({
     elevation: 5,
     overflow: 'hidden',
     marginLeft: -CARD_WIDTH / 2,
-    marginTop: -CARD_HEIGHT / 2 + 20
+    marginTop: -CARD_HEIGHT / 2 + 20,
+    top: '50%',
+    left: '50%',
   },
   cardImage: {
     width: '100%',
