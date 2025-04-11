@@ -55,7 +55,8 @@ const PetCard = ({
                 { scale },
                 ...position.getTranslateTransform(),
               ],
-              zIndex: 1,
+              zIndex: 10, // Ensure active card is on top
+              opacity: 1, // Make sure active card is fully opaque
             },
             cardStyle
           ]}
@@ -150,6 +151,7 @@ const PetCard = ({
               elevation: 4,
             },
           }),
+          zIndex: 5, // Lower z-index for next card
         },
         nextCardStyle,
       ]}

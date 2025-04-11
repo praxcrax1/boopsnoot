@@ -396,14 +396,14 @@ const FinderScreen = ({ navigation }) => {
 
         if (i === currentIndex) {
           return (
-            <Animated.View key={pet._id} style={{ opacity: cardOpacity }}>
+            <Animated.View key={pet._id} style={{ zIndex: 10 }}>
               <PetCard
                 pet={pet}
                 position={position}
                 swipeDirection={swipeDirection}
                 panHandlers={panResponder.panHandlers}
                 isActive={true}
-                cardStyle={{ zIndex: potentialMatches.length - i }}
+                cardStyle={{ zIndex: 10 }}
                 onCardPress={() => navigation.navigate('PetProfileScreen', { petId: pet._id })}
               />
             </Animated.View>
@@ -419,7 +419,7 @@ const FinderScreen = ({ navigation }) => {
               nextCardStyle={{
                 opacity: nextCardOpacity,
                 transform: [{ scale: nextCardScale }],
-                zIndex: potentialMatches.length - i,
+                zIndex: 1,
               }}
             />
           );
