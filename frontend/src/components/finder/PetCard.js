@@ -206,6 +206,11 @@ const PetCard = ({
         <Text style={styles.petDescription} numberOfLines={2}>
           {pet.description}
         </Text>
+        
+        {/* Adding the action hint to maintain consistent layout, but with opacity 0 */}
+        <View style={[styles.actionHint, { opacity: 0 }]}>
+          <Text style={styles.actionHintText}>Swipe right to like • Swipe left to pass</Text>
+        </View>
       </View>
     </Animated.View>
   );
