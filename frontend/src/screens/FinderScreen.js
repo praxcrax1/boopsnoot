@@ -665,7 +665,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 15,
   },
   petSelectorImage: {
     width: 40,
