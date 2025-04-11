@@ -317,15 +317,18 @@ const FinderScreen = ({ navigation }) => {
           >
             {selectedPet && (
               <View style={styles.selectedPetPreview}>
-                <Image
-                  source={
-                    selectedPet.photos && selectedPet.photos.length > 0
-                      ? { uri: selectedPet.photos[0] }
-                      : require('../assets/default-pet.png')
-                  }
-                  style={styles.selectedPetImage}
-                />
-                <Text style={styles.selectedPetName}>{selectedPet.name}</Text>
+                <View style={styles.selectedPetPreviewContent}>
+                  <Image
+                    source={
+                      selectedPet.photos && selectedPet.photos.length > 0
+                        ? { uri: selectedPet.photos[0] }
+                        : require('../assets/default-pet.png')
+                    }
+                    style={styles.selectedPetImage}
+                  />
+                  <Text style={styles.selectedPetName}>{selectedPet.name}</Text>
+                  <Ionicons name="chevron-down" size={14} color="#666" />
+                </View>
               </View>
             )}
           </TouchableOpacity>
@@ -460,7 +463,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
     borderRadius: 20,
     paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
+  },
+  selectedPetPreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 5,
   },
   selectedPetImage: {
     width: 24,
@@ -621,6 +630,7 @@ const styles = StyleSheet.create({
   },
   filterContent: {
     maxHeight: '90%',
+    paddingBottom: 20,
   },
   filterLabel: {
     fontSize: 16,

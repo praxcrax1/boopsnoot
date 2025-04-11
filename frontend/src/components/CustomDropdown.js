@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,35 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
   
   // Find the selected option's label
   const selectedOption = options.find(option => option.value === selectedValue);
+  
+  useEffect(() => {
+    if (modalVisible) {
+      // Slide up animation when modal opens
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Reset animation value when modal closes
+      slideAnim.setValue(0);
+    }
+  }, [modalVisible]);
+  
+  const modalTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  });
   
   return (
     <View>
@@ -28,13 +49,18 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
       </TouchableOpacity>
       
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              { transform: [{ translateY: modalTranslateY }] }
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalHeaderText}>{label}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -67,7 +93,7 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
                 </TouchableOpacity>
               )}
             />
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -98,6 +124,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    paddingBottom: 40,
     maxHeight: '70%',
   },
   modalHeader: {
@@ -114,8 +141,8 @@ const styles = StyleSheet.create({
   optionItem: {
     borderWidth: 1,
     borderColor: '#DDD',
-    borderRadius: 20,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingVertical: 12,
     paddingHorizontal: 15,
     margin: 5,
   },
