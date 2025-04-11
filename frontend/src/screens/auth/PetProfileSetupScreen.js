@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,13 @@ import * as ImagePicker from 'react-native-image-picker';
 import { petService } from '../../api/api';
 import { AuthContext } from '../../contexts/AuthContext';
 import { InputField, Button, CustomDropdown } from '../../components';
+import { validateName, validateBreed, validateAge, validatePhotos } from '../../utils/validation';
+import { 
+  petTypeOptions, 
+  genderOptions, 
+  sizeOptions, 
+  TEMPERAMENTS
+} from '../../constants/petConstants';
 
 const PetProfileSetupScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
@@ -31,28 +38,59 @@ const PetProfileSetupScreen = ({ navigation }) => {
     preferredPlaymates: [],
   });
 
-  // Pre-defined options for dropdowns
-  const typeOptions = [
-    { label: 'Dog', value: 'dog' },
-    { label: 'Cat', value: 'cat' },
-  ];
+  // Form validation state
+  const [touched, setTouched] = useState({
+    name: false,
+    breed: false,
+    age: false,
+    photos: false,
+  });
   
-  const genderOptions = [
-    { label: 'Male', value: 'male' },
-    { label: 'Female', value: 'female' },
-  ];
-  
-  const sizeOptions = [
-    { label: 'Small', value: 'small' },
-    { label: 'Medium', value: 'medium' },
-    { label: 'Large', value: 'large' },
-  ];
+  const [errors, setErrors] = useState({
+    name: null,
+    breed: null,
+    age: null,
+    photos: null,
+  });
+
+  // Validate form fields on change
+  useEffect(() => {
+    validateField('name', petData.name);
+    validateField('breed', petData.breed);
+    validateField('age', petData.age);
+    validateField('photos', petData.photos);
+  }, [petData]);
+
+  const validateField = (fieldName, value) => {
+    let error = null;
+
+    switch (fieldName) {
+      case 'name':
+        error = validateName(value);
+        break;
+      case 'breed':
+        error = validateBreed(value);
+        break;
+      case 'age':
+        error = validateAge(value);
+        break;
+      default:
+        break;
+    }
+
+    setErrors(prev => ({ ...prev, [fieldName]: error }));
+    return error;
+  };
 
   const handleInputChange = (field, value) => {
     setPetData({
       ...petData,
       [field]: value,
     });
+  };
+
+  const handleBlur = (fieldName) => {
+    setTouched({ ...touched, [fieldName]: true });
   };
 
   const toggleArrayItem = (field, item) => {
@@ -84,6 +122,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
         // In a real app, you would upload to a server and store the URL
         const newPhotos = [...petData.photos, result.assets[0].uri];
         setPetData({ ...petData, photos: newPhotos });
+        setTouched({ ...touched, photos: true });
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');
@@ -94,17 +133,32 @@ const PetProfileSetupScreen = ({ navigation }) => {
     const newPhotos = [...petData.photos];
     newPhotos.splice(index, 1);
     setPetData({ ...petData, photos: newPhotos });
+    setTouched({ ...touched, photos: true });
+  };
+
+  const validateForm = () => {
+    // Mark all fields as touched to show errors
+    const allTouched = {
+      name: true,
+      breed: true,
+      age: true,
+      photos: true,
+    };
+    setTouched(allTouched);
+
+    // Check if there are any errors
+    const nameError = validateField('name', petData.name);
+    const breedError = validateField('breed', petData.breed);
+    const ageError = validateField('age', petData.age);
+    const photosError = validateField('photos', petData.photos);
+
+    return !nameError && !breedError && !ageError && !photosError;
   };
 
   const handleSubmit = async () => {
-    // Basic validation
-    if (!petData.name || !petData.breed || !petData.age) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    if (petData.photos.length === 0) {
-      Alert.alert('Error', 'Please add at least one photo of your pet');
+    // Validate all fields
+    if (!validateForm()) {
+      // Scroll to the first error field would be added here
       return;
     }
 
@@ -148,6 +202,9 @@ const PetProfileSetupScreen = ({ navigation }) => {
             placeholder="e.g., Buddy"
             value={petData.name}
             onChangeText={(value) => handleInputChange('name', value)}
+            error={errors.name}
+            touched={touched.name}
+            onBlur={() => handleBlur('name')}
           />
 
           <InputField
@@ -156,12 +213,14 @@ const PetProfileSetupScreen = ({ navigation }) => {
             placeholder="e.g., Golden Retriever"
             value={petData.breed}
             onChangeText={(value) => handleInputChange('breed', value)}
+            error={errors.breed}
+            touched={touched.breed}
+            onBlur={() => handleBlur('breed')}
           />
 
-          <Text style={styles.label}>Type</Text>
           <CustomDropdown
-            label="Select Type"
-            options={typeOptions}
+            label="Type"
+            options={petTypeOptions}
             selectedValue={petData.type}
             onValueChange={(value) => handleInputChange('type', value)}
           />
@@ -173,19 +232,20 @@ const PetProfileSetupScreen = ({ navigation }) => {
             value={petData.age}
             onChangeText={(value) => handleInputChange('age', value)}
             keyboardType="default"
+            error={errors.age}
+            touched={touched.age}
+            onBlur={() => handleBlur('age')}
           />
 
-          <Text style={styles.label}>Gender</Text>
           <CustomDropdown
-            label="Select Gender"
+            label="Gender"
             options={genderOptions}
             selectedValue={petData.gender}
             onValueChange={(value) => handleInputChange('gender', value)}
           />
 
-          <Text style={styles.label}>Size</Text>
           <CustomDropdown
-            label="Select Size"
+            label="Size"
             options={sizeOptions}
             selectedValue={petData.size}
             onValueChange={(value) => handleInputChange('size', value)}
@@ -193,7 +253,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
 
           <Text style={styles.label}>Temperament (Select all that apply)</Text>
           <View style={styles.optionsContainer}>
-            {['Friendly', 'Shy', 'Energetic', 'Calm', 'Playful'].map((item) => (
+            {TEMPERAMENTS.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
@@ -225,24 +285,30 @@ const PetProfileSetupScreen = ({ navigation }) => {
             style={styles.textArea}
           />
 
-          <Text style={styles.label}>Pet Photos</Text>
-          <TouchableOpacity style={styles.photoUploadButton} onPress={pickImage}>
-            <Ionicons name="add-circle-outline" size={20} color="#666" />
-            <Text style={styles.photoUploadButtonText}>Add Photo</Text>
-          </TouchableOpacity>
+          <View>
+            <Text style={styles.label}>Pet Photos <Text style={styles.requiredMark}>*</Text></Text>
+            <TouchableOpacity style={styles.photoUploadButton} onPress={pickImage}>
+              <Ionicons name="add-circle-outline" size={20} color="#666" />
+              <Text style={styles.photoUploadButtonText}>Add Photo</Text>
+            </TouchableOpacity>
 
-          <View style={styles.photoContainer}>
-            {petData.photos?.map((photo, index) => (
-              <View key={index} style={styles.photoItem}>
-                <Image source={{ uri: photo }} style={styles.photo} />
-                <TouchableOpacity
-                  style={styles.removePhotoButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Text style={styles.removePhotoButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+            {touched.photos && errors.photos && (
+              <Text style={styles.photoError}>{errors.photos}</Text>
+            )}
+
+            <View style={styles.photoContainer}>
+              {petData.photos?.map((photo, index) => (
+                <View key={index} style={styles.photoItem}>
+                  <Image source={{ uri: photo }} style={styles.photo} />
+                  <TouchableOpacity
+                    style={styles.removePhotoButton}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Text style={styles.removePhotoButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
 
           <Button
@@ -252,13 +318,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
             loading={isSubmitting}
           />
 
-          <Button
-            title="Skip for Now"
-            onPress={() => navigation.navigate('MainTabs')}
-            type="secondary"
-            style={styles.skipButton}
-            textStyle={styles.skipButtonText}
-          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -376,6 +435,16 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontWeight: '500',
+  },
+  requiredMark: {
+    color: '#FF6B6B',
+  },
+  photoError: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 10,
+    marginLeft: 5,
   },
 });
 

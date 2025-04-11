@@ -388,6 +388,52 @@ export const petService = {
       throw handleApiError(error);
     }
   },
+  
+  async uploadPetImage(imageUri) {
+    try {
+      // Create form data for image upload
+      const formData = new FormData();
+      
+      // Get the file name from the URI
+      const fileName = imageUri.split('/').pop();
+      
+      // Get the file type based on extension
+      const fileType = fileName.split('.').pop();
+      const mimeType = fileType === 'jpg' || fileType === 'jpeg' ? 'image/jpeg' : 
+                       fileType === 'png' ? 'image/png' : 'image/jpg';
+      
+      // Append the image to form data
+      formData.append('image', {
+        uri: imageUri,
+        name: fileName,
+        type: mimeType
+      });
+      
+      // Create a special instance for multipart/form-data
+      const response = await axios.post(`${API_URL}/pets/upload-image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${await AsyncStorage.getItem('token')}`
+        }
+      });
+      
+      return response.data.imageUrl; // Return the uploaded image URL from server
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw handleApiError(error);
+    }
+  },
+  
+  async uploadMultiplePetImages(imageUris) {
+    try {
+      const uploadPromises = imageUris.map(uri => this.uploadPetImage(uri));
+      const imageUrls = await Promise.all(uploadPromises);
+      return imageUrls;
+    } catch (error) {
+      console.error('Multiple image upload error:', error);
+      throw handleApiError(error);
+    }
+  }
 };
 
 // Match service

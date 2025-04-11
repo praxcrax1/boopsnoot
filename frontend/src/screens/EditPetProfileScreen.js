@@ -16,6 +16,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'react-native-image-picker';
 import { petService } from '../api/api';
 import { InputField, Button, CustomDropdown } from '../components';
+import { validateName, validateBreed, validateAge, validatePhotos } from '../utils/validation';
+import { 
+  petTypeOptions, 
+  genderOptions, 
+  sizeOptions, 
+  activityOptions, 
+  vaccinatedOptions,
+  TEMPERAMENTS,
+  DOG_PLAYMATE_PREFERENCES
+} from '../constants/petConstants';
 
 const EditPetProfileScreen = ({ route, navigation }) => {
   const { petId } = route.params;
@@ -36,33 +46,30 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     preferredPlaymates: [],
   });
 
-  // Pre-defined options for dropdowns
-  const typeOptions = [
-    { label: 'Dog', value: 'dog' },
-    { label: 'Cat', value: 'cat' },
-  ];
+  // Validation state
+  const [touched, setTouched] = useState({
+    name: false,
+    breed: false,
+    age: false,
+    photos: false,
+  });
   
-  const genderOptions = [
-    { label: 'Male', value: 'male' },
-    { label: 'Female', value: 'female' },
-  ];
-  
-  const sizeOptions = [
-    { label: 'Small', value: 'small' },
-    { label: 'Medium', value: 'medium' },
-    { label: 'Large', value: 'large' },
-  ];
-  
-  const vaccinatedOptions = [
-    { label: 'Yes', value: 'yes' },
-    { label: 'No', value: 'no' },
-  ];
-  
-  const activityOptions = [
-    { label: 'Low', value: 'low' },
-    { label: 'Moderate', value: 'moderate' },
-    { label: 'High', value: 'high' },
-  ];
+  const [errors, setErrors] = useState({
+    name: null,
+    breed: null,
+    age: null,
+    photos: null,
+  });
+
+  // Validate fields when pet data changes
+  useEffect(() => {
+    if (!loading) {
+      validateField('name', petData.name);
+      validateField('breed', petData.breed);
+      validateField('age', petData.age);
+      validateField('photos', petData.photos);
+    }
+  }, [petData, loading]);
 
   useEffect(() => {
     const fetchPetData = async () => {
@@ -105,7 +112,10 @@ const EditPetProfileScreen = ({ route, navigation }) => {
           onPress={handleSubmit}
           disabled={submitting}
         >
-          <Text style={styles.saveButtonText}>
+          <Text style={[
+            styles.saveButtonText,
+            submitting && styles.disabledButtonText
+          ]}>
             {submitting ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
@@ -113,11 +123,39 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     });
   }, [petId, navigation, submitting]);
 
+  const validateField = (fieldName, value) => {
+    let error = null;
+
+    switch (fieldName) {
+      case 'name':
+        error = validateName(value);
+        break;
+      case 'breed':
+        error = validateBreed(value);
+        break;
+      case 'age':
+        error = validateAge(value);
+        break;
+      case 'photos':
+        error = validatePhotos(value);
+        break;
+      default:
+        break;
+    }
+
+    setErrors(prev => ({ ...prev, [fieldName]: error }));
+    return error;
+  };
+
   const handleInputChange = (field, value) => {
     setPetData({
       ...petData,
       [field]: value,
     });
+  };
+
+  const handleBlur = (fieldName) => {
+    setTouched({ ...touched, [fieldName]: true });
   };
 
   const toggleArrayItem = (field, item) => {
@@ -149,6 +187,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         // In a real app, you would upload to a server and store the URL
         const newPhotos = [...petData.photos, result.assets[0].uri];
         setPetData({ ...petData, photos: newPhotos });
+        setTouched({ ...touched, photos: true });
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');
@@ -159,6 +198,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     const newPhotos = [...petData.photos];
     newPhotos.splice(index, 1);
     setPetData({ ...petData, photos: newPhotos });
+    setTouched({ ...touched, photos: true });
   };
 
   const handleDeletePet = () => {
@@ -189,10 +229,30 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     );
   };
 
+  const validateForm = () => {
+    // Mark all fields as touched to show errors
+    const allTouched = {
+      name: true,
+      breed: true,
+      age: true,
+      photos: true,
+    };
+    setTouched(allTouched);
+
+    // Check if there are any errors
+    const nameError = validateField('name', petData.name);
+    const breedError = validateField('breed', petData.breed);
+    const ageError = validateField('age', petData.age);
+    const photosError = validateField('photos', petData.photos);
+
+    return !nameError && !breedError && !ageError && !photosError;
+  };
+
   const handleSubmit = async () => {
-    // Basic validation
-    if (!petData.name || !petData.breed || !petData.age) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Validate the form
+    if (!validateForm()) {
+      // If validation fails, show a message and scroll to the first error
+      Alert.alert('Validation Error', 'Please correct the errors in the form.');
       return;
     }
 
@@ -241,6 +301,9 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             placeholder="e.g., Buddy"
             value={petData.name}
             onChangeText={(value) => handleInputChange('name', value)}
+            error={errors.name}
+            touched={touched.name}
+            onBlur={() => handleBlur('name')}
           />
 
           <InputField
@@ -249,12 +312,14 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             placeholder="e.g., Golden Retriever"
             value={petData.breed}
             onChangeText={(value) => handleInputChange('breed', value)}
+            error={errors.breed}
+            touched={touched.breed}
+            onBlur={() => handleBlur('breed')}
           />
 
-          <Text style={styles.label}>Type</Text>
           <CustomDropdown
-            label="Select Type"
-            options={typeOptions}
+            label="Type"
+            options={petTypeOptions}
             selectedValue={petData.type}
             onValueChange={(value) => handleInputChange('type', value)}
           />
@@ -266,35 +331,34 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             value={petData.age}
             onChangeText={(value) => handleInputChange('age', value)}
             keyboardType="default"
+            error={errors.age}
+            touched={touched.age}
+            onBlur={() => handleBlur('age')}
           />
 
-          <Text style={styles.label}>Gender</Text>
           <CustomDropdown
-            label="Select Gender"
+            label="Gender"
             options={genderOptions}
             selectedValue={petData.gender}
             onValueChange={(value) => handleInputChange('gender', value)}
           />
 
-          <Text style={styles.label}>Size</Text>
           <CustomDropdown
-            label="Select Size"
+            label="Size"
             options={sizeOptions}
             selectedValue={petData.size}
             onValueChange={(value) => handleInputChange('size', value)}
           />
 
-          <Text style={styles.label}>Vaccinated</Text>
           <CustomDropdown
-            label="Vaccination Status"
+            label="Vaccinated"
             options={vaccinatedOptions}
             selectedValue={petData.vaccinated}
             onValueChange={(value) => handleInputChange('vaccinated', value)}
           />
 
-          <Text style={styles.label}>Activity Level</Text>
           <CustomDropdown
-            label="Select Activity Level"
+            label="Activity Level"
             options={activityOptions}
             selectedValue={petData.activityLevel}
             onValueChange={(value) => handleInputChange('activityLevel', value)}
@@ -302,7 +366,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
           <Text style={styles.label}>Temperament (Select all that apply)</Text>
           <View style={styles.optionsContainer}>
-            {['Friendly', 'Shy', 'Energetic', 'Calm', 'Playful'].map((item) => (
+            {TEMPERAMENTS.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
@@ -325,7 +389,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
           <Text style={styles.label}>Preferred Playmates (Select all that apply)</Text>
           <View style={styles.optionsContainer}>
-            {['Small Dogs', 'Medium Dogs', 'Large Dogs', 'All Dogs'].map((item) => (
+            {DOG_PLAYMATE_PREFERENCES.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
@@ -357,24 +421,30 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             style={styles.textArea}
           />
 
-          <Text style={styles.label}>Pet Photos</Text>
-          <TouchableOpacity style={styles.photoUploadButton} onPress={pickImage}>
-            <Ionicons name="add-circle-outline" size={20} color="#666" />
-            <Text style={styles.photoUploadButtonText}>Add Photo</Text>
-          </TouchableOpacity>
+          <View style={styles.photosSection}>
+            <Text style={styles.label}>Pet Photos <Text style={styles.requiredMark}>*</Text></Text>
+            <TouchableOpacity style={styles.photoUploadButton} onPress={pickImage}>
+              <Ionicons name="add-circle-outline" size={20} color="#666" />
+              <Text style={styles.photoUploadButtonText}>Add Photo</Text>
+            </TouchableOpacity>
+            
+            {touched.photos && errors.photos && (
+              <Text style={styles.photoError}>{errors.photos}</Text>
+            )}
 
-          <View style={styles.photoContainer}>
-            {petData.photos?.map((photo, index) => (
-              <View key={index} style={styles.photoItem}>
-                <Image source={{ uri: photo }} style={styles.photo} />
-                <TouchableOpacity
-                  style={styles.removePhotoButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Text style={styles.removePhotoButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+            <View style={styles.photoContainer}>
+              {petData.photos?.map((photo, index) => (
+                <View key={index} style={styles.photoItem}>
+                  <Image source={{ uri: photo }} style={styles.photo} />
+                  <TouchableOpacity
+                    style={styles.removePhotoButton}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Text style={styles.removePhotoButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
 
           <Button
@@ -409,6 +479,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  disabledButtonText: {
+    opacity: 0.6,
+  },
   scrollContent: {
     padding: 20,
   },
@@ -420,6 +493,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
     marginBottom: 8,
+  },
+  requiredMark: {
+    color: '#FF6B6B',
   },
   textArea: {
     height: 100,
@@ -447,6 +523,9 @@ const styles = StyleSheet.create({
   },
   selectedOptionText: {
     color: '#FFF',
+  },
+  photosSection: {
+    marginBottom: 20,
   },
   photoUploadButton: {
     flexDirection: 'row',
@@ -497,6 +576,13 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     marginTop: 10,
+  },
+  photoError: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 10,
+    marginLeft: 5,
   },
 });
 

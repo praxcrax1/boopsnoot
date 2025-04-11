@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,30 +11,109 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../contexts/AuthContext';
 import { InputField, Button } from '../../components';
+import { validateName, validateEmail, validatePassword, validatePasswordMatch } from '../../utils/validation';
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
+  const [errors, setErrors] = useState({
+    name: null,
+    email: null,
+    password: null,
+    confirmPassword: null,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register } = useContext(AuthContext);
 
-  const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
+  // Validate form fields whenever formData changes
+  useEffect(() => {
+    validateField('name', formData.name);
+    validateField('email', formData.email);
+    validateField('password', formData.password);
+    validateField('confirmPassword', formData.confirmPassword, formData.password);
+  }, [formData]);
+
+  const validateField = (fieldName, value, compareValue = null) => {
+    let error = null;
+
+    switch (fieldName) {
+      case 'name':
+        error = validateName(value);
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        error = validatePassword(value);
+        break;
+      case 'confirmPassword':
+        error = validatePasswordMatch(compareValue, value);
+        break;
+      default:
+        break;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+    setErrors(prev => ({ ...prev, [fieldName]: error }));
+    return error;
+  };
+
+  const handleChange = (field, value) => {
+    setFormData({
+      ...formData,
+      [field]: value,
+    });
+  };
+
+  const handleBlur = (field) => {
+    setTouched({
+      ...touched,
+      [field]: true,
+    });
+  };
+
+  const validateForm = () => {
+    // Mark all fields as touched to show errors
+    const allTouched = {
+      name: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    };
+    setTouched(allTouched);
+
+    // Validate all fields
+    const nameError = validateField('name', formData.name);
+    const emailError = validateField('email', formData.email);
+    const passwordError = validateField('password', formData.password);
+    const confirmPasswordError = validateField('confirmPassword', formData.confirmPassword, formData.password);
+
+    return !nameError && !emailError && !passwordError && !confirmPasswordError;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const result = await register({ name, email, password });
+      const result = await register({ 
+        name: formData.name, 
+        email: formData.email, 
+        password: formData.password 
+      });
+      
       if (result.success) {
         Alert.alert(
           'Registration Successful',
@@ -70,31 +149,47 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.formContainer}>
             <InputField
               placeholder="Full Name"
-              value={name}
-              onChangeText={setName}
+              value={formData.name}
+              onChangeText={(value) => handleChange('name', value)}
               autoCapitalize="words"
+              error={errors.name}
+              touched={touched.name}
+              onBlur={() => handleBlur('name')}
+              required
             />
             
             <InputField
               placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
+              value={formData.email}
+              onChangeText={(value) => handleChange('email', value)}
               keyboardType="email-address"
               autoCapitalize="none"
+              error={errors.email}
+              touched={touched.email}
+              onBlur={() => handleBlur('email')}
+              required
             />
             
             <InputField
               placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
+              value={formData.password}
+              onChangeText={(value) => handleChange('password', value)}
               secureTextEntry
+              error={errors.password}
+              touched={touched.password}
+              onBlur={() => handleBlur('password')}
+              required
             />
             
             <InputField
               placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              value={formData.confirmPassword}
+              onChangeText={(value) => handleChange('confirmPassword', value)}
               secureTextEntry
+              error={errors.confirmPassword}
+              touched={touched.confirmPassword}
+              onBlur={() => handleBlur('confirmPassword')}
+              required
             />
 
             <Button

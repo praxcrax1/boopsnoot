@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,23 +11,86 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../contexts/AuthContext';
 import { InputField, Button } from '../../components';
+import { validateEmail, validatePassword } from '../../utils/validation';
 
 const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false
+  });
+  const [errors, setErrors] = useState({
+    email: null,
+    password: null
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login } = useContext(AuthContext);
 
+  // Validate form fields when they change
+  useEffect(() => {
+    validateField('email', formData.email);
+    validateField('password', formData.password);
+  }, [formData]);
+
+  const validateField = (fieldName, value) => {
+    let error = null;
+
+    switch (fieldName) {
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        error = validatePassword(value);
+        break;
+      default:
+        break;
+    }
+
+    setErrors(prev => ({ ...prev, [fieldName]: error }));
+    return error;
+  };
+
+  const handleChange = (field, value) => {
+    setFormData({
+      ...formData,
+      [field]: value
+    });
+  };
+
+  const handleBlur = (field) => {
+    setTouched({
+      ...touched,
+      [field]: true
+    });
+  };
+
+  const validateForm = () => {
+    // Mark all fields as touched to show errors
+    const allTouched = {
+      email: true,
+      password: true
+    };
+    setTouched(allTouched);
+
+    // Check if there are any errors
+    const emailError = validateField('email', formData.email);
+    const passwordError = validateField('password', formData.password);
+
+    return !emailError && !passwordError;
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
-    try {;
-      await login(email, password);
+    try {
+      await login(formData.email, formData.password);
       // Success - AuthContext will update user state and navigator will switch to app stack
     } catch (error) {
       Alert.alert('Login Failed', error.message || 'Failed to login. Please try again.');
@@ -60,17 +123,25 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.formContainer}>
           <InputField
             placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
+            value={formData.email}
+            onChangeText={(value) => handleChange('email', value)}
             keyboardType="email-address"
             autoCapitalize="none"
+            error={errors.email}
+            touched={touched.email}
+            onBlur={() => handleBlur('email')}
+            required
           />
           
           <InputField
             placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
+            value={formData.password}
+            onChangeText={(value) => handleChange('password', value)}
             secureTextEntry
+            error={errors.password}
+            touched={touched.password}
+            onBlur={() => handleBlur('password')}
+            required
           />
 
           <Button

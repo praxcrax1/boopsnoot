@@ -10,7 +10,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
+const CustomDropdown = ({ 
+  label, 
+  options, 
+  selectedValue, 
+  onValueChange,
+  required = false,
+  error = null,
+  touched = false,
+  onBlur = () => {},
+}) => {
   const [modalVisible, setModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   
@@ -30,6 +39,11 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
       slideAnim.setValue(0);
     }
   }, [modalVisible]);
+
+  const handleClose = () => {
+    setModalVisible(false);
+    onBlur();
+  };
   
   const modalTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
@@ -37,9 +51,17 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
   });
   
   return (
-    <View>
+    <View style={styles.container}>
+      {label && (
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.requiredMark}>*</Text>}
+        </Text>
+      )}
       <TouchableOpacity 
-        style={styles.dropdownButton}
+        style={[
+          styles.dropdownButton,
+          error && touched && styles.errorDropdown
+        ]}
         onPress={() => setModalVisible(true)}
       >
         <Text style={styles.dropdownButtonText}>
@@ -48,11 +70,15 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
         <Ionicons name="chevron-down" size={18} color="#666" />
       </TouchableOpacity>
       
+      {touched && error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
+      
       <Modal
         animationType="fade"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={handleClose}
       >
         <View style={styles.modalOverlay}>
           <Animated.View 
@@ -63,7 +89,7 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
           >
             <View style={styles.modalHeader}>
               <Text style={styles.modalHeaderText}>{label}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={handleClose}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
@@ -79,7 +105,7 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
-                    setModalVisible(false);
+                    handleClose();
                   }}
                 >
                   <Text
@@ -101,14 +127,31 @@ const CustomDropdown = ({ label, options, selectedValue, onValueChange }) => {
 };
 
 const styles = StyleSheet.create({
+  container: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
+  },
+  requiredMark: {
+    color: '#FF6B6B',
+  },
   dropdownButton: {
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  errorDropdown: {
+    borderColor: '#FF3B30',
+    borderWidth: 1,
   },
   dropdownButtonText: {
     fontSize: 16,
@@ -155,6 +198,12 @@ const styles = StyleSheet.create({
   },
   selectedOptionText: {
     color: '#FFF',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 5,
   },
 });
 
