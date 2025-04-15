@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     View,
     StyleSheet,
@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { matchService, petService } from "../api/api";
 import * as Haptics from "expo-haptics";
+import ChatService from "../services/ChatService";
 
 // Import extracted components
 import Header from "../components/finder/Header";
@@ -348,6 +349,37 @@ const FinderScreen = ({ navigation }) => {
         });
     };
 
+    const navigateToMatchChat = useCallback(
+        async (matchId) => {
+            try {
+                // Show loading indicator for better UX
+                setLoading(true);
+                
+                // Get or create chat for this match
+                const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
+
+                if (chatResponse.success && chatResponse.chat) {
+                    // Navigate to the chat with the returned chat ID
+                    navigation.navigate("Chat", {
+                        chatId: chatResponse.chat._id,
+                    });
+                } else {
+                    console.error("Failed to get or create chat:", chatResponse);
+                    // Fallback to direct navigation with match ID (though this likely won't work)
+                    navigation.navigate("Chat", {
+                        chatId: matchId,
+                    });
+                }
+            } catch (error) {
+                console.error("Error navigating to chat:", error);
+                Alert.alert("Error", "Failed to open chat. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        },
+        [navigation]
+    );
+
     const handleLike = async () => {
         if (currentIndex >= potentialMatches.length) return;
 
@@ -370,10 +402,7 @@ const FinderScreen = ({ navigation }) => {
                 Alert.alert("New Match!", `You matched with ${pet.name}!`, [
                     {
                         text: "Send Message",
-                        onPress: () =>
-                            navigation.navigate("Chat", {
-                                chatId: response.match._id,
-                            }),
+                        onPress: () => navigateToMatchChat(response.match._id),
                     },
                     {
                         text: "Continue Browsing",

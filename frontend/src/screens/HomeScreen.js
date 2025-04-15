@@ -134,6 +134,35 @@ const HomeScreen = ({ navigation, route }) => {
         [selectedPetId]
     );
 
+    // Function to navigate to a chat with a matched pet
+    const navigateToMatchChat = useCallback(async (matchId) => {
+        try {
+            // Show loading indicator for better UX
+            setMatchesLoading(true);
+
+            // Get or create chat for this match
+            const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
+
+            if (chatResponse.success && chatResponse.chat) {
+                // Navigate to the chat with the returned chat ID
+                navigation.navigate("Chat", {
+                    chatId: chatResponse.chat._id,
+                });
+            } else {
+                console.error("Failed to get or create chat:", chatResponse);
+                // Fallback to direct navigation with match ID (though this likely won't work)
+                navigation.navigate("Chat", {
+                    chatId: matchId,
+                });
+            }
+        } catch (error) {
+            console.error("Error navigating to chat:", error);
+            Alert.alert("Error", "Failed to open chat. Please try again.");
+        } finally {
+            setMatchesLoading(false);
+        }
+    }, [navigation]);
+
     // Memoize the selected pet to avoid unnecessary calculations
     const selectedPet = useMemo(() => {
         return (
@@ -296,55 +325,9 @@ const HomeScreen = ({ navigation, route }) => {
                                     <TouchableOpacity
                                         key={match.matchId}
                                         style={styles.matchCard}
-                                        onPress={async () => {
-                                            try {
-                                                // Show loading indicator for better UX
-                                                setMatchesLoading(true);
-
-                                                // Get or create chat for this match
-                                                const chatResponse =
-                                                    await ChatService.getOrCreateChatForMatch(
-                                                        match.matchId
-                                                    );
-
-                                                if (
-                                                    chatResponse.success &&
-                                                    chatResponse.chat
-                                                ) {
-                                                    // Navigate to the chat with the returned chat ID
-                                                    navigation.navigate(
-                                                        "Chat",
-                                                        {
-                                                            chatId: chatResponse
-                                                                .chat._id,
-                                                        }
-                                                    );
-                                                } else {
-                                                    console.error(
-                                                        "Failed to get or create chat:",
-                                                        chatResponse
-                                                    );
-                                                    // Fallback to direct navigation with match ID (though this likely won't work)
-                                                    navigation.navigate(
-                                                        "Chat",
-                                                        {
-                                                            chatId: match.matchId,
-                                                        }
-                                                    );
-                                                }
-                                            } catch (error) {
-                                                console.error(
-                                                    "Error navigating to chat:",
-                                                    error
-                                                );
-                                                Alert.alert(
-                                                    "Error",
-                                                    "Failed to open chat. Please try again."
-                                                );
-                                            } finally {
-                                                setMatchesLoading(false);
-                                            }
-                                        }}>
+                                        onPress={() =>
+                                            navigateToMatchChat(match.matchId)
+                                        }>
                                         <Image
                                             source={
                                                 match.pet.photos &&
