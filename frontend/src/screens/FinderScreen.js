@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
 import {
     View,
     StyleSheet,
@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { matchService, petService } from "../api/api";
 import * as Haptics from "expo-haptics";
 import ChatService from "../services/ChatService";
+import { AuthContext } from "../contexts/AuthContext";
 
 // Import extracted components
 import Header from "../components/finder/Header";
@@ -35,7 +36,7 @@ const FinderScreen = ({ navigation }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [filterVisible, setFilterVisible] = useState(false);
     const [filters, setFilters] = useState({
-        maxDistance: 10, // in miles
+        maxDistance: 25, // Default 25km radius
     });
     const [userPets, setUserPets] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null);
@@ -45,6 +46,7 @@ const FinderScreen = ({ navigation }) => {
     const [hasMorePets, setHasMorePets] = useState(true);
     const [swipingEnabled, setSwipingEnabled] = useState(true);
     const [isSwipingBack, setIsSwipingBack] = useState(false);
+    const { requestAndUpdateLocation } = useContext(AuthContext);
 
     // Animation values
     const position = useRef(new Animated.ValueXY()).current;

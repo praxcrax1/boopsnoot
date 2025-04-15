@@ -9,6 +9,7 @@ class AuthService {
                 password,
             });
             await AsyncStorage.setItem("token", response.data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
             return response.data;
         } catch (error) {
             throw handleApiError(error);
@@ -19,6 +20,7 @@ class AuthService {
         try {
             const response = await apiClient.post("/auth/register", userData);
             await AsyncStorage.setItem("token", response.data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
             return response.data;
         } catch (error) {
             throw handleApiError(error);
@@ -28,6 +30,7 @@ class AuthService {
     async logout() {
         try {
             await AsyncStorage.removeItem("token");
+            await AsyncStorage.removeItem("user");
             return true;
         } catch (error) {
             console.error("Logout error:", error);
@@ -38,6 +41,9 @@ class AuthService {
     async getCurrentUser() {
         try {
             const response = await apiClient.get("/auth/me");
+            if (response.data && response.data.user) {
+                await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+            }
             return response.data;
         } catch (error) {
             throw handleApiError(error);
@@ -45,8 +51,26 @@ class AuthService {
     }
 
     async isAuthenticated() {
-        const token = await AsyncStorage.getItem("token");
-        return !!token;
+        try {
+            const token = await AsyncStorage.getItem("token");
+            return !!token;
+        } catch (error) {
+            console.error("Auth check error:", error);
+            return false;
+        }
+    }
+    
+    async updateUserLocation(locationData) {
+        try {
+            const response = await apiClient.put("/auth/update-location", locationData);
+            if (response.data && response.data.user) {
+                await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+            }
+            return response.data;
+        } catch (error) {
+            console.error("Location update error:", error);
+            throw handleApiError(error);
+        }
     }
 }
 
