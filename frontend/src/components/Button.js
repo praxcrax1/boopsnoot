@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     ActivityIndicator,
+    View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -36,6 +37,8 @@ const Button = ({
         textStyle,
     ];
 
+    const iconColor = type === "secondary" ? "#333" : "#FFF";
+
     const renderIcon = () => {
         if (!icon) return null;
 
@@ -43,7 +46,7 @@ const Button = ({
             <Ionicons
                 name={icon}
                 size={20}
-                color={type === "secondary" ? "#333" : "#FFF"}
+                color={iconColor}
                 style={
                     iconPosition === "left" ? styles.leftIcon : styles.rightIcon
                 }
@@ -57,7 +60,18 @@ const Button = ({
             onPress={onPress}
             disabled={disabled || loading}>
             {loading ? (
-                <ActivityIndicator size="small" color="#FFF" />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator 
+                        size="small" 
+                        color={type === "secondary" ? "#333" : "#FFF"} 
+                    />
+                    {/* Keep title visible during loading state */}
+                    {icon === "logo-google" && (
+                        <Text style={[textStyles, styles.loadingText]}>
+                            {title.includes("Google") ? "Connecting..." : "Loading..."}
+                        </Text>
+                    )}
+                </View>
             ) : (
                 <>
                     {icon && iconPosition === "left" && renderIcon()}
@@ -112,6 +126,14 @@ const styles = StyleSheet.create({
     rightIcon: {
         marginLeft: 8,
     },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginLeft: 8,
+    }
 });
 
 export default Button;

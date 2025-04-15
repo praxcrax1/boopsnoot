@@ -116,15 +116,9 @@ const LoginScreen = ({ navigation }) => {
                 // Use the token to log in via our backend
                 const loginResult = await loginWithGoogle(result.accessToken);
                 // AuthContext will handle the navigation if successful
-            } else {
-                Alert.alert("Authentication Failed", result.error);
             }
         } catch (error) {
             console.error("Google login error:", error);
-            Alert.alert(
-                "Authentication Error",
-                error.message || "Failed to authenticate with Google"
-            );
         } finally {
             setIsGoogleLoading(false);
         }
