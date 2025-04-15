@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { GOOGLE_CLIENT_ID } from '../constants/apiConfig';
+import { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } from '../constants/apiConfig';
 
 // Register for the AuthSession redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -16,9 +16,8 @@ class GoogleAuthService {
         try {
             // Configure OAuth request
             const clientId = GOOGLE_CLIENT_ID;
-            const redirectUri = AuthSession.makeRedirectUri({
-                useProxy: true,
-            });
+            // Use the exact URI that was registered in Google console
+            const redirectUri = GOOGLE_REDIRECT_URI;
             
             const scopes = ['profile', 'email'];
 
