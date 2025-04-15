@@ -171,6 +171,34 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Login with Google
+    const loginWithGoogle = async (accessToken) => {
+        setIsLoading(true);
+        setAuthError(null);
+
+        try {
+            const response = await AuthService.loginWithGoogle(accessToken);
+            setUser(response.user);
+            setIsAuthenticated(true);
+            
+            // Check if we need to request location after Google login
+            if (!response.user.location || 
+                (!response.user.location.coordinates || 
+                 (response.user.location.coordinates[0] === 0 && 
+                  response.user.location.coordinates[1] === 0))) {
+                requestAndUpdateLocation();
+            }
+            
+            return { success: true, user: response.user };
+        } catch (error) {
+            console.error("Google login error:", error);
+            setAuthError(error.message);
+            return { success: false, error: error.message };
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Logout user
     const logout = async () => {
         setIsLoading(true);
@@ -212,6 +240,7 @@ export const AuthProvider = ({ children }) => {
                 register,
                 login,
                 logout,
+                loginWithGoogle,
                 updateUser,
                 clearAuthError,
                 requestAndUpdateLocation,

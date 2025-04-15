@@ -111,15 +111,25 @@ router.post("/login", async (req, res) => {
 // @access  Public
 router.post("/google", async (req, res) => {
     try {
-        const { idToken } = req.body;
+        const { accessToken } = req.body;
 
-        // Verify the Google ID token
-        const ticket = await googleClient.verifyIdToken({
-            idToken,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
+        if (!accessToken) {
+            return res.status(400).json({
+                success: false,
+                message: "Access token is required",
+            });
+        }
 
-        const payload = ticket.getPayload();
+        // Use the access token to get user info from Google
+        const response = await fetch(
+            `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch user data from Google");
+        }
+
+        const payload = await response.json();
         const { sub: googleId, email, name, picture } = payload;
 
         // Check if user exists

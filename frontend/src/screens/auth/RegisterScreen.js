@@ -18,6 +18,7 @@ import {
 } from "../../utils/validation";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
+import GoogleAuthService from "../../services/GoogleAuthService";
 
 const RegisterScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -39,8 +40,9 @@ const RegisterScreen = ({ navigation }) => {
         confirmPassword: null,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-    const { register } = useContext(AuthContext);
+    const { register, loginWithGoogle } = useContext(AuthContext);
 
     // Validate form fields whenever formData changes
     useEffect(() => {
@@ -154,6 +156,44 @@ const RegisterScreen = ({ navigation }) => {
         }
     };
 
+    const handleGoogleSignup = async () => {
+        try {
+            setIsGoogleLoading(true);
+            
+            const result = await GoogleAuthService.signInWithGoogle();
+            
+            if (result.success) {
+                // Use the token to log in via our backend
+                const loginResult = await loginWithGoogle(result.accessToken);
+                
+                if (loginResult.success) {
+                    Alert.alert(
+                        "Registration Successful",
+                        "Let's set up your pet profile!",
+                        [
+                            {
+                                text: "Continue",
+                                onPress: () =>
+                                    navigation.navigate("PetProfileSetup"),
+                            },
+                        ],
+                        { cancelable: false }
+                    );
+                }
+            } else {
+                Alert.alert("Authentication Failed", result.error);
+            }
+        } catch (error) {
+            console.error("Google auth error:", error);
+            Alert.alert(
+                "Authentication Error",
+                error.message || "Failed to authenticate with Google"
+            );
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -231,6 +271,24 @@ const RegisterScreen = ({ navigation }) => {
                             disabled={isSubmitting}
                             loading={isSubmitting}
                         />
+                        
+                        <View style={styles.orContainer}>
+                            <View style={styles.divider} />
+                            <Text style={styles.orText}>OR</Text>
+                            <View style={styles.divider} />
+                        </View>
+                        
+                        <Button
+                            title={isGoogleLoading ? "Connecting to Google..." : "Sign up with Google"}
+                            onPress={handleGoogleSignup}
+                            type="secondary"
+                            style={styles.googleButton}
+                            textStyle={styles.googleButtonText}
+                            disabled={isGoogleLoading}
+                            loading={isGoogleLoading}
+                            icon="logo-google"
+                            iconPosition="left"
+                        />
                     </View>
 
                     <View style={styles.footerContainer}>
@@ -301,6 +359,30 @@ const styles = StyleSheet.create({
         padding: 0,
         marginBottom: 0,
         height: 20,
+    },
+    googleButton: {
+        backgroundColor: "#FFF",
+        borderWidth: 1,
+        borderColor: "#DDD",
+    },
+    googleButtonText: {
+        color: "#333",
+    },
+    orContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 15,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#DDDDDD',
+    },
+    orText: {
+        marginHorizontal: 10,
+        color: '#666666',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

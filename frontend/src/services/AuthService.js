@@ -72,6 +72,19 @@ class AuthService {
             throw handleApiError(error);
         }
     }
+
+    async loginWithGoogle(accessToken) {
+        try {
+            const response = await apiClient.post("/auth/google", {
+                accessToken
+            });
+            await AsyncStorage.setItem("token", response.data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
+    }
 }
 
 export default new AuthService();

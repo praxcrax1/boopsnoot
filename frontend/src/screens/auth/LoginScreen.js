@@ -13,6 +13,8 @@ import { AuthContext } from "../../contexts/AuthContext";
 import { validateEmail, validatePassword } from "../../utils/validation";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
+import GoogleAuthService from "../../services/GoogleAuthService";
+import { AntDesign } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -28,8 +30,9 @@ const LoginScreen = ({ navigation }) => {
         password: null,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-    const { login } = useContext(AuthContext);
+    const { login, loginWithGoogle } = useContext(AuthContext);
 
     // Validate form fields when they change
     useEffect(() => {
@@ -104,8 +107,27 @@ const LoginScreen = ({ navigation }) => {
     };
 
     const handleGoogleLogin = async () => {
-        Alert.alert("Info", "Google login would be implemented here.");
-        // Implementation would require expo-auth-session or react-native-google-signin
+        try {
+            setIsGoogleLoading(true);
+            
+            const result = await GoogleAuthService.signInWithGoogle();
+            
+            if (result.success) {
+                // Use the token to log in via our backend
+                const loginResult = await loginWithGoogle(result.accessToken);
+                // AuthContext will handle the navigation if successful
+            } else {
+                Alert.alert("Authentication Failed", result.error);
+            }
+        } catch (error) {
+            console.error("Google login error:", error);
+            Alert.alert(
+                "Authentication Error",
+                error.message || "Failed to authenticate with Google"
+            );
+        } finally {
+            setIsGoogleLoading(false);
+        }
     };
 
     return (
@@ -155,13 +177,27 @@ const LoginScreen = ({ navigation }) => {
                         disabled={isSubmitting}
                         loading={isSubmitting}
                     />
+                    
+                    <View style={styles.orContainer}>
+                        <View style={styles.divider} />
+                        <Text style={styles.orText}>OR</Text>
+                        <View style={styles.divider} />
+                    </View>
 
                     <Button
-                        title="Continue with Google"
+                        title={
+                            isGoogleLoading
+                                ? "Connecting to Google..."
+                                : "Continue with Google"
+                        }
                         onPress={handleGoogleLogin}
                         type="secondary"
                         style={styles.googleButton}
                         textStyle={styles.googleButtonText}
+                        disabled={isGoogleLoading}
+                        loading={isGoogleLoading}
+                        icon="logo-google"
+                        iconPosition="left"
                     />
                 </View>
 
@@ -221,6 +257,22 @@ const styles = StyleSheet.create({
     },
     googleButtonText: {
         color: "#333",
+    },
+    orContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 15,
+    },
+    divider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#DDDDDD',
+    },
+    orText: {
+        marginHorizontal: 10,
+        color: '#666666',
+        fontSize: 14,
+        fontWeight: '600',
     },
     footerContainer: {
         flexDirection: "row",
