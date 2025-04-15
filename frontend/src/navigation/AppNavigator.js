@@ -19,6 +19,7 @@ import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PetProfileScreen from '../screens/PetProfileScreen';
 import EditPetProfileScreen from '../screens/EditPetProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -83,6 +84,10 @@ const MainStack = () => (
     <Stack.Screen name="PetProfileSetup" 
       component={PetProfileSetupScreen} 
       options={{ headerShown: true, title: 'Add Your Pet' }} 
+    />
+    <Stack.Screen name="Settings" 
+      component={SettingsScreen} 
+      options={{ headerShown: false }} 
     />
   </Stack.Navigator>
 );

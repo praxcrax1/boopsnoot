@@ -16,7 +16,7 @@ import PetService from "../services/PetService";
 import Button from "../components/Button";
 
 const ProfileScreen = ({ navigation }) => {
-    const { user, logout } = useContext(AuthContext);
+    const { user } = useContext(AuthContext);
     const [pets, setPets] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -45,16 +45,8 @@ const ProfileScreen = ({ navigation }) => {
         navigation.navigate("PetProfileSetup");
     };
 
-    const handleLogout = () => {
-        Alert.alert("Logout", "Are you sure you want to logout?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Logout",
-                onPress: () => {
-                    logout();
-                },
-            },
-        ]);
+    const navigateToSettings = () => {
+        navigation.navigate("Settings");
     };
 
     if (!user) {
@@ -83,9 +75,9 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Profile</Text>
-                <TouchableOpacity onPress={handleLogout}>
+                <TouchableOpacity onPress={navigateToSettings}>
                     <Ionicons
-                        name="log-out-outline"
+                        name="settings-outline"
                         size={24}
                         color="#FF6B6B"
                     />
@@ -107,18 +99,6 @@ const ProfileScreen = ({ navigation }) => {
                             <Text style={styles.userEmail}>{user.email}</Text>
                         </View>
                     </View>
-                    <Button
-                        title="Edit Profile"
-                        onPress={() =>
-                            Alert.alert(
-                                "Info",
-                                "Edit profile functionality would be implemented here."
-                            )
-                        }
-                        type="secondary"
-                        icon="create-outline"
-                        style={styles.editProfileButton}
-                    />
                 </View>
 
                 <View style={styles.petSection}>
@@ -183,73 +163,6 @@ const ProfileScreen = ({ navigation }) => {
                             />
                         </View>
                     )}
-                </View>
-
-                <View style={styles.settingsSection}>
-                    <Text style={styles.sectionTitle}>Settings</Text>
-                    <TouchableOpacity
-                        style={styles.settingItem}
-                        onPress={() =>
-                            Alert.alert(
-                                "Info",
-                                "Notifications settings would be implemented here."
-                            )
-                        }>
-                        <Ionicons
-                            name="notifications-outline"
-                            size={24}
-                            color="#666"
-                        />
-                        <Text style={styles.settingText}>Notifications</Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={20}
-                            color="#DDD"
-                            style={styles.settingChevron}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.settingItem}
-                        onPress={() =>
-                            Alert.alert(
-                                "Info",
-                                "Privacy settings would be implemented here."
-                            )
-                        }>
-                        <Ionicons
-                            name="shield-outline"
-                            size={24}
-                            color="#666"
-                        />
-                        <Text style={styles.settingText}>Privacy</Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={20}
-                            color="#DDD"
-                            style={styles.settingChevron}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.settingItem}
-                        onPress={() =>
-                            Alert.alert(
-                                "Info",
-                                "Help center would be implemented here."
-                            )
-                        }>
-                        <Ionicons
-                            name="help-circle-outline"
-                            size={24}
-                            color="#666"
-                        />
-                        <Text style={styles.settingText}>Help & Support</Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={20}
-                            color="#DDD"
-                            style={styles.settingChevron}
-                        />
-                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -329,9 +242,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 3,
     },
-    editProfileButton: {
-        marginTop: 15,
-    },
     petSection: {
         padding: 20,
         borderBottomWidth: 1,
@@ -399,25 +309,6 @@ const styles = StyleSheet.create({
     noPetsText: {
         color: "#666",
         marginVertical: 10,
-    },
-    settingsSection: {
-        padding: 20,
-    },
-    settingItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
-    },
-    settingText: {
-        marginLeft: 15,
-        flex: 1,
-        fontSize: 16,
-        color: "#333",
-    },
-    settingChevron: {
-        marginLeft: "auto",
     },
 });
 
