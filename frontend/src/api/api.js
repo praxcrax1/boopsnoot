@@ -2,12 +2,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import io from 'socket.io-client';
 
-// Base URL for API requests - change this to your actual backend URL
-// For local development, use your computer's local IP address instead of localhost
-// Example: const API_URL = 'http://192.168.1.100:5000/api';
-const API_URL = 'http://192.168.1.33:5000/api';
+const API_URL = 'http://192.168.1.34:5000/api';
 
-// Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
@@ -15,7 +11,6 @@ const apiClient = axios.create({
   },
 });
 
-// Add request interceptor to include auth token in requests
 apiClient.interceptors.request.use(
   async (config) => {
     const token = await AsyncStorage.getItem('token');
