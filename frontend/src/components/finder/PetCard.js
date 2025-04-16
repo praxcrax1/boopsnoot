@@ -15,8 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
 
 const { width, height } = Dimensions.get("window");
-const CARD_WIDTH = width * 0.92;
-const CARD_HEIGHT = height * 0.6;
+// Reduced card height even further to allow more space at bottom
+const CARD_WIDTH = width * 0.94;
+const CARD_HEIGHT = height * 0.55; // Reduced from 60% to 55% of screen height
 
 const PetCard = ({
     pet,
@@ -28,19 +29,15 @@ const PetCard = ({
     nextCardStyle,
     onCardPress,
 }) => {
-    // Format distance for display
     const formatDistance = (distance) => {
         if (!distance && distance !== 0) return "Nearby";
 
-        // Convert to km if needed
         if (typeof distance === "number") {
             if (distance < 1) {
                 return `${(distance * 1000).toFixed(0)}m`;
             } else if (distance < 10) {
-                // More precision for shorter distances
                 return `${distance.toFixed(1)}km`;
             } else {
-                // Round to whole number for longer distances
                 return `${Math.round(distance)}km`;
             }
         }
@@ -48,28 +45,28 @@ const PetCard = ({
         return "Nearby";
     };
 
-    // Active card with swipe animations
     if (isActive) {
         const rotate = position.x.interpolate({
             inputRange: [-width / 2, 0, width / 2],
-            outputRange: ["-10deg", "0deg", "10deg"],
+            outputRange: ["-8deg", "0deg", "8deg"],
             extrapolate: "clamp",
         });
 
         const likeOpacity = swipeDirection.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
+            inputRange: [0, 0.5, 1],
+            outputRange: [0, 0.8, 1],
+            extrapolate: "clamp",
         });
 
         const dislikeOpacity = swipeDirection.interpolate({
-            inputRange: [-1, 0],
-            outputRange: [1, 0],
+            inputRange: [-1, -0.5, 0],
+            outputRange: [1, 0.8, 0],
+            extrapolate: "clamp",
         });
 
-        // Scale effect for when card moves in either direction
         const scale = position.x.interpolate({
             inputRange: [-width / 2, 0, width / 2],
-            outputRange: [0.98, 1, 0.98],
+            outputRange: [0.985, 1, 0.985],
             extrapolate: "clamp",
         });
 
@@ -84,8 +81,8 @@ const PetCard = ({
                                 { scale },
                                 ...position.getTranslateTransform(),
                             ],
-                            zIndex: 10, // Ensure active card is on top
-                            opacity: 1, // Make sure active card is fully opaque
+                            zIndex: 10,
+                            opacity: 1,
                         },
                         cardStyle,
                     ]}
@@ -96,7 +93,7 @@ const PetCard = ({
                             { opacity: likeOpacity },
                         ]}>
                         <BlurView
-                            intensity={90}
+                            intensity={60}
                             tint="light"
                             style={styles.likeBlur}>
                             <Text style={styles.likeText}>LIKE</Text>
@@ -109,7 +106,7 @@ const PetCard = ({
                             { opacity: dislikeOpacity },
                         ]}>
                         <BlurView
-                            intensity={90}
+                            intensity={60}
                             tint="light"
                             style={styles.dislikeBlur}>
                             <Text style={styles.dislikeText}>NOPE</Text>
@@ -127,7 +124,7 @@ const PetCard = ({
                     />
 
                     <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.7)"]}
+                        colors={["transparent", "rgba(0,0,0,0.8)"]}
                         style={styles.gradient}
                     />
 
@@ -159,7 +156,7 @@ const PetCard = ({
 
                         {pet.temperament && pet.temperament.length > 0 && (
                             <View style={styles.tagsContainer}>
-                                {pet.temperament.map((tag, index) => (
+                                {pet.temperament.slice(0, 3).map((tag, index) => (
                                     <View key={index} style={styles.tag}>
                                         <Text style={styles.tagText}>
                                             {tag}
@@ -169,22 +166,17 @@ const PetCard = ({
                             </View>
                         )}
 
-                        <Text style={styles.petDescription} numberOfLines={3}>
-                            {pet.description}
-                        </Text>
-
-                        <View style={styles.actionHint}>
-                            <Text style={styles.actionHintText}>
-                                Swipe right to like • Swipe left to pass
+                        {pet.description && (
+                            <Text style={styles.petDescription} numberOfLines={2}>
+                                {pet.description}
                             </Text>
-                        </View>
+                        )}
                     </View>
                 </Animated.View>
             </Pressable>
         );
     }
 
-    // Next card with scale effect
     return (
         <Animated.View
             style={[
@@ -193,15 +185,15 @@ const PetCard = ({
                     ...Platform.select({
                         ios: {
                             shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 5 },
+                            shadowOpacity: 0.15,
+                            shadowRadius: 12,
                         },
                         android: {
-                            elevation: 4,
+                            elevation: 8,
                         },
                     }),
-                    zIndex: 5, // Lower z-index for next card
+                    zIndex: 5,
                 },
                 nextCardStyle,
             ]}>
@@ -216,7 +208,7 @@ const PetCard = ({
             />
 
             <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.7)"]}
+                colors={["transparent", "rgba(0,0,0,0.8)"]}
                 style={styles.gradient}
             />
 
@@ -241,27 +233,6 @@ const PetCard = ({
                         value={pet.vaccinated === "yes" ? "Yes" : "No"}
                     />
                 </View>
-
-                {pet.temperament && pet.temperament.length > 0 && (
-                    <View style={styles.tagsContainer}>
-                        {pet.temperament.slice(0, 3).map((tag, index) => (
-                            <View key={index} style={styles.tag}>
-                                <Text style={styles.tagText}>{tag}</Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-                <Text style={styles.petDescription} numberOfLines={2}>
-                    {pet.description}
-                </Text>
-
-                {/* Adding the action hint to maintain consistent layout, but with opacity 0 */}
-                <View style={[styles.actionHint, { opacity: 0 }]}>
-                    <Text style={styles.actionHintText}>
-                        Swipe right to like • Swipe left to pass
-                    </Text>
-                </View>
             </View>
         </Animated.View>
     );
@@ -272,32 +243,38 @@ const styles = StyleSheet.create({
         position: "absolute",
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
-        borderRadius: 24,
+        borderRadius: 20,
         backgroundColor: "#FFFFFF",
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
         overflow: "hidden",
         marginLeft: -CARD_WIDTH / 2,
-        marginTop: -CARD_HEIGHT / 2 + 20,
-        top: "50%",
+        marginTop: -CARD_HEIGHT / 2, // Move card higher on screen
+        top: "50%", // Position card higher (from 50% to 45%)
         left: "50%",
+        ...Platform.select({
+            ios: {
+                shadowColor: "#000000",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     cardImage: {
         width: "100%",
         height: "100%",
-        borderRadius: 24,
+        borderRadius: 20,
     },
     gradient: {
         position: "absolute",
         left: 0,
         right: 0,
         bottom: 0,
-        height: "55%",
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        height: "50%",
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
     },
     cardContent: {
         position: "absolute",
@@ -316,14 +293,14 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: "700",
         color: "#FFFFFF",
-        textShadowColor: "rgba(0, 0, 0, 0.3)",
+        textShadowColor: "rgba(0, 0, 0, 0.4)",
         textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        textShadowRadius: 4,
     },
     distanceBadge: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "rgba(0, 0, 0, 0.25)",
+        backgroundColor: "rgba(0, 0, 0, 0.3)",
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 14,
@@ -362,59 +339,50 @@ const styles = StyleSheet.create({
         fontWeight: "500",
     },
     petDescription: {
-        fontSize: 16,
-        color: "#F0F0F0",
-        lineHeight: 22,
-        marginBottom: 16,
+        fontSize: 15,
+        color: "rgba(255, 255, 255, 0.9)",
+        lineHeight: 21,
+        marginBottom: 8,
     },
     likeContainer: {
         position: "absolute",
-        top: 50,
+        top: 60,
         right: 40,
         zIndex: 1,
         transform: [{ rotate: "15deg" }],
     },
     likeBlur: {
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: "hidden",
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: "#4CAF50",
     },
     likeText: {
         color: "#4CAF50",
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: "800",
         paddingVertical: 8,
         paddingHorizontal: 16,
     },
     dislikeContainer: {
         position: "absolute",
-        top: 50,
+        top: 60,
         left: 40,
         zIndex: 1,
         transform: [{ rotate: "-15deg" }],
     },
     dislikeBlur: {
-        borderRadius: 12,
+        borderRadius: 10,
         overflow: "hidden",
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: "#FF5252",
     },
     dislikeText: {
         color: "#FF5252",
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: "800",
         paddingVertical: 8,
         paddingHorizontal: 16,
-    },
-    actionHint: {
-        alignItems: "center",
-        marginTop: 8,
-    },
-    actionHintText: {
-        color: "rgba(255, 255, 255, 0.7)",
-        fontSize: 14,
-        fontWeight: "500",
     },
 });
 

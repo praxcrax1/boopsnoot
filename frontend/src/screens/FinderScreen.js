@@ -13,8 +13,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { matchService, petService } from "../api/api";
 import * as Haptics from "expo-haptics";
+import MatchService from "../services/MatchService";
+import PetService from "../services/PetService";
 import ChatService from "../services/ChatService";
 import { AuthContext } from "../contexts/AuthContext";
 
@@ -25,9 +26,10 @@ import FilterModal from "../components/finder/FilterModal";
 import PetSelectorModal from "../components/finder/PetSelectorModal";
 import PetCard from "../components/finder/PetCard";
 import SkeletonLoader from "../components/finder/SkeletonLoader";
+import { BlurView } from "expo-blur"; // Ensure expo-blur is installed
 
-const { width } = Dimensions.get("window");
-const SWIPE_THRESHOLD = width * 0.25;
+const { width, height } = Dimensions.get("window");
+const SWIPE_THRESHOLD = width * 0.3; // Increased threshold for more deliberate swipes
 
 const FinderScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -48,45 +50,76 @@ const FinderScreen = ({ navigation }) => {
     const [isSwipingBack, setIsSwipingBack] = useState(false);
     const { requestAndUpdateLocation } = useContext(AuthContext);
 
-    // Animation values
     const position = useRef(new Animated.ValueXY()).current;
     const swipeDirection = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
-
-    // Additional animation values for smoothness
     const cardOpacity = useRef(new Animated.Value(1)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
+    const buttonScale = useRef(new Animated.Value(1)).current;
+
+    const swipeProgress = position.x.interpolate({
+        inputRange: [-width / 2, 0, width / 2],
+        outputRange: [1, 0, 1],
+        extrapolate: "clamp",
+    });
+
+    const likeButtonScale = position.x.interpolate({
+        inputRange: [0, width / 4],
+        outputRange: [1, 1.15],
+        extrapolate: "clamp",
+    });
+
+    const dislikeButtonScale = position.x.interpolate({
+        inputRange: [-width / 4, 0],
+        outputRange: [1.15, 1],
+        extrapolate: "clamp",
+    });
 
     const nextCardOpacity = position.x.interpolate({
         inputRange: [-width / 2, 0, width / 2],
-        outputRange: [1, 0.5, 1],
+        outputRange: [1, 0.65, 1],
         extrapolate: "clamp",
     });
 
     const nextCardScale = position.x.interpolate({
         inputRange: [-width / 2, 0, width / 2],
-        outputRange: [1, 0.5, 1],
+        outputRange: [1, 0.85, 1],
         extrapolate: "clamp",
     });
 
-    // Improved Pan responder for swipe gestures
+    const nextCardTranslateY = position.x.interpolate({
+        inputRange: [-width / 2, 0, width / 2],
+        outputRange: [0, 20, 0],
+        extrapolate: "clamp",
+    });
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => swipingEnabled,
+            onMoveShouldSetPanResponder: (_, gesture) => {
+                return swipingEnabled && Math.abs(gesture.dx) > Math.abs(gesture.dy * 2);
+            },
             onPanResponderGrant: () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
                 position.setOffset({
                     x: position.x._value,
                     y: position.y._value,
                 });
                 position.setValue({ x: 0, y: 0 });
+
+                Animated.spring(buttonScale, {
+                    toValue: 1.1,
+                    friction: 5,
+                    tension: 40,
+                    useNativeDriver: true,
+                }).start();
             },
             onPanResponderMove: (_, gesture) => {
                 if (!swipingEnabled) return;
 
-                position.setValue({ x: gesture.dx, y: gesture.dy * 0.2 }); // Reduce vertical movement
+                position.setValue({ x: gesture.dx, y: gesture.dy * 0.15 });
 
-                // Update swipe direction indicator
                 if (gesture.dx > 0) {
                     swipeDirection.setValue(
                         gesture.dx / SWIPE_THRESHOLD > 1
@@ -101,15 +134,33 @@ const FinderScreen = ({ navigation }) => {
                     );
                 }
 
-                // Provide haptic feedback when crossing the threshold
-                if (Math.abs(gesture.dx) === Math.round(SWIPE_THRESHOLD)) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                const thresholdDxPositive = Math.round(SWIPE_THRESHOLD * 0.9);
+                const thresholdDxNegative = -Math.round(SWIPE_THRESHOLD * 0.9);
+
+                if (
+                    Math.abs(gesture.dx) >= thresholdDxPositive &&
+                    Math.abs(gesture.dx) <= thresholdDxPositive + 5
+                ) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }
+
+                if (
+                    Math.abs(gesture.dx) >= Math.abs(thresholdDxNegative) &&
+                    Math.abs(gesture.dx) <= Math.abs(thresholdDxNegative) + 5
+                ) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 }
             },
             onPanResponderRelease: (_, gesture) => {
                 if (!swipingEnabled) return;
 
                 position.flattenOffset();
+                Animated.spring(buttonScale, {
+                    toValue: 1,
+                    friction: 5,
+                    tension: 40,
+                    useNativeDriver: true,
+                }).start();
 
                 if (gesture.dx > SWIPE_THRESHOLD) {
                     swipeRight();
@@ -121,6 +172,12 @@ const FinderScreen = ({ navigation }) => {
             },
             onPanResponderTerminate: () => {
                 resetPosition();
+                Animated.spring(buttonScale, {
+                    toValue: 1,
+                    friction: 5,
+                    tension: 40,
+                    useNativeDriver: true,
+                }).start();
             },
         })
     ).current;
@@ -129,16 +186,14 @@ const FinderScreen = ({ navigation }) => {
         StatusBar.setBarStyle("dark-content");
         fetchUserPets();
 
-        // Fade in content when the component mounts
         Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 600,
+            duration: 750,
             useNativeDriver: true,
             delay: 100,
         }).start();
 
         return () => {
-            // Reset any animation when component unmounts
             position.setValue({ x: 0, y: 0 });
             swipeDirection.setValue(0);
         };
@@ -159,12 +214,11 @@ const FinderScreen = ({ navigation }) => {
         }
     }, [selectedPetId, userPets]);
 
-    // Animate content opacity when new cards are shown
     useEffect(() => {
         if (!initialLoading && potentialMatches.length > 0) {
             Animated.timing(contentOpacity, {
                 toValue: 1,
-                duration: 500,
+                duration: 600,
                 useNativeDriver: true,
             }).start();
         }
@@ -173,7 +227,7 @@ const FinderScreen = ({ navigation }) => {
     const fetchUserPets = async () => {
         setLoading(true);
         try {
-            const response = await petService.getUserPets();
+            const response = await PetService.getUserPets();
             if (response.pets && response.pets.length > 0) {
                 setUserPets(response.pets);
                 setSelectedPetId(response.pets[0]._id);
@@ -217,14 +271,13 @@ const FinderScreen = ({ navigation }) => {
                 limit: 10,
             };
 
-            const response = await matchService.getPotentialMatches(
+            const response = await MatchService.getPotentialMatches(
                 apiFilters,
                 selectedPetId
             );
             const newPets = response.pets || [];
 
             if (reset) {
-                // Fade out and in for smoother transitions when resetting
                 Animated.sequence([
                     Animated.timing(contentOpacity, {
                         toValue: 0,
@@ -271,9 +324,11 @@ const FinderScreen = ({ navigation }) => {
         setSwipingEnabled(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        Animated.timing(position, {
-            toValue: { x: width + 100, y: 0 },
-            duration: 300,
+        Animated.spring(position, {
+            toValue: { x: width + 100, y: 30 },
+            friction: 6,
+            tension: 40,
+            velocity: 5,
             useNativeDriver: false,
         }).start(() => {
             handleLike();
@@ -287,9 +342,11 @@ const FinderScreen = ({ navigation }) => {
         setSwipingEnabled(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        Animated.timing(position, {
-            toValue: { x: -width - 100, y: 0 },
-            duration: 300,
+        Animated.spring(position, {
+            toValue: { x: -width - 100, y: 30 },
+            friction: 6,
+            tension: 40,
+            velocity: 5,
             useNativeDriver: false,
         }).start(() => {
             handlePass();
@@ -304,20 +361,19 @@ const FinderScreen = ({ navigation }) => {
 
         Animated.spring(position, {
             toValue: { x: 0, y: 0 },
-            friction: 5,
-            tension: 40,
+            friction: 6,
+            tension: 60,
             useNativeDriver: false,
         }).start();
 
         Animated.spring(swipeDirection, {
             toValue: 0,
-            friction: 5,
-            tension: 40,
+            friction: 6,
+            tension: 60,
             useNativeDriver: false,
         }).start();
     };
 
-    // Swipe back to previous pet
     const swipeBack = () => {
         if (currentIndex === 0 || isSwipingBack) return;
 
@@ -325,24 +381,21 @@ const FinderScreen = ({ navigation }) => {
         setSwipingEnabled(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // First fade out current card
         Animated.timing(cardOpacity, {
             toValue: 0,
             duration: 150,
             useNativeDriver: true,
         }).start(() => {
-            // Go to previous card
             setCurrentIndex(currentIndex - 1);
             position.setValue({ x: -width, y: 0 });
 
-            // Immediate reset of opacity
             cardOpacity.setValue(1);
 
-            // Animate the card back in from the left
             Animated.spring(position, {
                 toValue: { x: 0, y: 0 },
-                friction: 5,
-                tension: 40,
+                friction: 6,
+                tension: 60,
+                velocity: 3,
                 useNativeDriver: false,
             }).start(() => {
                 setIsSwipingBack(false);
@@ -354,20 +407,16 @@ const FinderScreen = ({ navigation }) => {
     const navigateToMatchChat = useCallback(
         async (matchId) => {
             try {
-                // Show loading indicator for better UX
                 setLoading(true);
-                
-                // Get or create chat for this match
+
                 const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
 
                 if (chatResponse.success && chatResponse.chat) {
-                    // Navigate to the chat with the returned chat ID
                     navigation.navigate("Chat", {
                         chatId: chatResponse.chat._id,
                     });
                 } else {
                     console.error("Failed to get or create chat:", chatResponse);
-                    // Fallback to direct navigation with match ID (though this likely won't work)
                     navigation.navigate("Chat", {
                         chatId: matchId,
                     });
@@ -391,7 +440,7 @@ const FinderScreen = ({ navigation }) => {
         goToNextPet();
 
         try {
-            const response = await matchService.likeProfile(
+            const response = await MatchService.likeProfile(
                 selectedPetId,
                 pet._id
             );
@@ -428,7 +477,7 @@ const FinderScreen = ({ navigation }) => {
         goToNextPet();
 
         try {
-            await matchService.passProfile(selectedPetId, pet._id);
+            await MatchService.passProfile(selectedPetId, pet._id);
         } catch (error) {
             console.error("Error passing profile:", error);
             Alert.alert("Error", "Failed to pass profile. Please try again.");
@@ -466,7 +515,12 @@ const FinderScreen = ({ navigation }) => {
 
                 if (i === currentIndex) {
                     return (
-                        <Animated.View key={pet._id} style={{ zIndex: 10 }}>
+                        <Animated.View
+                            key={pet._id}
+                            style={{
+                                zIndex: 10,
+                                opacity: cardOpacity,
+                            }}>
                             <PetCard
                                 pet={pet}
                                 position={position}
@@ -492,7 +546,10 @@ const FinderScreen = ({ navigation }) => {
                             isActive={false}
                             nextCardStyle={{
                                 opacity: nextCardOpacity,
-                                transform: [{ scale: nextCardScale }],
+                                transform: [
+                                    { scale: nextCardScale },
+                                    { translateY: nextCardTranslateY },
+                                ],
                                 zIndex: 1,
                             }}
                         />
@@ -545,34 +602,55 @@ const FinderScreen = ({ navigation }) => {
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
                     !loading && (
-                        <View style={styles.buttonsContainer}>
-                            <TouchableOpacity
-                                style={[styles.roundButton, styles.undoButton]}
-                                onPress={swipeBack}
-                                disabled={currentIndex === 0 || isSwipingBack}>
-                                <Ionicons
-                                    name="arrow-undo"
-                                    size={22}
-                                    color={
-                                        currentIndex === 0 ? "#CCCCCC" : "#666"
-                                    }
-                                />
-                            </TouchableOpacity>
+                        <Animated.View
+                            style={[
+                                styles.actionsContainer,
+                                { opacity: contentOpacity },
+                            ]}>
+                                <View style={styles.buttonsContainer}>
+                                    <Animated.View
+                                        style={{
+                                            transform: [
+                                                { scale: dislikeButtonScale },
+                                            ],
+                                        }}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.button,
+                                                styles.passButton,
+                                            ]}
+                                            onPress={swipeLeft}
+                                            disabled={!swipingEnabled}>
+                                            <Ionicons
+                                                name="close"
+                                                size={32}
+                                                color="#fff"
+                                            />
+                                        </TouchableOpacity>
+                                    </Animated.View>
 
-                            <TouchableOpacity
-                                style={[styles.button, styles.passButton]}
-                                onPress={swipeLeft}
-                                disabled={!swipingEnabled}>
-                                <Ionicons name="close" size={28} color="#fff" />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.likeButton]}
-                                onPress={swipeRight}
-                                disabled={!swipingEnabled}>
-                                <Ionicons name="heart" size={28} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
+                                    <Animated.View
+                                        style={{
+                                            transform: [
+                                                { scale: likeButtonScale },
+                                            ],
+                                        }}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.button,
+                                                styles.likeButton,
+                                            ]}
+                                            onPress={swipeRight}
+                                            disabled={!swipingEnabled}>
+                                            <Ionicons
+                                                name="heart"
+                                                size={32}
+                                                color="#fff"
+                                            />
+                                        </TouchableOpacity>
+                                    </Animated.View>
+                                </View>
+                        </Animated.View>
                     )}
 
                 <FilterModal
@@ -606,27 +684,47 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+        paddingBottom: height * 0.15, // Use percentage of screen height instead of fixed value
+    },
+    actionsContainer: {
+        position: "absolute",
+        bottom: 0, // Position from bottom based on screen height
+        left: 0,
+        right: 0,
+        height: height * 0.15, // Explicitly set height to 15% of screen height
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    actionsBlur: {
+        borderRadius: 30,
+        overflow: "hidden",
+        width: "70%",
+        ...Platform.select({
+            ios: {
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 6,
+            },
+        }),
     },
     buttonsContainer: {
         flexDirection: "row",
-        justifyContent: "center",
+        justifyContent: "space-around",
         alignItems: "center",
-        paddingBottom: 24,
-        paddingTop: 12,
-        top: 30,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        width: "100%",
     },
     button: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         justifyContent: "center",
         alignItems: "center",
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 4,
-        marginHorizontal: 16,
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
@@ -635,33 +733,9 @@ const styles = StyleSheet.create({
                 shadowRadius: 6,
             },
             android: {
-                elevation: 6,
+                elevation: 8,
             },
         }),
-    },
-    roundButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: "center",
-        alignItems: "center",
-        marginHorizontal: 10,
-        backgroundColor: "#F0F0F0",
-        ...Platform.select({
-            ios: {
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 3,
-            },
-            android: {
-                elevation: 2,
-            },
-        }),
-    },
-    undoButton: {
-        position: "absolute",
-        left: 20,
     },
     passButton: {
         backgroundColor: "#FF5252",
