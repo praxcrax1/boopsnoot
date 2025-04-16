@@ -13,7 +13,7 @@ import { BlurView } from "expo-blur";
 
 const { width } = Dimensions.get("window");
 
-const FilterModal = ({ visible, filters, onClose, onFilterChange }) => (
+const FilterModal = ({ visible, filters, onClose, onFilterChange, onApply }) => (
     <Modal
         visible={visible}
         transparent={true}
@@ -55,20 +55,17 @@ const FilterModal = ({ visible, filters, onClose, onFilterChange }) => (
                         </View>
                     </View>
 
-                    <Text style={styles.infoText}>
-                        <Ionicons
-                            name="information-circle-outline"
-                            size={14}
-                            color="#888"
-                        />{" "}
-                        Distance is calculated from your current location.
-                        Matching with pets farther away might reduce available
-                        matches.
-                    </Text>
+                    <View style={styles.infoContainer}>
+                        <Text style={styles.infoText}>
+                            Distance is calculated from your current location.
+                            Matching with pets farther away might reduce available
+                            matches.
+                        </Text>
+                    </View>
 
                     <TouchableOpacity
                         style={styles.applyButton}
-                        onPress={onClose}>
+                        onPress={onApply}>
                         <Text style={styles.applyButtonText}>Apply</Text>
                     </TouchableOpacity>
                 </View>
@@ -147,10 +144,22 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#999999",
     },
-    infoText: {
-        fontSize: 12,
-        color: "#888888",
+    infoContainer: {
+        flexDirection: "row",
+        alignItems: "flex-start",
         marginBottom: 24,
+        backgroundColor: "#F8F8F8",
+        padding: 12,
+        borderRadius: 8,
+    },
+    infoIcon: {
+        marginRight: 8,
+        marginTop: 2,
+    },
+    infoText: {
+        flex: 1,
+        fontSize: 12,
+        color: "#666666",
         lineHeight: 18,
     },
     applyButton: {

@@ -37,7 +37,10 @@ const FinderScreen = ({ navigation }) => {
     const [potentialMatches, setPotentialMatches] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [filterVisible, setFilterVisible] = useState(false);
-    const [filters, setFilters] = useState({
+    const [activeFilters, setActiveFilters] = useState({
+        maxDistance: 25, // Default 25km radius
+    });
+    const [tempFilters, setTempFilters] = useState({
         maxDistance: 25, // Default 25km radius
     });
     const [userPets, setUserPets] = useState([]);
@@ -205,7 +208,7 @@ const FinderScreen = ({ navigation }) => {
             setHasMorePets(true);
             fetchPotentialMatches(true);
         }
-    }, [selectedPetId, filters]);
+    }, [selectedPetId, activeFilters]);
 
     useEffect(() => {
         if (selectedPetId && userPets.length > 0) {
@@ -266,7 +269,7 @@ const FinderScreen = ({ navigation }) => {
         setLoading(true);
         try {
             const apiFilters = {
-                ...filters,
+                ...activeFilters,
                 skip: reset ? 0 : page * 10,
                 limit: 10,
             };
@@ -495,10 +498,20 @@ const FinderScreen = ({ navigation }) => {
     };
 
     const handleFilterChange = (name, value) => {
-        setFilters({
-            ...filters,
+        setTempFilters({
+            ...tempFilters,
             [name]: value,
         });
+    };
+
+    const applyFilters = () => {
+        setActiveFilters(tempFilters);
+        setFilterVisible(false);
+    };
+
+    const handleOpenFilterModal = () => {
+        setTempFilters({ ...activeFilters });
+        setFilterVisible(true);
     };
 
     const renderCards = () => {
@@ -583,7 +596,7 @@ const FinderScreen = ({ navigation }) => {
                 <Header
                     title="Find Playmates"
                     selectedPet={selectedPet}
-                    onFilterPress={() => setFilterVisible(true)}
+                    onFilterPress={handleOpenFilterModal}
                     onPetSelectorPress={() => setPetSelectorVisible(true)}
                 />
 
@@ -655,9 +668,10 @@ const FinderScreen = ({ navigation }) => {
 
                 <FilterModal
                     visible={filterVisible}
-                    filters={filters}
+                    filters={tempFilters}
                     onClose={() => setFilterVisible(false)}
                     onFilterChange={handleFilterChange}
+                    onApply={applyFilters}
                 />
 
                 <PetSelectorModal
