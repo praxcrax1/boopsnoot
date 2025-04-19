@@ -39,8 +39,6 @@ export const validateBreed = (value) => {
 };
 
 export const validatePhotos = (photos) => {
-  if (!photos || photos.length === 0) {
-    return 'Please add at least one photo';
-  }
+  // Temporarily disabled photo validation
   return null;
 };

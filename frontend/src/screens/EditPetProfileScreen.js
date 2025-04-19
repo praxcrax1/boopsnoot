@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     View,
     Text,
@@ -38,8 +38,16 @@ import Button from "../components/Button";
 
 const EditPetProfileScreen = ({ route, navigation }) => {
     const { petId } = route.params;
+    
+    // Mutable ref to store the original pet data for reference
+    const originalPetData = useRef(null);
+    
+    // Loading & submission states
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [hasChanges, setHasChanges] = useState(false);
+    
+    // Form state
     const [petData, setPetData] = useState({
         name: "",
         breed: "",
@@ -54,8 +62,8 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         temperament: [],
         preferredPlaymates: [],
     });
-
-    // Validation state
+    
+    // Form validation state
     const [touched, setTouched] = useState({
         name: false,
         breed: false,
@@ -70,80 +78,137 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         photos: null,
     });
 
-    // Get appropriate playmates based on pet type
-    const getPlaymatePreferences = () => {
-        return petData.type === PET_TYPES.DOG 
-            ? DOG_PLAYMATE_PREFERENCES 
-            : CAT_PLAYMATE_PREFERENCES;
-    };
+    // Helper function to normalize pet data
+    const normalizePetData = (pet) => ({
+        ...pet,
+        preferredPlaymates: Array.isArray(pet.preferredPlaymates)
+            ? pet.preferredPlaymates
+            : [],
+        temperament: Array.isArray(pet.temperament)
+            ? pet.temperament
+            : [],
+        photos: Array.isArray(pet.photos)
+            ? pet.photos
+            : [],
+    });
 
-    // Validate fields when pet data changes
+    // Fetch pet data
     useEffect(() => {
-        if (!loading) {
-            validateField("name", petData.name);
-            validateField("breed", petData.breed);
-            validateField("age", petData.age);
-            validateField("photos", petData.photos);
-        }
-    }, [petData, loading]);
-
-    useEffect(() => {
+        let isMounted = true;
+        
         const fetchPetData = async () => {
             try {
                 const response = await PetService.getPetById(petId);
+                
+                if (!isMounted) return;
+                
                 if (response && response.pet) {
-                    // Ensure preferredPlaymates is an array for compatibility
-                    const petWithNormalizedData = {
-                        ...response.pet,
-                        preferredPlaymates: Array.isArray(
-                            response.pet.preferredPlaymates
-                        )
-                            ? response.pet.preferredPlaymates
-                            : [],
-                    };
-                    setPetData(petWithNormalizedData);
+                    const normalizedPet = normalizePetData(response.pet);
+                    setPetData(normalizedPet);
+                    originalPetData.current = { ...normalizedPet };
+                } else {
+                    throw new Error("Pet not found");
                 }
             } catch (error) {
                 console.error("Error fetching pet data:", error);
-                Alert.alert(
-                    "Error",
-                    "Failed to load pet information. Please try again."
-                );
+                if (isMounted) {
+                    Alert.alert(
+                        "Error",
+                        "Failed to load pet information. Please try again."
+                    );
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchPetData();
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [petId]);
 
-        // Set navigation header
+    // Setup navigation header separately from data fetching
+    useEffect(() => {
+        const headerLeftButton = () => (
+            <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleBackPress}>
+                <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+        );
+        
+        const headerRightButton = () => (
+            <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleSubmit}
+                disabled={submitting || !hasChanges}>
+                <Text
+                    style={[
+                        styles.saveButtonText,
+                        (submitting || !hasChanges) && styles.disabledButtonText,
+                    ]}>
+                    {submitting ? "Saving..." : "Save"}
+                </Text>
+            </TouchableOpacity>
+        );
+        
         navigation.setOptions({
             title: "Edit Pet Profile",
-            headerLeft: () => (
-                <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={() => navigation.goBack()}>
-                    <Ionicons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-            ),
-            headerRight: () => (
-                <TouchableOpacity
-                    style={styles.headerButton}
-                    onPress={handleSubmit}
-                    disabled={submitting}>
-                    <Text
-                        style={[
-                            styles.saveButtonText,
-                            submitting && styles.disabledButtonText,
-                        ]}>
-                        {submitting ? "Saving..." : "Save"}
-                    </Text>
-                </TouchableOpacity>
-            ),
+            headerLeft: headerLeftButton,
+            headerRight: headerRightButton,
         });
-    }, [petId, navigation, submitting]);
+    }, [navigation, submitting, hasChanges]);
 
-    const validateField = (fieldName, value) => {
+    // Check for form changes
+    useEffect(() => {
+        if (!loading && originalPetData.current) {
+            const hasFormChanges = JSON.stringify(originalPetData.current) !== JSON.stringify(petData);
+            setHasChanges(hasFormChanges);
+        }
+    }, [petData, loading]);
+
+    // Handle back button press
+    const handleBackPress = () => {
+        if (hasChanges) {
+            Alert.alert(
+                "Unsaved Changes",
+                "You have unsaved changes. Are you sure you want to leave?",
+                [
+                    { text: "Stay", style: "cancel" },
+                    { text: "Leave", style: "destructive", onPress: () => navigation.goBack() }
+                ]
+            );
+        } else {
+            navigation.goBack();
+        }
+    };
+
+    // Run validation when values change after being touched
+    useEffect(() => {
+        const validateTouchedFields = () => {
+            Object.keys(touched).forEach(field => {
+                if (touched[field]) {
+                    validateField(field, petData[field]);
+                }
+            });
+        };
+        
+        validateTouchedFields();
+    }, [petData]);
+    
+    // Get appropriate playmates based on pet type
+    const getPlaymatePreferences = useCallback(() => {
+        return petData.type === PET_TYPES.DOG 
+            ? DOG_PLAYMATE_PREFERENCES 
+            : CAT_PLAYMATE_PREFERENCES;
+    }, [petData.type]);
+
+    // Field validation
+    const validateField = useCallback((fieldName, value) => {
         let error = null;
 
         switch (fieldName) {
@@ -156,40 +221,47 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             case "age":
                 error = validateAge(value);
                 break;
+            case "photos":
+                error = validatePhotos(value);
+                break;
             default:
                 break;
         }
 
-        setErrors((prev) => ({ ...prev, [fieldName]: error }));
+        setErrors(prev => ({ ...prev, [fieldName]: error }));
         return error;
-    };
+    }, []);
 
-    const handleInputChange = (field, value) => {
-        setPetData({
-            ...petData,
+    // Input handlers
+    const handleInputChange = useCallback((field, value) => {
+        setPetData(prevData => ({
+            ...prevData,
             [field]: value,
+        }));
+    }, []);
+
+    const handleBlur = useCallback((fieldName) => {
+        setTouched(prev => ({ ...prev, [fieldName]: true }));
+    }, []);
+
+    const toggleArrayItem = useCallback((field, item) => {
+        setPetData(prevData => {
+            const array = prevData[field];
+            const exists = array.includes(item);
+            
+            const newArray = exists 
+                ? array.filter(i => i !== item) 
+                : [...array, item];
+                
+            return {
+                ...prevData,
+                [field]: newArray
+            };
         });
-    };
+    }, []);
 
-    const handleBlur = (fieldName) => {
-        setTouched({ ...touched, [fieldName]: true });
-    };
-
-    const toggleArrayItem = (field, item) => {
-        const array = petData[field];
-        const exists = array.includes(item);
-
-        let newArray;
-        if (exists) {
-            newArray = array.filter((i) => i !== item);
-        } else {
-            newArray = [...array, item];
-        }
-
-        setPetData({ ...petData, [field]: newArray });
-    };
-
-    const pickImage = async () => {
+    // Image handling
+    const pickImage = useCallback(async () => {
         const options = {
             mediaType: "photo",
             includeBase64: false,
@@ -200,25 +272,52 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         try {
             const result = await ImagePicker.launchImageLibrary(options);
             if (!result.didCancel && !result.errorCode) {
-                // For simplicity, we'll just store the image URI in the state
-                // In a real app, you would upload to a server and store the URL
-                const newPhotos = [...petData.photos, result.assets[0].uri];
-                setPetData({ ...petData, photos: newPhotos });
-                setTouched({ ...touched, photos: true });
+                setPetData(prevData => ({
+                    ...prevData, 
+                    photos: [...prevData.photos, result.assets[0].uri]
+                }));
+                setTouched(prev => ({ ...prev, photos: true }));
             }
         } catch (error) {
             Alert.alert("Error", "Failed to pick image");
         }
-    };
+    }, []);
 
-    const removeImage = (index) => {
-        const newPhotos = [...petData.photos];
-        newPhotos.splice(index, 1);
-        setPetData({ ...petData, photos: newPhotos });
-        setTouched({ ...touched, photos: true });
-    };
+    const removeImage = useCallback((index) => {
+        setPetData(prevData => {
+            const newPhotos = [...prevData.photos];
+            newPhotos.splice(index, 1);
+            return {
+                ...prevData,
+                photos: newPhotos
+            };
+        });
+        setTouched(prev => ({ ...prev, photos: true }));
+    }, []);
 
-    const handleDeletePet = () => {
+    // Form validation
+    const validateForm = useCallback(() => {
+        // Mark all fields as touched
+        const allTouched = {
+            name: true,
+            breed: true,
+            age: true,
+            photos: true,
+        };
+        setTouched(allTouched);
+
+        // Check all fields
+        const nameError = validateField("name", petData.name);
+        const breedError = validateField("breed", petData.breed);
+        const ageError = validateField("age", petData.age);
+        const photosError = validateField("photos", petData.photos);
+
+        // Return true if no errors
+        return !nameError && !breedError && !ageError && !photosError;
+    }, [petData, validateField]);
+
+    // Delete pet handler
+    const handleDeletePet = useCallback(() => {
         Alert.alert(
             "Delete Pet",
             "Are you sure you want to delete this pet? This action cannot be undone.",
@@ -230,7 +329,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                     onPress: async () => {
                         try {
                             await PetService.deletePet(petId);
-                            // Navigate to Home tab with refresh parameter
                             navigation.navigate("MainTabs", {
                                 screen: "Home",
                                 params: { refresh: true },
@@ -247,31 +345,13 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                 },
             ]
         );
-    };
-
-    const validateForm = () => {
-        // Mark all fields as touched to show errors
-        const allTouched = {
-            name: true,
-            breed: true,
-            age: true,
-            photos: true,
-        };
-        setTouched(allTouched);
-
-        // Check if there are any errors
-        const nameError = validateField("name", petData.name);
-        const breedError = validateField("breed", petData.breed);
-        const ageError = validateField("age", petData.age);
-        const photosError = validateField("photos", petData.photos);
-
-        return !nameError && !breedError && !ageError && !photosError;
-    };
-
-    const handleSubmit = async () => {
-        // Validate the form
+    }, [petId, navigation]);
+    
+    // Form submission
+    const handleSubmit = useCallback(async () => {
+        console.log("Submit pressed, current petData:", petData);
+        
         if (!validateForm()) {
-            // If validation fails, show a message and scroll to the first error
             Alert.alert(
                 "Validation Error",
                 "Please correct the errors in the form."
@@ -281,7 +361,15 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
         setSubmitting(true);
         try {
-            await PetService.updatePet(petId, petData);
+            // Create a deep copy of the petData to send to the API
+            const dataToSubmit = JSON.parse(JSON.stringify(petData));
+            
+            await PetService.updatePet(petId, dataToSubmit);
+            
+            // Update the original data ref after successful update
+            originalPetData.current = { ...petData };
+            setHasChanges(false);
+            
             Alert.alert(
                 "Success",
                 "Pet profile updated successfully!",
@@ -307,8 +395,9 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         } finally {
             setSubmitting(false);
         }
-    };
+    }, [petData, petId, navigation, validateForm]);
 
+    // Loading state
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -478,8 +567,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
                     <View style={styles.photosSection}>
                         <Text style={styles.label}>
-                            Pet Photos{" "}
-                            <Text style={styles.requiredMark}>*</Text>
+                            Pet Photos
                         </Text>
                         <TouchableOpacity
                             style={styles.photoUploadButton}
