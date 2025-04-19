@@ -29,6 +29,8 @@ import {
     vaccinatedOptions,
     TEMPERAMENTS,
     DOG_PLAYMATE_PREFERENCES,
+    CAT_PLAYMATE_PREFERENCES,
+    PET_TYPES,
 } from "../constants/petConstants";
 import InputField from "../components/InputField";
 import CustomDropdown from "../components/CustomDropdown";
@@ -67,6 +69,13 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         age: null,
         photos: null,
     });
+
+    // Get appropriate playmates based on pet type
+    const getPlaymatePreferences = () => {
+        return petData.type === PET_TYPES.DOG 
+            ? DOG_PLAYMATE_PREFERENCES 
+            : CAT_PLAYMATE_PREFERENCES;
+    };
 
     // Validate fields when pet data changes
     useEffect(() => {
@@ -428,7 +437,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                         Preferred Playmates (Select all that apply)
                     </Text>
                     <View style={styles.optionsContainer}>
-                        {DOG_PLAYMATE_PREFERENCES.map((item) => (
+                        {getPlaymatePreferences().map((item) => (
                             <TouchableOpacity
                                 key={item}
                                 style={[

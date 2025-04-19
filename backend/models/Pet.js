@@ -67,13 +67,6 @@ const PetSchema = new mongoose.Schema({
     size: [{
       type: String,
     }],
-    gender: [{
-      type: String,
-    }],
-    ageRange: {
-      min: Number,
-      max: Number
-    }
   },
   dislikedPets: [{
     type: mongoose.Schema.Types.ObjectId,

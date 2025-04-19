@@ -24,6 +24,9 @@ import {
     genderOptions,
     sizeOptions,
     TEMPERAMENTS,
+    DOG_PLAYMATE_PREFERENCES,
+    CAT_PLAYMATE_PREFERENCES,
+    PET_TYPES,
 } from "../../constants/petConstants";
 import InputField from "../../components/InputField";
 import CustomDropdown from "../../components/CustomDropdown";
@@ -59,6 +62,13 @@ const PetProfileSetupScreen = ({ navigation }) => {
         age: null,
         photos: null,
     });
+
+    // Get appropriate playmates based on pet type
+    const getPlaymatePreferences = () => {
+        return petData.type === PET_TYPES.DOG 
+            ? DOG_PLAYMATE_PREFERENCES 
+            : CAT_PLAYMATE_PREFERENCES;
+    };
 
     // Validate form fields on change
     useEffect(() => {
@@ -293,6 +303,33 @@ const PetProfileSetupScreen = ({ navigation }) => {
                                     style={[
                                         styles.optionText,
                                         petData.temperament?.includes(item) &&
+                                            styles.selectedOptionText,
+                                    ]}>
+                                    {item}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <Text style={styles.label}>
+                        Preferred Playmates (Select all that apply)
+                    </Text>
+                    <View style={styles.optionsContainer}>
+                        {getPlaymatePreferences().map((item) => (
+                            <TouchableOpacity
+                                key={item}
+                                style={[
+                                    styles.optionItem,
+                                    petData.preferredPlaymates?.includes(item) &&
+                                        styles.selectedOption,
+                                ]}
+                                onPress={() =>
+                                    toggleArrayItem("preferredPlaymates", item)
+                                }>
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        petData.preferredPlaymates?.includes(item) &&
                                             styles.selectedOptionText,
                                     ]}>
                                     {item}
