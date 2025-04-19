@@ -359,7 +359,8 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                     <InputField
                         label="Age"
                         required
-                        placeholder="e.g., 2 years"
+                        placeholder="e.g., 2"
+                        isNumeric={true}
                         value={petData.age}
                         onChangeText={(value) =>
                             handleInputChange("age", value)

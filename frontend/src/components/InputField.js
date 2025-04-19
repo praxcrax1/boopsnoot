@@ -18,7 +18,23 @@ const InputField = ({
     error = null,
     touched = false,
     onBlur = () => {},
+    isNumeric = false,
 }) => {
+    // Set the keyboard type to numeric when isNumeric is true
+    const inputKeyboardType = isNumeric ? "numeric" : keyboardType;
+    
+    // Handle numeric input conversion
+    const handleChangeText = (text) => {
+        if (isNumeric) {
+            // For numeric fields, either pass the number or empty string
+            const numericValue = text.trim() === '' ? '' : text;
+            onChangeText(numericValue);
+        } else {
+            // For non-numeric fields, pass the text as-is
+            onChangeText(text);
+        }
+    };
+    
     return (
         <View style={styles.container}>
             {label && (
@@ -36,10 +52,10 @@ const InputField = ({
                 <TextInput
                     style={[styles.input, multiline && styles.textArea]}
                     placeholder={placeholder}
-                    value={value}
-                    onChangeText={onChangeText}
+                    value={String(value)} // Convert to string to ensure compatibility
+                    onChangeText={handleChangeText}
                     secureTextEntry={secureTextEntry}
-                    keyboardType={keyboardType}
+                    keyboardType={inputKeyboardType}
                     multiline={multiline}
                     numberOfLines={numberOfLines}
                     textAlignVertical={textAlignVertical}
