@@ -15,6 +15,7 @@ import {
     ActivityIndicator,
     Animated,
     Alert,
+    StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import PetService from "../services/PetService";
 import MatchService from "../services/MatchService";
 import ChatService from "../services/ChatService";
+import theme, { withOpacity } from "../styles/theme";
 
 const HomeScreen = ({ navigation, route }) => {
     const { user } = useContext(AuthContext);
@@ -174,20 +176,25 @@ const HomeScreen = ({ navigation, route }) => {
     if (initialLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B6B" />
+                <StatusBar backgroundColor={theme.colors.background} barStyle="dark-content" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar backgroundColor={theme.colors.background} barStyle="dark-content" />
+            
             <View style={styles.header}>
-                <Text style={styles.welcomeText}>
-                    Welcome, {user?.name || "Pet Lover"}!
-                </Text>
-                {selectedPet && (
-                    <Text style={styles.petWelcome}>& {selectedPet.name}</Text>
-                )}
+                <View>
+                    <Text style={styles.welcomeText}>
+                        Welcome, {user?.name || "Pet Lover"}!
+                    </Text>
+                    {selectedPet && (
+                        <Text style={styles.petWelcome}>& {selectedPet.name}</Text>
+                    )}
+                </View>
             </View>
 
             {/* Pet Selection Tabs (Only show if user has multiple pets) */}
@@ -213,7 +220,11 @@ const HomeScreen = ({ navigation, route }) => {
                                             ? { uri: pet.photos[0] }
                                             : require("../assets/default-pet.png")
                                     }
-                                    style={styles.petTabImage}
+                                    style={[
+                                        styles.petTabImage,
+                                        selectedPetId === pet._id &&
+                                            styles.activePetTabImage
+                                    ]}
                                 />
                                 <Text
                                     style={[
@@ -229,7 +240,10 @@ const HomeScreen = ({ navigation, route }) => {
                 </View>
             )}
 
-            <ScrollView style={styles.scrollContainer}>
+            <ScrollView 
+                style={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Quick Actions */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -238,7 +252,7 @@ const HomeScreen = ({ navigation, route }) => {
                             style={styles.quickActionButton}
                             onPress={() => navigation.navigate("Finder")}>
                             <View style={styles.quickActionIconContainer}>
-                                <Ionicons name="paw" size={24} color="#FFF" />
+                                <Ionicons name="paw" size={24} color={theme.colors.onPrimary} />
                             </View>
                             <Text style={styles.quickActionText}>
                                 Find Playmates
@@ -248,11 +262,14 @@ const HomeScreen = ({ navigation, route }) => {
                         <TouchableOpacity
                             style={styles.quickActionButton}
                             onPress={() => navigation.navigate("Chats")}>
-                            <View style={styles.quickActionIconContainer}>
+                            <View style={[
+                                styles.quickActionIconContainer,
+                                { backgroundColor: theme.colors.secondary }
+                            ]}>
                                 <Ionicons
                                     name="chatbubble"
                                     size={24}
-                                    color="#FFF"
+                                    color={theme.colors.onSecondary}
                                 />
                             </View>
                             <Text style={styles.quickActionText}>Messages</Text>
@@ -262,7 +279,10 @@ const HomeScreen = ({ navigation, route }) => {
                             <TouchableOpacity
                                 style={styles.quickActionButton}
                                 onPress={() => navigation.navigate("Profile")}>
-                                <View style={styles.quickActionIconContainer}>
+                                <View style={[
+                                    styles.quickActionIconContainer,
+                                    { backgroundColor: theme.colors.info }
+                                ]}>
                                     <Ionicons
                                         name="settings"
                                         size={24}
@@ -279,7 +299,10 @@ const HomeScreen = ({ navigation, route }) => {
                                 onPress={() =>
                                     navigation.navigate("PetProfileSetup")
                                 }>
-                                <View style={styles.quickActionIconContainer}>
+                                <View style={[
+                                    styles.quickActionIconContainer,
+                                    { backgroundColor: theme.colors.success }
+                                ]}>
                                     <Ionicons
                                         name="add"
                                         size={24}
@@ -312,7 +335,7 @@ const HomeScreen = ({ navigation, route }) => {
                             <View style={styles.matchesLoadingContainer}>
                                 <ActivityIndicator
                                     size="small"
-                                    color="#FF6B6B"
+                                    color={theme.colors.primary}
                                 />
                             </View>
                         )}
@@ -320,7 +343,8 @@ const HomeScreen = ({ navigation, route }) => {
                         {!matchesLoading && matches.length > 0 ? (
                             <ScrollView
                                 horizontal
-                                showsHorizontalScrollIndicator={false}>
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.matchesContainer}>
                                 {matches.map((match) => (
                                     <TouchableOpacity
                                         key={match.matchId}
@@ -349,6 +373,7 @@ const HomeScreen = ({ navigation, route }) => {
                         ) : (
                             !matchesLoading && (
                                 <View style={styles.emptyStateContainer}>
+                                    <Ionicons name="paw-outline" size={48} color={withOpacity(theme.colors.primary, 0.6)} />
                                     <Text style={styles.emptyStateText}>
                                         No matches yet
                                     </Text>
@@ -373,23 +398,32 @@ const HomeScreen = ({ navigation, route }) => {
                     <Text style={styles.sectionTitle}>Your Activity</Text>
                     <View style={styles.statsContainer}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>
-                                {matches.length || 0}
-                            </Text>
+                            <View style={styles.statCircle}>
+                                <Text style={styles.statNumber}>
+                                    {matches.length || 0}
+                                </Text>
+                            </View>
                             <Text style={styles.statLabel}>Matches</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>
-                                {pets.length || 0}
-                            </Text>
+                            <View style={[styles.statCircle, styles.petStatCircle]}>
+                                <Text style={styles.statNumber}>
+                                    {pets.length || 0}
+                                </Text>
+                            </View>
                             <Text style={styles.statLabel}>Pets</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>0</Text>
+                            <View style={[styles.statCircle, styles.playdateStatCircle]}>
+                                <Text style={styles.statNumber}>0</Text>
+                            </View>
                             <Text style={styles.statLabel}>Playdates</Text>
                         </View>
                     </View>
                 </View>
+                
+                {/* Extra padding at bottom for comfortable scrolling */}
+                <View style={styles.bottomPadding} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -397,98 +431,116 @@ const HomeScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
     matchesLoadingContainer: {
-        height: 100,
+        height: 120,
         justifyContent: "center",
         alignItems: "center",
     },
     container: {
         flex: 1,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: theme.colors.background,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: theme.colors.background,
     },
     header: {
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 5, // Reduced from 15 to 5
-        borderBottomWidth: 0, // Removed border
-        borderBottomColor: "#F0F0F0",
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: theme.spacing.xl,
+        paddingTop: theme.spacing.lg,
+        paddingBottom: theme.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.divider,
+    },
+    headerIcon: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: theme.borderRadius.circle,
+        backgroundColor: withOpacity(theme.colors.primary, 0.1),
     },
     welcomeText: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: "#333",
+        fontSize: theme.typography.fontSize.xl,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textPrimary,
     },
     petWelcome: {
-        fontSize: 18,
-        color: "#666",
-        marginTop: 5,
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
+        marginTop: 2,
     },
     petTabsWrapper: {
         borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        borderBottomColor: theme.colors.divider,
+        backgroundColor: theme.colors.backgroundVariant,
     },
     petTabsContainer: {
-        backgroundColor: "#F8F8F8",
-        paddingVertical: 5, // Reduced from 10 to 5
-        paddingHorizontal: 15,
+        paddingVertical: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.md,
     },
     petTabsContent: {
         alignItems: "center",
+        paddingVertical: theme.spacing.xs,
     },
     petTab: {
         alignItems: "center",
-        marginRight: 10, // Reduced from 15 to 10
-        paddingHorizontal: 5,
-        paddingVertical: 5, // Reduced from 8 to 5
-        borderRadius: 15, // Changed from 20 to 15
-        flexDirection: "row", // Changed to row to make it more compact
+        marginHorizontal: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        borderRadius: theme.borderRadius.lg,
+        flexDirection: "row",
     },
     activePetTab: {
-        backgroundColor: "#FFE9E9",
+        backgroundColor: withOpacity(theme.colors.primary, 0.15),
     },
     petTabImage: {
-        width: 30, // Reduced from 40 to 30
-        height: 30, // Reduced from 40 to 30
-        borderRadius: 15, // Adjusted for new size
-        marginRight: 5, // Add margin to separate from text
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        marginRight: theme.spacing.xs,
         borderWidth: 2,
-        borderColor: "#FFF",
+        borderColor: theme.colors.background,
+    },
+    activePetTabImage: {
+        borderColor: theme.colors.primary,
     },
     petTabName: {
-        fontSize: 12,
-        color: "#666",
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        fontWeight: theme.typography.fontWeight.medium,
     },
     activePetTabName: {
-        fontWeight: "600",
-        color: "#FF6B6B",
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.primary,
     },
     scrollContainer: {
         flex: 1,
     },
     section: {
-        padding: 20,
+        padding: theme.spacing.xl,
         borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        borderBottomColor: theme.colors.divider,
     },
     sectionTitleContainer: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 15,
+        marginBottom: theme.spacing.lg,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 15,
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
+        marginBottom: theme.spacing.lg,
     },
     viewAllText: {
-        fontSize: 14,
-        color: "#FF6B6B",
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.primary,
     },
     quickActionsContainer: {
         flexDirection: "row",
@@ -497,24 +549,29 @@ const styles = StyleSheet.create({
     quickActionButton: {
         flex: 1,
         alignItems: "center",
-        marginHorizontal: 5,
+        marginHorizontal: theme.spacing.xs,
     },
     quickActionIconContainer: {
         width: 60,
         height: 60,
-        borderRadius: 30,
-        backgroundColor: "#FF6B6B",
+        borderRadius: theme.borderRadius.circle,
+        backgroundColor: theme.colors.primary,
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 8,
+        marginBottom: theme.spacing.md,
+        ...theme.shadows.medium,
     },
     quickActionText: {
-        fontSize: 14,
-        color: "#333",
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
         textAlign: "center",
     },
+    matchesContainer: {
+        paddingVertical: theme.spacing.sm,
+    },
     matchCard: {
-        marginRight: 15,
+        marginRight: theme.spacing.lg,
         alignItems: "center",
         width: 100,
     },
@@ -522,63 +579,79 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        marginBottom: 8,
+        marginBottom: theme.spacing.sm,
+        borderWidth: 2,
+        borderColor: theme.colors.primary,
+        ...theme.shadows.small,
     },
     matchName: {
-        fontSize: 14,
-        color: "#333",
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
         textAlign: "center",
     },
     emptyStateContainer: {
-        padding: 20,
+        padding: theme.spacing.xl,
         alignItems: "center",
+        backgroundColor: theme.colors.backgroundVariant,
+        borderRadius: theme.borderRadius.lg,
+        margin: theme.spacing.sm,
     },
     emptyStateText: {
-        fontSize: 14,
-        color: "#666",
-        marginBottom: 10,
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
+        marginVertical: theme.spacing.md,
     },
     emptyStateButton: {
-        backgroundColor: "#FF6B6B",
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderRadius: 5,
+        backgroundColor: theme.colors.primary,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.borderRadius.md,
+        ...theme.shadows.small,
     },
     emptyStateButtonText: {
-        color: "#FFF",
-        fontWeight: "500",
-    },
-    nearbyPetsCard: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        backgroundColor: "#F5F5F5",
-        padding: 15,
-        borderRadius: 10,
-    },
-    nearbyPetsText: {
-        fontSize: 14,
-        color: "#333",
-        flex: 1,
+        color: theme.colors.onPrimary,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        fontSize: theme.typography.fontSize.sm,
     },
     statsContainer: {
         flexDirection: "row",
         justifyContent: "space-around",
-        padding: 10,
+        padding: theme.spacing.md,
     },
     statItem: {
         alignItems: "center",
     },
+    statCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: withOpacity(theme.colors.primary, 0.15),
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: theme.spacing.sm,
+        ...theme.shadows.small,
+    },
+    petStatCircle: {
+        backgroundColor: withOpacity(theme.colors.secondary, 0.15),
+    },
+    playdateStatCircle: {
+        backgroundColor: withOpacity(theme.colors.info, 0.15),
+    },
     statNumber: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: "#FF6B6B",
+        fontSize: theme.typography.fontSize.xl,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.primary,
     },
     statLabel: {
-        fontSize: 14,
-        color: "#666",
-        marginTop: 5,
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textSecondary,
+        marginTop: theme.spacing.xs,
     },
+    bottomPadding: {
+        height: theme.spacing.xxxl,
+    }
 });
 
 export default HomeScreen;
