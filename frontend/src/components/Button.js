@@ -7,6 +7,7 @@ import {
     View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import theme from '../styles/theme';
 
 const Button = ({
     title,
@@ -37,7 +38,7 @@ const Button = ({
         textStyle,
     ];
 
-    const iconColor = type === "secondary" ? "#333" : "#FFF";
+    const iconColor = type === "secondary" ? theme.colors.textPrimary : theme.colors.onPrimary;
 
     const renderIcon = () => {
         if (!icon) return null;
@@ -63,7 +64,7 @@ const Button = ({
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator 
                         size="small" 
-                        color={type === "secondary" ? "#333" : "#FFF"} 
+                        color={type === "secondary" ? theme.colors.textPrimary : theme.colors.onPrimary} 
                     />
                     {/* Keep title visible during loading state */}
                     {icon === "logo-google" && (
@@ -85,46 +86,46 @@ const Button = ({
 
 const styles = StyleSheet.create({
     button: {
-        padding: 15,
-        borderRadius: 10,
+        padding: theme.spacing.lg,
+        borderRadius: theme.borderRadius.md,
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
-        marginBottom: 15,
+        marginBottom: theme.spacing.lg,
     },
     primaryButton: {
-        backgroundColor: "#FF6B6B",
+        backgroundColor: theme.colors.buttonPrimary,
     },
     secondaryButton: {
-        backgroundColor: "#FFF",
+        backgroundColor: theme.colors.buttonSecondary,
     },
     dangerButton: {
-        backgroundColor: "#E74C3C",
+        backgroundColor: theme.colors.buttonDanger,
     },
     disabledButton: {
         opacity: 0.5,
     },
     buttonText: {
-        fontSize: 16,
-        fontWeight: "bold",
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.bold,
     },
     primaryButtonText: {
-        color: "#FFF",
+        color: theme.colors.onPrimary,
     },
     secondaryButtonText: {
-        color: "#333",
+        color: theme.colors.textPrimary,
     },
     dangerButtonText: {
-        color: "#FFF",
+        color: theme.colors.onPrimary,
     },
     disabledButtonText: {
-        color: "#FFF",
+        color: theme.colors.onPrimary,
     },
     leftIcon: {
-        marginRight: 8,
+        marginRight: theme.spacing.sm,
     },
     rightIcon: {
-        marginLeft: 8,
+        marginLeft: theme.spacing.sm,
     },
     loadingContainer: {
         flexDirection: 'row',
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     loadingText: {
-        marginLeft: 8,
+        marginLeft: theme.spacing.sm,
     }
 });
 

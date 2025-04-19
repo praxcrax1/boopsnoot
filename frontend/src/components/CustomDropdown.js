@@ -9,6 +9,7 @@ import {
     Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import theme from '../styles/theme';
 
 const CustomDropdown = ({
     label,
@@ -69,7 +70,7 @@ const CustomDropdown = ({
                 <Text style={styles.dropdownButtonText}>
                     {selectedOption ? selectedOption.label : "Select option"}
                 </Text>
-                <Ionicons name="chevron-down" size={18} color="#666" />
+                <Ionicons name="chevron-down" size={18} color={theme.colors.icon} />
             </TouchableOpacity>
 
             {touched && error && <Text style={styles.errorText}>{error}</Text>}
@@ -88,7 +89,7 @@ const CustomDropdown = ({
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalHeaderText}>{label}</Text>
                             <TouchableOpacity onPress={handleClose}>
-                                <Ionicons name="close" size={24} color="#333" />
+                                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
                             </TouchableOpacity>
                         </View>
 
@@ -126,21 +127,21 @@ const CustomDropdown = ({
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 20,
+        marginBottom: theme.spacing.xl,
     },
     label: {
-        fontSize: 16,
-        fontWeight: "500",
-        color: "#333",
-        marginBottom: 8,
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
+        marginBottom: theme.spacing.sm,
     },
     requiredMark: {
-        color: "#FF6B6B",
+        color: theme.colors.primary,
     },
     dropdownButton: {
-        backgroundColor: "#F5F5F5",
-        borderRadius: 8,
-        padding: 12,
+        backgroundColor: theme.colors.backgroundVariant,
+        borderRadius: theme.borderRadius.sm,
+        padding: theme.spacing.md,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
@@ -148,12 +149,12 @@ const styles = StyleSheet.create({
         borderColor: "transparent",
     },
     errorDropdown: {
-        borderColor: "#FF3B30",
+        borderColor: theme.colors.error,
         borderWidth: 1,
     },
     dropdownButtonText: {
-        fontSize: 16,
-        color: "#333",
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textPrimary,
     },
     modalOverlay: {
         flex: 1,
@@ -161,47 +162,47 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(0,0,0,0.5)",
     },
     modalContent: {
-        backgroundColor: "#FFF",
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingBottom: 40,
+        backgroundColor: theme.colors.background,
+        borderTopLeftRadius: theme.borderRadius.xl,
+        borderTopRightRadius: theme.borderRadius.xl,
+        padding: theme.spacing.xl,
+        paddingBottom: theme.spacing.xxxl,
         maxHeight: "70%",
     },
     modalHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 20,
+        marginBottom: theme.spacing.xl,
     },
     modalHeaderText: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#333",
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textPrimary,
     },
     optionItem: {
         borderWidth: 1,
-        borderColor: "#DDD",
-        borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        margin: 5,
+        borderColor: theme.colors.divider,
+        borderRadius: theme.borderRadius.md,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        margin: theme.spacing.xs,
     },
     selectedOption: {
-        backgroundColor: "#FF6B6B",
-        borderColor: "#FF6B6B",
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
     },
     optionText: {
-        color: "#333",
+        color: theme.colors.textPrimary,
     },
     selectedOptionText: {
-        color: "#FFF",
+        color: theme.colors.onPrimary,
     },
     errorText: {
-        color: "#FF3B30",
-        fontSize: 12,
-        marginTop: 5,
-        marginLeft: 5,
+        color: theme.colors.error,
+        fontSize: theme.typography.fontSize.xs,
+        marginTop: theme.spacing.xs,
+        marginLeft: theme.spacing.xs,
     },
 });
 

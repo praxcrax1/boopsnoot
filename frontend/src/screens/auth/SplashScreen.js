@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import theme from '../../styles/theme';
 
 const SplashScreen = ({ navigation }) => {
     return (
@@ -31,9 +32,9 @@ const SplashScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFF",
+        backgroundColor: theme.colors.background,
         justifyContent: "space-between",
-        padding: 20,
+        padding: theme.spacing.xl,
     },
     logoContainer: {
         flex: 1,
@@ -43,32 +44,32 @@ const styles = StyleSheet.create({
     logo: {
         width: 200,
         height: 200,
-        marginBottom: 20,
+        marginBottom: theme.spacing.xl,
     },
     appName: {
-        fontSize: 36,
-        fontWeight: "bold",
-        color: "#FF6B6B",
-        marginBottom: 10,
+        fontSize: theme.typography.fontSize.display,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.primary,
+        marginBottom: theme.spacing.md,
     },
     tagline: {
-        fontSize: 18,
-        color: "#666",
+        fontSize: theme.typography.fontSize.lg,
+        color: theme.colors.textSecondary,
     },
     buttonContainer: {
         width: "100%",
-        paddingBottom: 20,
+        paddingBottom: theme.spacing.xl,
     },
     button: {
-        backgroundColor: "#FF6B6B",
-        padding: 15,
-        borderRadius: 10,
+        backgroundColor: theme.colors.primary,
+        padding: theme.spacing.lg,
+        borderRadius: theme.borderRadius.md,
         alignItems: "center",
     },
     buttonText: {
-        color: "#FFF",
-        fontSize: 18,
-        fontWeight: "bold",
+        color: theme.colors.onPrimary,
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.bold,
     },
 });
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { TextInput, StyleSheet, View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import theme from '../styles/theme';
 
 const InputField = ({
     label,
@@ -52,6 +53,7 @@ const InputField = ({
                 <TextInput
                     style={[styles.input, multiline && styles.textArea]}
                     placeholder={placeholder}
+                    placeholderTextColor={theme.colors.placeholder}
                     value={String(value)} // Convert to string to ensure compatibility
                     onChangeText={handleChangeText}
                     secureTextEntry={secureTextEntry}
@@ -66,7 +68,7 @@ const InputField = ({
                     <Ionicons
                         name="alert-circle"
                         size={20}
-                        color="#FF3B30"
+                        color={theme.colors.error}
                         style={styles.errorIcon}
                     />
                 )}
@@ -78,20 +80,20 @@ const InputField = ({
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 20,
+        marginBottom: theme.spacing.xl,
     },
     label: {
-        fontSize: 16,
-        fontWeight: "500",
-        color: "#333",
-        marginBottom: 8,
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
+        marginBottom: theme.spacing.sm,
     },
     requiredMark: {
-        color: "#FF6B6B",
+        color: theme.colors.primary,
     },
     inputContainer: {
-        backgroundColor: "#F5F5F5",
-        borderRadius: 8,
+        backgroundColor: theme.colors.backgroundVariant,
+        borderRadius: theme.borderRadius.sm,
         flexDirection: "row",
         alignItems: "center",
         borderWidth: 1,
@@ -99,25 +101,26 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        padding: 12,
-        fontSize: 16,
+        padding: theme.spacing.md,
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textPrimary,
     },
     textArea: {
         height: 100,
         textAlignVertical: "top",
     },
     errorInput: {
-        borderColor: "#FF3B30",
+        borderColor: theme.colors.error,
         borderWidth: 1,
     },
     errorText: {
-        color: "#FF3B30",
-        fontSize: 12,
-        marginTop: 5,
-        marginLeft: 5,
+        color: theme.colors.error,
+        fontSize: theme.typography.fontSize.xs,
+        marginTop: theme.spacing.xs,
+        marginLeft: theme.spacing.xs,
     },
     errorIcon: {
-        marginRight: 10,
+        marginRight: theme.spacing.md,
     },
 });
 
