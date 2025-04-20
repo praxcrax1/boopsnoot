@@ -255,6 +255,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                     <InputField
                         label="Age"
                         required
+                        isNumeric={true}
                         placeholder="e.g., 2 years"
                         value={petData.age}
                         onChangeText={(value) =>

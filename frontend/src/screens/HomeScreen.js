@@ -192,7 +192,7 @@ const HomeScreen = ({ navigation, route }) => {
                         Welcome, {user?.name || "Pet Lover"}!
                     </Text>
                     {selectedPet && (
-                        <Text style={styles.petWelcome}>& {selectedPet.name}</Text>
+                        <Text style={styles.petWelcome}>& {selectedPet?.name}</Text>
                     )}
                 </View>
             </View>
@@ -232,7 +232,7 @@ const HomeScreen = ({ navigation, route }) => {
                                         selectedPetId === pet._id &&
                                             styles.activePetTabName,
                                     ]}>
-                                    {pet.name}
+                                    {pet?.name}
                                 </Text>
                             </TouchableOpacity>
                         ))}
@@ -354,8 +354,8 @@ const HomeScreen = ({ navigation, route }) => {
                                         }>
                                         <Image
                                             source={
-                                                match.pet.photos &&
-                                                match.pet.photos.length
+                                                match?.pet?.photos &&
+                                                match?.pet?.photos.length
                                                     ? {
                                                           uri: match.pet
                                                               .photos[0],
@@ -365,7 +365,7 @@ const HomeScreen = ({ navigation, route }) => {
                                             style={styles.matchImage}
                                         />
                                         <Text style={styles.matchName}>
-                                            {match.pet.name}
+                                            {match.pet?.name}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
