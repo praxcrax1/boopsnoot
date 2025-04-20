@@ -638,37 +638,23 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+        height: "90%",
+        marginBottom: 0,
     },
     actionsContainer: {
-        position: "absolute",
-        bottom: Platform.OS === 'ios' ? 40 : 20,
-        left: 20,
-        right: 20,
-        alignItems: "center",
-    },
-    actionsBlur: {
-        borderRadius: 30,
-        overflow: "hidden",
+        height: "5%",
         width: "100%",
-        ...Platform.select({
-            ios: {
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 12,
-            },
-            android: {
-                elevation: 8,
-            },
-        }),
+        position: "absolute",
+        bottom: 0,
+        alignItems: "center",
+        backgroundColor: 'transparent',
     },
     buttonRow: {
         width: "100%",
         flexDirection: "row",
-        justifyContent: "space-between",
+        justifyContent: "space-evenly",
         alignItems: "center",
-        paddingVertical: 16,
-        paddingHorizontal: 24,
+        height: "100%", // Take up full height of the actions container
     },
     actionButton: {
         justifyContent: "center",

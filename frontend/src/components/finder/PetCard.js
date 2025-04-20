@@ -72,7 +72,7 @@ const PetCard = ({
                     style={[
                         styles.card(CARD_WIDTH, CARD_HEIGHT),
                         {
-                            transform: [{ rotate }, { scale }, ...position.getTranslateTransform()],
+                            transform: [{ rotate },  ...position.getTranslateTransform()],
                             zIndex: 10,
                             opacity: 1,
                         },
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     card: (width, height) => ({
         position: "absolute",
         width,
-        height,
+        height: height - 50,
         borderRadius: 24,
         backgroundColor: "#FFFFFF",
         overflow: "hidden",
