@@ -630,7 +630,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: theme.spacing.sm,
-        ...theme.shadows.small,
     },
     petStatCircle: {
         backgroundColor: withOpacity(theme.colors.secondary, 0.15),
