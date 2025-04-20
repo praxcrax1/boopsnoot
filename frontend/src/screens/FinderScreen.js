@@ -4,16 +4,16 @@ import {
     StyleSheet,
     TouchableOpacity,
     ActivityIndicator,
-    Dimensions,
-    Alert,
-    Animated,
-    PanResponder,
     StatusBar,
     Platform,
+    useWindowDimensions,
+    Animated,
+    PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
 import MatchService from "../services/MatchService";
 import PetService from "../services/PetService";
 import ChatService from "../services/ChatService";
@@ -26,10 +26,6 @@ import FilterModal from "../components/finder/FilterModal";
 import PetSelectorModal from "../components/finder/PetSelectorModal";
 import PetCard from "../components/finder/PetCard";
 import SkeletonLoader from "../components/finder/SkeletonLoader";
-import { BlurView } from "expo-blur"; // Ensure expo-blur is installed
-
-const { width, height } = Dimensions.get("window");
-const SWIPE_THRESHOLD = width * 0.3; // Increased threshold for more deliberate swipes
 
 const FinderScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -38,10 +34,10 @@ const FinderScreen = ({ navigation }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [filterVisible, setFilterVisible] = useState(false);
     const [activeFilters, setActiveFilters] = useState({
-        maxDistance: 25, // Default 25km radius
+        maxDistance: 25,
     });
     const [tempFilters, setTempFilters] = useState({
-        maxDistance: 25, // Default 25km radius
+        maxDistance: 25,
     });
     const [userPets, setUserPets] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null);
@@ -60,38 +56,40 @@ const FinderScreen = ({ navigation }) => {
     const contentOpacity = useRef(new Animated.Value(0)).current;
     const buttonScale = useRef(new Animated.Value(1)).current;
 
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
     const swipeProgress = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
+        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
         outputRange: [1, 0, 1],
         extrapolate: "clamp",
     });
 
     const likeButtonScale = position.x.interpolate({
-        inputRange: [0, width / 4],
+        inputRange: [0, windowWidth / 4],
         outputRange: [1, 1.15],
         extrapolate: "clamp",
     });
 
     const dislikeButtonScale = position.x.interpolate({
-        inputRange: [-width / 4, 0],
+        inputRange: [-windowWidth / 4, 0],
         outputRange: [1.15, 1],
         extrapolate: "clamp",
     });
 
     const nextCardOpacity = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
+        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
         outputRange: [1, 0.65, 1],
         extrapolate: "clamp",
     });
 
     const nextCardScale = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
+        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
         outputRange: [1, 0.85, 1],
         extrapolate: "clamp",
     });
 
     const nextCardTranslateY = position.x.interpolate({
-        inputRange: [-width / 2, 0, width / 2],
+        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
         outputRange: [0, 20, 0],
         extrapolate: "clamp",
     });
@@ -125,20 +123,20 @@ const FinderScreen = ({ navigation }) => {
 
                 if (gesture.dx > 0) {
                     swipeDirection.setValue(
-                        gesture.dx / SWIPE_THRESHOLD > 1
+                        gesture.dx / windowWidth > 1
                             ? 1
-                            : gesture.dx / SWIPE_THRESHOLD
+                            : gesture.dx / windowWidth
                     );
                 } else {
                     swipeDirection.setValue(
-                        gesture.dx / SWIPE_THRESHOLD < -1
+                        gesture.dx / windowWidth < -1
                             ? -1
-                            : gesture.dx / SWIPE_THRESHOLD
+                            : gesture.dx / windowWidth
                     );
                 }
 
-                const thresholdDxPositive = Math.round(SWIPE_THRESHOLD * 0.9);
-                const thresholdDxNegative = -Math.round(SWIPE_THRESHOLD * 0.9);
+                const thresholdDxPositive = Math.round(windowWidth * 0.9);
+                const thresholdDxNegative = -Math.round(windowWidth * 0.9);
 
                 if (
                     Math.abs(gesture.dx) >= thresholdDxPositive &&
@@ -165,9 +163,9 @@ const FinderScreen = ({ navigation }) => {
                     useNativeDriver: true,
                 }).start();
 
-                if (gesture.dx > SWIPE_THRESHOLD) {
+                if (gesture.dx > windowWidth) {
                     swipeRight();
-                } else if (gesture.dx < -SWIPE_THRESHOLD) {
+                } else if (gesture.dx < -windowWidth) {
                     swipeLeft();
                 } else {
                     resetPosition();
@@ -328,7 +326,7 @@ const FinderScreen = ({ navigation }) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         Animated.spring(position, {
-            toValue: { x: width + 100, y: 30 },
+            toValue: { x: windowWidth + 100, y: 30 },
             friction: 6,
             tension: 40,
             velocity: 5,
@@ -346,7 +344,7 @@ const FinderScreen = ({ navigation }) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         Animated.spring(position, {
-            toValue: { x: -width - 100, y: 30 },
+            toValue: { x: -windowWidth - 100, y: 30 },
             friction: 6,
             tension: 40,
             velocity: 5,
@@ -375,36 +373,6 @@ const FinderScreen = ({ navigation }) => {
             tension: 60,
             useNativeDriver: false,
         }).start();
-    };
-
-    const swipeBack = () => {
-        if (currentIndex === 0 || isSwipingBack) return;
-
-        setIsSwipingBack(true);
-        setSwipingEnabled(false);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        Animated.timing(cardOpacity, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-        }).start(() => {
-            setCurrentIndex(currentIndex - 1);
-            position.setValue({ x: -width, y: 0 });
-
-            cardOpacity.setValue(1);
-
-            Animated.spring(position, {
-                toValue: { x: 0, y: 0 },
-                friction: 6,
-                tension: 60,
-                velocity: 3,
-                useNativeDriver: false,
-            }).start(() => {
-                setIsSwipingBack(false);
-                setSwipingEnabled(true);
-            });
-        });
     };
 
     const navigateToMatchChat = useCallback(
@@ -574,6 +542,28 @@ const FinderScreen = ({ navigation }) => {
             .reverse();
     };
 
+    const renderActionButtons = () => (
+        <View style={styles.actionsContainer}>
+                <View style={styles.buttonRow}>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.mainButton, styles.passButton]}
+                        onPress={swipeLeft}
+                        disabled={!swipingEnabled}>
+                        <Ionicons name="close" size={32} color="#fff" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.mainButton, styles.likeButton]}
+                        onPress={swipeRight}
+                        disabled={!swipingEnabled}>
+                        <Ionicons name="heart" size={32} color="#fff" />
+                    </TouchableOpacity>
+
+                </View>
+        </View>
+    );
+
     if (initialLoading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -590,7 +580,10 @@ const FinderScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+            <StatusBar 
+                barStyle={Platform.OS === 'ios' ? "dark-content" : "light-content"}
+                backgroundColor="#F8F9FA" 
+            />
 
             <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
                 <Header
@@ -600,11 +593,7 @@ const FinderScreen = ({ navigation }) => {
                     onPetSelectorPress={() => setPetSelectorVisible(true)}
                 />
 
-                <Animated.View
-                    style={[
-                        styles.cardsContainer,
-                        { opacity: contentOpacity },
-                    ]}>
+                <Animated.View style={[styles.cardsContainer, { opacity: contentOpacity }]}>
                     {loading && !initialLoading && currentIndex === 0 ? (
                         <SkeletonLoader />
                     ) : (
@@ -614,57 +603,8 @@ const FinderScreen = ({ navigation }) => {
 
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
-                    !loading && (
-                        <Animated.View
-                            style={[
-                                styles.actionsContainer,
-                                { opacity: contentOpacity },
-                            ]}>
-                                <View style={styles.buttonsContainer}>
-                                    <Animated.View
-                                        style={{
-                                            transform: [
-                                                { scale: dislikeButtonScale },
-                                            ],
-                                        }}>
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.button,
-                                                styles.passButton,
-                                            ]}
-                                            onPress={swipeLeft}
-                                            disabled={!swipingEnabled}>
-                                            <Ionicons
-                                                name="close"
-                                                size={32}
-                                                color="#fff"
-                                            />
-                                        </TouchableOpacity>
-                                    </Animated.View>
-
-                                    <Animated.View
-                                        style={{
-                                            transform: [
-                                                { scale: likeButtonScale },
-                                            ],
-                                        }}>
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.button,
-                                                styles.likeButton,
-                                            ]}
-                                            onPress={swipeRight}
-                                            disabled={!swipingEnabled}>
-                                            <Ionicons
-                                                name="heart"
-                                                size={32}
-                                                color="#fff"
-                                            />
-                                        </TouchableOpacity>
-                                    </Animated.View>
-                                </View>
-                        </Animated.View>
-                    )}
+                    !loading &&
+                    renderActionButtons()}
 
                 <FilterModal
                     visible={filterVisible}
@@ -698,64 +638,68 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
-        paddingBottom: height * 0.15, // Use percentage of screen height instead of fixed value
     },
     actionsContainer: {
         position: "absolute",
-        bottom: 0, // Position from bottom based on screen height
-        left: 0,
-        right: 0,
-        height: height * 0.15, // Explicitly set height to 15% of screen height
+        bottom: Platform.OS === 'ios' ? 40 : 20,
+        left: 20,
+        right: 20,
         alignItems: "center",
-        justifyContent: "center",
     },
     actionsBlur: {
         borderRadius: 30,
         overflow: "hidden",
-        width: "70%",
+        width: "100%",
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-            },
-            android: {
-                elevation: 6,
-            },
-        }),
-    },
-    buttonsContainer: {
-        flexDirection: "row",
-        justifyContent: "space-around",
-        alignItems: "center",
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        width: "100%",
-    },
-    button: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        justifyContent: "center",
-        alignItems: "center",
-        ...Platform.select({
-            ios: {
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.16,
-                shadowRadius: 6,
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
             },
             android: {
                 elevation: 8,
             },
         }),
     },
-    passButton: {
-        backgroundColor: "#FF5252",
+    buttonRow: {
+        width: "100%",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+    },
+    actionButton: {
+        justifyContent: "center",
+        alignItems: "center",
+        borderRadius: 50,
+        ...Platform.select({
+            ios: {
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 4,
+            },
+        }),
+    },
+    mainButton: {
+        width: 64,
+        height: 64,
+    },
+    smallButton: {
+        width: 48,
+        height: 48,
+        backgroundColor: "#FFFFFF",
     },
     likeButton: {
         backgroundColor: "#4CAF50",
+    },
+    passButton: {
+        backgroundColor: "#FF5252",
     },
 });
 

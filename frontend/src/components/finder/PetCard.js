@@ -8,16 +8,12 @@ import {
     Dimensions,
     Pressable,
     Platform,
+    useWindowDimensions,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
-
-const { width, height } = Dimensions.get("window");
-// Reduced card height even further to allow more space at bottom
-const CARD_WIDTH = width * 0.94;
-const CARD_HEIGHT = height * 0.55; // Reduced from 60% to 55% of screen height
 
 const PetCard = ({
     pet,
@@ -29,25 +25,25 @@ const PetCard = ({
     nextCardStyle,
     onCardPress,
 }) => {
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    
+    // Dynamic card dimensions based on screen size
+    const CARD_WIDTH = Math.min(windowWidth * 0.92, 400);
+    const CARD_HEIGHT = Math.min(windowHeight * 0.68, 600);
+
     const formatDistance = (distance) => {
         if (!distance && distance !== 0) return "Nearby";
-
         if (typeof distance === "number") {
-            if (distance < 1) {
-                return `${(distance * 1000).toFixed(0)}m`;
-            } else if (distance < 10) {
-                return `${distance.toFixed(1)}km`;
-            } else {
-                return `${Math.round(distance)}km`;
-            }
+            if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
+            if (distance < 10) return `${distance.toFixed(1)}km`;
+            return `${Math.round(distance)}km`;
         }
-
         return "Nearby";
     };
 
-    if (isActive) {
+    const renderActiveCard = () => {
         const rotate = position.x.interpolate({
-            inputRange: [-width / 2, 0, width / 2],
+            inputRange: [-windowWidth / 2, 0, windowWidth / 2],
             outputRange: ["-8deg", "0deg", "8deg"],
             extrapolate: "clamp",
         });
@@ -65,7 +61,7 @@ const PetCard = ({
         });
 
         const scale = position.x.interpolate({
-            inputRange: [-width / 2, 0, width / 2],
+            inputRange: [-windowWidth / 2, 0, windowWidth / 2],
             outputRange: [0.985, 1, 0.985],
             extrapolate: "clamp",
         });
@@ -74,41 +70,23 @@ const PetCard = ({
             <Pressable onPress={onCardPress}>
                 <Animated.View
                     style={[
-                        styles.card,
+                        styles.card(CARD_WIDTH, CARD_HEIGHT),
                         {
-                            transform: [
-                                { rotate },
-                                { scale },
-                                ...position.getTranslateTransform(),
-                            ],
+                            transform: [{ rotate }, { scale }, ...position.getTranslateTransform()],
                             zIndex: 10,
                             opacity: 1,
                         },
                         cardStyle,
                     ]}
                     {...panHandlers}>
-                    <Animated.View
-                        style={[
-                            styles.likeContainer,
-                            { opacity: likeOpacity },
-                        ]}>
-                        <BlurView
-                            intensity={60}
-                            tint="light"
-                            style={styles.likeBlur}>
+                    <Animated.View style={[styles.likeContainer, { opacity: likeOpacity }]}>
+                        <BlurView intensity={60} tint="light" style={styles.likeBlur}>
                             <Text style={styles.likeText}>LIKE</Text>
                         </BlurView>
                     </Animated.View>
 
-                    <Animated.View
-                        style={[
-                            styles.dislikeContainer,
-                            { opacity: dislikeOpacity },
-                        ]}>
-                        <BlurView
-                            intensity={60}
-                            tint="light"
-                            style={styles.dislikeBlur}>
+                    <Animated.View style={[styles.dislikeContainer, { opacity: dislikeOpacity }]}>
+                        <BlurView intensity={60} tint="light" style={styles.dislikeBlur}>
                             <Text style={styles.dislikeText}>NOPE</Text>
                         </BlurView>
                     </Animated.View>
@@ -124,7 +102,7 @@ const PetCard = ({
                     />
 
                     <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.8)"]}
+                        colors={["transparent", "rgba(0,0,0,0.9)"]}
                         style={styles.gradient}
                     />
 
@@ -132,14 +110,8 @@ const PetCard = ({
                         <View style={styles.nameRow}>
                             <Text style={styles.petName}>{pet.name}</Text>
                             <View style={styles.distanceBadge}>
-                                <Ionicons
-                                    name="location"
-                                    size={14}
-                                    color="#FFFFFF"
-                                />
-                                <Text style={styles.petDistance}>
-                                    {formatDistance(pet.distance)}
-                                </Text>
+                                <Ionicons name="location" size={14} color="#FFFFFF" />
+                                <Text style={styles.petDistance}>{formatDistance(pet.distance)}</Text>
                             </View>
                         </View>
 
@@ -148,19 +120,14 @@ const PetCard = ({
                         <View style={styles.detailsRow}>
                             <DetailBadge label="Age" value={pet.age} />
                             <DetailBadge label="Size" value={pet.size} />
-                            <DetailBadge
-                                label="Vaccinated"
-                                value={pet.vaccinated === "yes" ? "Yes" : "No"}
-                            />
+                            <DetailBadge label="Vaccinated" value={pet.vaccinated === "yes" ? "Yes" : "No"} />
                         </View>
 
                         {pet.temperament && pet.temperament.length > 0 && (
                             <View style={styles.tagsContainer}>
                                 {pet.temperament.slice(0, 3).map((tag, index) => (
                                     <View key={index} style={styles.tag}>
-                                        <Text style={styles.tagText}>
-                                            {tag}
-                                        </Text>
+                                        <Text style={styles.tagText}>{tag}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -175,12 +142,16 @@ const PetCard = ({
                 </Animated.View>
             </Pressable>
         );
+    };
+
+    if (isActive) {
+        return renderActiveCard();
     }
 
     return (
         <Animated.View
             style={[
-                styles.card,
+                styles.card(CARD_WIDTH, CARD_HEIGHT),
                 {
                     ...Platform.select({
                         ios: {
@@ -208,7 +179,7 @@ const PetCard = ({
             />
 
             <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.8)"]}
+                colors={["transparent", "rgba(0,0,0,0.9)"]}
                 style={styles.gradient}
             />
 
@@ -217,9 +188,7 @@ const PetCard = ({
                     <Text style={styles.petName}>{pet.name}</Text>
                     <View style={styles.distanceBadge}>
                         <Ionicons name="location" size={14} color="#FFFFFF" />
-                        <Text style={styles.petDistance}>
-                            {formatDistance(pet.distance)}
-                        </Text>
+                        <Text style={styles.petDistance}>{formatDistance(pet.distance)}</Text>
                     </View>
                 </View>
 
@@ -228,10 +197,7 @@ const PetCard = ({
                 <View style={styles.detailsRow}>
                     <DetailBadge label="Age" value={pet.age} />
                     <DetailBadge label="Size" value={pet.size} />
-                    <DetailBadge
-                        label="Vaccinated"
-                        value={pet.vaccinated === "yes" ? "Yes" : "No"}
-                    />
+                    <DetailBadge label="Vaccinated" value={pet.vaccinated === "yes" ? "Yes" : "No"} />
                 </View>
             </View>
         </Animated.View>
@@ -239,42 +205,42 @@ const PetCard = ({
 };
 
 const styles = StyleSheet.create({
-    card: {
+    card: (width, height) => ({
         position: "absolute",
-        width: CARD_WIDTH,
-        height: CARD_HEIGHT,
-        borderRadius: 20,
+        width,
+        height,
+        borderRadius: 24,
         backgroundColor: "#FFFFFF",
         overflow: "hidden",
-        marginLeft: -CARD_WIDTH / 2,
-        marginTop: -CARD_HEIGHT / 2, // Move card higher on screen
-        top: "50%", // Position card higher (from 50% to 45%)
+        marginLeft: -width / 2,
+        marginTop: -height / 2,
+        top: "50%",
         left: "50%",
         ...Platform.select({
             ios: {
                 shadowColor: "#000000",
                 shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.15,
-                shadowRadius: 12,
+                shadowOpacity: 0.2,
+                shadowRadius: 15,
             },
             android: {
-                elevation: 8,
+                elevation: 12,
             },
         }),
-    },
+    }),
     cardImage: {
         width: "100%",
         height: "100%",
-        borderRadius: 20,
+        borderRadius: 24,
     },
     gradient: {
         position: "absolute",
         left: 0,
         right: 0,
         bottom: 0,
-        height: "50%",
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
+        height: "60%",
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
     cardContent: {
         position: "absolute",
@@ -287,7 +253,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 4,
+        marginBottom: 8,
     },
     petName: {
         fontSize: 32,
@@ -300,38 +266,40 @@ const styles = StyleSheet.create({
     distanceBadge: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "rgba(0, 0, 0, 0.3)",
-        paddingHorizontal: 10,
+        backgroundColor: "rgba(255, 255, 255, 0.15)",
+        paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 14,
+        borderRadius: 16,
+        backdropFilter: "blur(10px)",
     },
     petDistance: {
         fontSize: 14,
         color: "#FFFFFF",
         marginLeft: 4,
-        fontWeight: "500",
+        fontWeight: "600",
     },
     petBreed: {
         fontSize: 18,
         color: "#F0F0F0",
         marginBottom: 16,
+        fontWeight: "500",
     },
     detailsRow: {
         flexDirection: "row",
         marginBottom: 16,
+        gap: 8,
     },
     tagsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
         marginBottom: 16,
+        gap: 8,
     },
     tag: {
-        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        backgroundColor: "rgba(255, 255, 255, 0.15)",
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 14,
-        marginRight: 8,
-        marginBottom: 8,
     },
     tagText: {
         fontSize: 14,
@@ -341,18 +309,17 @@ const styles = StyleSheet.create({
     petDescription: {
         fontSize: 15,
         color: "rgba(255, 255, 255, 0.9)",
-        lineHeight: 21,
-        marginBottom: 8,
+        lineHeight: 22,
     },
     likeContainer: {
         position: "absolute",
-        top: 60,
-        right: 40,
+        top: "15%",
+        right: "10%",
         zIndex: 1,
         transform: [{ rotate: "15deg" }],
     },
     likeBlur: {
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: "hidden",
         borderWidth: 2,
         borderColor: "#4CAF50",
@@ -366,13 +333,13 @@ const styles = StyleSheet.create({
     },
     dislikeContainer: {
         position: "absolute",
-        top: 60,
-        left: 40,
+        top: "15%",
+        left: "10%",
         zIndex: 1,
         transform: [{ rotate: "-15deg" }],
     },
     dislikeBlur: {
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: "hidden",
         borderWidth: 2,
         borderColor: "#FF5252",
