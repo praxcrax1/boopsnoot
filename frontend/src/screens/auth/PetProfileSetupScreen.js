@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "react-native-image-picker";
-import { petService } from "../../api/api";
+import PetService from "../../services/PetService";
 import { AuthContext } from "../../contexts/AuthContext";
 import {
     validateName,
@@ -187,7 +187,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 ownerId: user.id,
             };
 
-            await petService.createPet(petWithOwner);
+            await PetService.createPet(petWithOwner);
 
             // Navigate to Home tab
             navigation.reset({
