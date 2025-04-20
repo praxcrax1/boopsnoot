@@ -14,6 +14,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
+import { DISPLAY_VALUES } from "../../constants/petConstants";
 
 const PetCard = ({
     pet,
@@ -118,9 +119,19 @@ const PetCard = ({
                         <Text style={styles.petBreed}>{pet.breed}</Text>
 
                         <View style={styles.detailsRow}>
-                            <DetailBadge label="Age" value={pet.age} />
-                            <DetailBadge label="Size" value={pet.size} />
-                            <DetailBadge label="Vaccinated" value={pet.vaccinated === "yes" ? "Yes" : "No"} />
+                            <DetailBadge 
+                                label="Gender" 
+                                value={DISPLAY_VALUES.GENDER[pet.gender]}
+                                icon={pet.gender === 'male' ? 'male' : 'female'} 
+                            />
+                            <DetailBadge 
+                                label="Size" 
+                                value={DISPLAY_VALUES.SIZE[pet.size]} 
+                            />
+                            <DetailBadge 
+                                label="Activity" 
+                                value={DISPLAY_VALUES.ACTIVITY[pet.activityLevel]} 
+                            />
                         </View>
 
                         {pet.temperament && pet.temperament.length > 0 && (
@@ -195,9 +206,19 @@ const PetCard = ({
                 <Text style={styles.petBreed}>{pet.breed}</Text>
 
                 <View style={styles.detailsRow}>
-                    <DetailBadge label="Age" value={pet.age} />
-                    <DetailBadge label="Size" value={pet.size} />
-                    <DetailBadge label="Vaccinated" value={pet.vaccinated === "yes" ? "Yes" : "No"} />
+                    <DetailBadge 
+                        label="Gender" 
+                        value={DISPLAY_VALUES.GENDER[pet.gender]}
+                        icon={pet.gender === 'male' ? 'male' : 'female'} 
+                    />
+                    <DetailBadge 
+                        label="Size" 
+                        value={DISPLAY_VALUES.SIZE[pet.size]} 
+                    />
+                    <DetailBadge 
+                        label="Activity" 
+                        value={DISPLAY_VALUES.ACTIVITY[pet.activityLevel]} 
+                    />
                 </View>
             </View>
         </Animated.View>

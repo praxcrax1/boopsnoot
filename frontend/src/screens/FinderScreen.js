@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { BlurView } from "expo-blur";
 import MatchService from "../services/MatchService";
 import PetService from "../services/PetService";
 import ChatService from "../services/ChatService";
@@ -163,9 +162,11 @@ const FinderScreen = ({ navigation }) => {
                     useNativeDriver: true,
                 }).start();
 
-                if (gesture.dx > windowWidth) {
+                const swipeThreshold = windowWidth * 0.4; // 40% of screen width for swipe threshold
+
+                if (gesture.dx > swipeThreshold) {
                     swipeRight();
-                } else if (gesture.dx < -windowWidth) {
+                } else if (gesture.dx < -swipeThreshold) {
                     swipeLeft();
                 } else {
                     resetPosition();

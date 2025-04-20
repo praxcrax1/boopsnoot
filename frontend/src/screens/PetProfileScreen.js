@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import PetService from "../services/PetService";
 import Button from "../components/Button";
+import { DISPLAY_VALUES } from "../constants/petConstants";
 
 const PetProfileScreen = ({ route, navigation }) => {
     const { petId } = route.params;
@@ -250,7 +251,12 @@ const InfoItem = ({ label, value, icon }) => (
         />
         <View>
             <Text style={styles.infoLabel}>{label}</Text>
-            <Text style={styles.infoValue}>{value}</Text>
+            <Text style={styles.infoValue}>
+                {label === "Gender" ? DISPLAY_VALUES.GENDER[value] :
+                 label === "Size" ? DISPLAY_VALUES.SIZE[value] :
+                 label === "Activity" ? DISPLAY_VALUES.ACTIVITY[value] :
+                 value}
+            </Text>
         </View>
     </View>
 );
