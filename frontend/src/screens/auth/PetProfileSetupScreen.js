@@ -7,10 +7,11 @@ import {
     TouchableOpacity,
     Image,
     Alert,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "react-native-image-picker";
+import * as ImagePicker from "expo-image-picker";
 import PetService from "../../services/PetService";
 import { AuthContext } from "../../contexts/AuthContext";
 import {
@@ -35,6 +36,7 @@ import Button from "../../components/Button";
 const PetProfileSetupScreen = ({ navigation }) => {
     const { user } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
     const [petData, setPetData] = useState({
         name: "",
         breed: "",
@@ -47,6 +49,10 @@ const PetProfileSetupScreen = ({ navigation }) => {
         temperament: [],
         preferredPlaymates: [],
     });
+    
+    // Local image URIs and cloud URLs mapping
+    const [localImages, setLocalImages] = useState([]);
+    const [cloudinaryUrls, setCloudinaryUrls] = useState([]);
 
     // Form validation state
     const [touched, setTouched] = useState({
@@ -63,6 +69,16 @@ const PetProfileSetupScreen = ({ navigation }) => {
         photos: null,
     });
 
+    // Request permission for image library
+    useEffect(() => {
+        (async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images!');
+            }
+        })();
+    }, []);
+
     // Get appropriate playmates based on pet type
     const getPlaymatePreferences = () => {
         return petData.type === PET_TYPES.DOG 
@@ -75,8 +91,8 @@ const PetProfileSetupScreen = ({ navigation }) => {
         validateField("name", petData.name);
         validateField("breed", petData.breed);
         validateField("age", petData.age);
-        validateField("photos", petData.photos);
-    }, [petData]);
+        validateField("photos", cloudinaryUrls);
+    }, [petData, cloudinaryUrls]);
 
     const validateField = (fieldName, value) => {
         let error = null;
@@ -90,6 +106,9 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 break;
             case "age":
                 error = validateAge(value);
+                break;
+            case "photos":
+                error = validatePhotos(value);
                 break;
             default:
                 break;
@@ -125,31 +144,78 @@ const PetProfileSetupScreen = ({ navigation }) => {
     };
 
     const pickImage = async () => {
-        const options = {
-            mediaType: "photo",
-            includeBase64: false,
-            maxHeight: 800,
-            maxWidth: 800,
-        };
-
         try {
-            const result = await ImagePicker.launchImageLibrary(options);
-            if (!result.didCancel && !result.errorCode) {
-                // For simplicity, we'll just store the image URI in the state
-                // In a real app, you would upload to a server and store the URL
-                const newPhotos = [...petData.photos, result.assets[0].uri];
-                setPetData({ ...petData, photos: newPhotos });
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 4],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const selectedImage = result.assets[0];
+                
+                // Add to local images
+                setLocalImages([...localImages, selectedImage.uri]);
+                
+                // Start upload to Cloudinary
+                uploadImageToCloudinary(selectedImage.uri);
+                
                 setTouched({ ...touched, photos: true });
             }
         } catch (error) {
+            console.error('Image picker error:', error);
             Alert.alert("Error", "Failed to pick image");
+        }
+    };
+    
+    const uploadImageToCloudinary = async (imageUri) => {
+        setImageUploading(true);
+        try {
+            // Upload to Cloudinary
+            const response = await PetService.uploadPetImage(imageUri);
+            
+            if (response.success && response.imageUrl) {
+                // Add Cloudinary URL to state
+                const newUrls = [...cloudinaryUrls, response.imageUrl];
+                setCloudinaryUrls(newUrls);
+                
+                // Also update petData.photos which will be sent to API
+                setPetData(prev => ({
+                    ...prev,
+                    photos: newUrls
+                }));
+            } else {
+                throw new Error('Upload failed');
+            }
+        } catch (error) {
+            console.error('Cloudinary upload error:', error);
+            Alert.alert('Upload Failed', 'Failed to upload image to cloud storage.');
+            
+            // Remove the local image if upload fails
+            setLocalImages(localImages.filter(uri => uri !== imageUri));
+        } finally {
+            setImageUploading(false);
         }
     };
 
     const removeImage = (index) => {
-        const newPhotos = [...petData.photos];
-        newPhotos.splice(index, 1);
-        setPetData({ ...petData, photos: newPhotos });
+        // Remove from both local and cloudinary arrays
+        const newLocalImages = [...localImages];
+        const newCloudinaryUrls = [...cloudinaryUrls];
+        
+        newLocalImages.splice(index, 1);
+        newCloudinaryUrls.splice(index, 1);
+        
+        setLocalImages(newLocalImages);
+        setCloudinaryUrls(newCloudinaryUrls);
+        
+        // Update petData.photos
+        setPetData({
+            ...petData,
+            photos: newCloudinaryUrls
+        });
+        
         setTouched({ ...touched, photos: true });
     };
 
@@ -167,7 +233,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
         const nameError = validateField("name", petData.name);
         const breedError = validateField("breed", petData.breed);
         const ageError = validateField("age", petData.age);
-        const photosError = validateField("photos", petData.photos);
+        const photosError = validateField("photos", cloudinaryUrls);
 
         return !nameError && !breedError && !ageError && !photosError;
     };
@@ -175,15 +241,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
     const handleSubmit = async () => {
         // Validate all fields
         if (!validateForm()) {
-            // Scroll to the first error field would be added here
             return;
         }
 
         setIsSubmitting(true);
         try {
-            // Add user ID to pet data
+            // Prepare pet data with Cloudinary URLs
             const petWithOwner = {
                 ...petData,
+                photos: cloudinaryUrls, // Use Cloudinary URLs
                 ownerId: user.id,
             };
 
@@ -359,15 +425,22 @@ const PetProfileSetupScreen = ({ navigation }) => {
                         </Text>
                         <TouchableOpacity
                             style={styles.photoUploadButton}
-                            onPress={pickImage}>
-                            <Ionicons
-                                name="add-circle-outline"
-                                size={20}
-                                color="#666"
-                            />
-                            <Text style={styles.photoUploadButtonText}>
-                                Add Photo
-                            </Text>
+                            onPress={pickImage}
+                            disabled={imageUploading}>
+                            {imageUploading ? (
+                                <ActivityIndicator size="small" color="#666" />
+                            ) : (
+                                <>
+                                    <Ionicons
+                                        name="add-circle-outline"
+                                        size={20}
+                                        color="#666"
+                                    />
+                                    <Text style={styles.photoUploadButtonText}>
+                                        Add Photo
+                                    </Text>
+                                </>
+                            )}
                         </TouchableOpacity>
 
                         {touched.photos && errors.photos && (
@@ -377,22 +450,29 @@ const PetProfileSetupScreen = ({ navigation }) => {
                         )}
 
                         <View style={styles.photoContainer}>
-                            {petData.photos?.map((photo, index) => (
+                            {localImages.map((photoUri, index) => (
                                 <View key={index} style={styles.photoItem}>
                                     <Image
-                                        source={{ uri: photo }}
+                                        source={{ uri: photoUri }}
                                         style={styles.photo}
                                     />
-                                    <TouchableOpacity
-                                        style={styles.removePhotoButton}
-                                        onPress={() => removeImage(index)}>
-                                        <Text
-                                            style={
-                                                styles.removePhotoButtonText
-                                            }>
-                                            ×
-                                        </Text>
-                                    </TouchableOpacity>
+                                    {!imageUploading && (
+                                        <TouchableOpacity
+                                            style={styles.removePhotoButton}
+                                            onPress={() => removeImage(index)}>
+                                            <Text
+                                                style={
+                                                    styles.removePhotoButtonText
+                                                }>
+                                                ×
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {index >= cloudinaryUrls.length && (
+                                        <View style={styles.uploadingOverlay}>
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        </View>
+                                    )}
                                 </View>
                             ))}
                         </View>
@@ -405,7 +485,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                                 : "Create Pet Profile"
                         }
                         onPress={handleSubmit}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || imageUploading}
                         loading={isSubmitting}
                     />
                 </View>
@@ -519,6 +599,17 @@ const styles = StyleSheet.create({
         color: "#FFF",
         fontSize: 18,
         fontWeight: "bold",
+    },
+    uploadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     skipButton: {
         marginTop: 10,

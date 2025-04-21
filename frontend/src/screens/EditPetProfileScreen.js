@@ -8,12 +8,10 @@ import {
     Image,
     ActivityIndicator,
     Alert,
-    Modal,
-    FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "react-native-image-picker";
+import * as ImagePicker from "expo-image-picker";
 import PetService from "../services/PetService";
 import {
     validateName,
@@ -46,6 +44,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
     
     // Form state
     const [petData, setPetData] = useState({
@@ -77,6 +76,19 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         age: null,
         photos: null,
     });
+    
+    // Track which images are new and being uploaded
+    const [pendingUploads, setPendingUploads] = useState([]);
+
+    // Request permission for image library
+    useEffect(() => {
+        (async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images!');
+            }
+        })();
+    }, []);
 
     // Helper function to normalize pet data
     const normalizePetData = (pet) => ({
@@ -145,11 +157,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             <TouchableOpacity
                 style={styles.headerButton}
                 onPress={handleSubmit}
-                disabled={submitting || !hasChanges}>
+                disabled={submitting || !hasChanges || imageUploading}>
                 <Text
                     style={[
                         styles.saveButtonText,
-                        (submitting || !hasChanges) && styles.disabledButtonText,
+                        (submitting || !hasChanges || imageUploading) && styles.disabledButtonText,
                     ]}>
                     {submitting ? "Saving..." : "Save"}
                 </Text>
@@ -161,7 +173,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             headerLeft: headerLeftButton,
             headerRight: headerRightButton,
         });
-    }, [navigation, submitting, hasChanges]);
+    }, [navigation, submitting, hasChanges, imageUploading]);
 
     // Check for form changes
     useEffect(() => {
@@ -262,38 +274,101 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
     // Image handling
     const pickImage = useCallback(async () => {
-        const options = {
-            mediaType: "photo",
-            includeBase64: false,
-            maxHeight: 800,
-            maxWidth: 800,
-        };
-
         try {
-            const result = await ImagePicker.launchImageLibrary(options);
-            if (!result.didCancel && !result.errorCode) {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 4],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const selectedImage = result.assets[0];
+                
+                // Add to pending uploads list
+                setPendingUploads(prev => [...prev, selectedImage.uri]);
+                
+                // Add to pet photos with local URI first (will be replaced with Cloudinary URL)
                 setPetData(prevData => ({
-                    ...prevData, 
-                    photos: [...prevData.photos, result.assets[0].uri]
+                    ...prevData,
+                    photos: [...prevData.photos, selectedImage.uri]
                 }));
+                
+                // Start upload to Cloudinary
+                uploadImageToCloudinary(selectedImage.uri);
+                
                 setTouched(prev => ({ ...prev, photos: true }));
             }
         } catch (error) {
+            console.error('Image picker error:', error);
             Alert.alert("Error", "Failed to pick image");
         }
-    }, []);
+    }, [petData.photos]);
+    
+    const uploadImageToCloudinary = async (imageUri) => {
+        setImageUploading(true);
+        try {
+            // Upload to Cloudinary
+            const response = await PetService.uploadPetImage(imageUri);
+            
+            if (response.success && response.imageUrl) {
+                // Replace the local URI with the Cloudinary URL
+                setPetData(prevData => {
+                    const photos = [...prevData.photos];
+                    const localIndex = photos.findIndex(uri => uri === imageUri);
+                    
+                    if (localIndex !== -1) {
+                        photos[localIndex] = response.imageUrl;
+                    }
+                    
+                    return {
+                        ...prevData,
+                        photos: photos
+                    };
+                });
+                
+                // Remove from pending uploads
+                setPendingUploads(prev => prev.filter(uri => uri !== imageUri));
+            } else {
+                throw new Error('Upload failed');
+            }
+        } catch (error) {
+            console.error('Cloudinary upload error:', error);
+            Alert.alert('Upload Failed', 'Failed to upload image to cloud storage.');
+            
+            // Remove the failed image
+            setPetData(prevData => ({
+                ...prevData,
+                photos: prevData.photos.filter(uri => uri !== imageUri)
+            }));
+            
+            // Remove from pending uploads
+            setPendingUploads(prev => prev.filter(uri => uri !== imageUri));
+        } finally {
+            setImageUploading(false);
+        }
+    };
 
     const removeImage = useCallback((index) => {
         setPetData(prevData => {
             const newPhotos = [...prevData.photos];
+            const removedUri = newPhotos[index];
+            
+            // Remove from photos array
             newPhotos.splice(index, 1);
+            
+            // Remove from pending uploads if it's there
+            if (pendingUploads.includes(removedUri)) {
+                setPendingUploads(prev => prev.filter(uri => uri !== removedUri));
+            }
+            
             return {
                 ...prevData,
                 photos: newPhotos
             };
         });
         setTouched(prev => ({ ...prev, photos: true }));
-    }, []);
+    }, [pendingUploads]);
 
     // Form validation
     const validateForm = useCallback(() => {
@@ -351,6 +426,16 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     const handleSubmit = useCallback(async () => {
         console.log("Submit pressed, current petData:", petData);
         
+        // Check if there are pending uploads
+        if (pendingUploads.length > 0) {
+            Alert.alert(
+                "Images Still Uploading",
+                "Please wait for all images to finish uploading before saving.",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+        
         if (!validateForm()) {
             Alert.alert(
                 "Validation Error",
@@ -395,7 +480,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         } finally {
             setSubmitting(false);
         }
-    }, [petData, petId, navigation, validateForm]);
+    }, [petData, petId, navigation, validateForm, pendingUploads]);
 
     // Loading state
     if (loading) {
@@ -405,6 +490,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             </View>
         );
     }
+
+    // Check if a photo URL is a local URI or remote URL
+    const isLocalUri = (uri) => {
+        return uri && (uri.startsWith('file:') || uri.startsWith('content:') || pendingUploads.includes(uri));
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -571,15 +661,22 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                         </Text>
                         <TouchableOpacity
                             style={styles.photoUploadButton}
-                            onPress={pickImage}>
-                            <Ionicons
-                                name="add-circle-outline"
-                                size={20}
-                                color="#666"
-                            />
-                            <Text style={styles.photoUploadButtonText}>
-                                Add Photo
-                            </Text>
+                            onPress={pickImage}
+                            disabled={imageUploading}>
+                            {imageUploading ? (
+                                <ActivityIndicator size="small" color="#666" />
+                            ) : (
+                                <>
+                                    <Ionicons
+                                        name="add-circle-outline"
+                                        size={20}
+                                        color="#666"
+                                    />
+                                    <Text style={styles.photoUploadButtonText}>
+                                        Add Photo
+                                    </Text>
+                                </>
+                            )}
                         </TouchableOpacity>
 
                         {touched.photos && errors.photos && (
@@ -597,7 +694,8 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                                     />
                                     <TouchableOpacity
                                         style={styles.removePhotoButton}
-                                        onPress={() => removeImage(index)}>
+                                        onPress={() => removeImage(index)}
+                                        disabled={imageUploading}>
                                         <Text
                                             style={
                                                 styles.removePhotoButtonText
@@ -605,6 +703,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                                             ×
                                         </Text>
                                     </TouchableOpacity>
+                                    {isLocalUri(photo) && (
+                                        <View style={styles.uploadingOverlay}>
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        </View>
+                                    )}
                                 </View>
                             ))}
                         </View>
@@ -736,6 +839,17 @@ const styles = StyleSheet.create({
         color: "#FFF",
         fontSize: 18,
         fontWeight: "bold",
+    },
+    uploadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     deleteButton: {
         marginTop: 10,
