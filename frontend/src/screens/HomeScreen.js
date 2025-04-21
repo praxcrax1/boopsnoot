@@ -415,12 +415,6 @@ const HomeScreen = ({ navigation, route }) => {
                             </View>
                             <Text style={styles.statLabel}>Pets</Text>
                         </View>
-                        <View style={styles.statItem}>
-                            <View style={[styles.statCircle, styles.playdateStatCircle]}>
-                                <Text style={styles.statNumber}>0</Text>
-                            </View>
-                            <Text style={styles.statLabel}>Playdates</Text>
-                        </View>
                     </View>
                 </View>
                 

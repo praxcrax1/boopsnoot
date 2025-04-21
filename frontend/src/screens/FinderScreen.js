@@ -46,9 +46,11 @@ const FinderScreen = ({ navigation }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
     const cardAnimation = useRef(new Animated.Value(1)).current;
-    const cardPosition = useRef(new Animated.Value(0)).current;
+    const cardScale = useRef(new Animated.Value(1)).current;
+    const cardOpacity = useRef(new Animated.Value(1)).current;
     const nextCardOpacity = useRef(new Animated.Value(0)).current;
     const [isTransitioning, setIsTransitioning] = useState(false);
+    const [dataLoading, setDataLoading] = useState(true);
 
     useEffect(() => {
         StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
@@ -79,6 +81,7 @@ const FinderScreen = ({ navigation }) => {
 
     const fetchUserPets = async () => {
         setLoading(true);
+        setDataLoading(true);
         try {
             const response = await PetService.getUserPets();
             if (response.pets && response.pets.length > 0) {
@@ -117,6 +120,7 @@ const FinderScreen = ({ navigation }) => {
         if (!selectedPetId) return;
 
         setLoading(true);
+        setDataLoading(true);
         try {
             const apiFilters = {
                 ...activeFilters,
@@ -170,24 +174,35 @@ const FinderScreen = ({ navigation }) => {
         } finally {
             setLoading(false);
             setInitialLoading(false);
+            setDataLoading(false);
         }
     };
 
     const animateCardTransition = (isLike) => {
         setIsTransitioning(true);
-        const position = isLike ? 100 : -100;
-
+        
+        // Animation for center outward effect (scaling + opacity)
         Animated.parallel([
-            Animated.timing(cardPosition, {
-                toValue: position,
-                duration: 250,
-                useNativeDriver: true,
-            }),
-            Animated.timing(cardAnimation, {
+            // Scale the card up slightly then down to 0
+            Animated.sequence([
+                Animated.timing(cardScale, {
+                    toValue: 1.05,
+                    duration: 100,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(cardScale, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+            ]),
+            // Fade out the card
+            Animated.timing(cardOpacity, {
                 toValue: 0,
                 duration: 250,
                 useNativeDriver: true,
             }),
+            // Prepare next card to appear
             Animated.timing(nextCardOpacity, {
                 toValue: 1,
                 duration: 200,
@@ -195,8 +210,9 @@ const FinderScreen = ({ navigation }) => {
                 useNativeDriver: true,
             }),
         ]).start(() => {
-            cardPosition.setValue(0);
-            cardAnimation.setValue(1);
+            // Reset animation values
+            cardScale.setValue(1);
+            cardOpacity.setValue(1);
             nextCardOpacity.setValue(0);
             setIsTransitioning(false);
             goToNextPet();
@@ -272,6 +288,10 @@ const FinderScreen = ({ navigation }) => {
         if (loading && !initialLoading) {
             return <PawLoader />;
         }
+        
+        if (dataLoading) {
+            return <PawLoader />;
+        }
 
         if (potentialMatches.length === 0 || currentIndex >= potentialMatches.length) {
             return <EmptyState onRefresh={() => fetchPotentialMatches(true)} />;
@@ -294,10 +314,9 @@ const FinderScreen = ({ navigation }) => {
                     styles.currentCardContainer,
                     {
                         transform: [
-                            { translateX: cardPosition },
-                            { scale: cardAnimation }
+                            { scale: cardScale }
                         ],
-                        opacity: cardAnimation,
+                        opacity: cardOpacity,
                     }
                 ]}>
                     <PetCard
@@ -348,7 +367,8 @@ const FinderScreen = ({ navigation }) => {
 
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
-                    !loading && (
+                    !loading &&
+                    !dataLoading && (
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.passButton]}

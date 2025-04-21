@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo, useCallback, memo } from "react";
 import {
     View,
     Text,
@@ -13,19 +13,15 @@ import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
 import { DISPLAY_VALUES } from "../../constants/petConstants";
 
-// Local placeholder images (replace these paths with your actual placeholder image assets)
-const PLACEHOLDER_IMAGES = [
-    require('../../assets/default-pet.png'),
-    require('../../assets/default-pet.png'),
-    require('../../assets/default-pet.png'),
-    require('../../assets/default-pet.png'),
-];
+// Using icon.png as a placeholder image
+const PLACEHOLDER_IMAGE = require('../../../assets/icon.png');
 
-const PetCard = ({ pet, onCardPress, animationStyle }) => {
+const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const [imagesLoaded, setImagesLoaded] = useState({});
     const flatListRef = useRef(null);
 
-    const formatDistance = (distance) => {
+    const formatDistance = useCallback((distance) => {
         if (!distance && distance !== 0) return "Nearby";
         if (typeof distance === "number") {
             if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
@@ -33,19 +29,37 @@ const PetCard = ({ pet, onCardPress, animationStyle }) => {
             return `${Math.round(distance)}km`;
         }
         return "Nearby";
-    };
+    }, []);
 
-    const renderImageItem = ({ item }) => (
-        <Image
-            source={typeof item === 'string' ? { uri: item } : item}
-            style={styles.image}
-            resizeMode="cover"
-        />
-    );
+    const handleImageLoad = useCallback((index) => {
+        setImagesLoaded(prev => ({
+            ...prev,
+            [index]: true
+        }));
+    }, []);
 
-    const renderPagingDots = () => (
+    const renderImageItem = useCallback(({ item, index }) => (
+        <View style={styles.imageWrapper}>
+            <Image
+                source={PLACEHOLDER_IMAGE}
+                style={styles.placeholderImage}
+                resizeMode="contain"
+            />
+            <Image
+                source={typeof item === 'string' ? { uri: item } : item}
+                style={[
+                    styles.image, 
+                    imagesLoaded[index] ? { opacity: 1 } : { opacity: 0 }
+                ]}
+                resizeMode="cover"
+                onLoad={() => handleImageLoad(index)}
+            />
+        </View>
+    ), [imagesLoaded, handleImageLoad]);
+
+    const renderPagingDots = useMemo(() => (
         <View style={styles.paginationDots}>
-            {(pet.photos?.length ? pet.photos : PLACEHOLDER_IMAGES).map((_, index) => (
+            {(pet.photos?.length ? pet.photos : [PLACEHOLDER_IMAGE]).map((_, index) => (
                 <View
                     key={index}
                     style={[
@@ -55,86 +69,102 @@ const PetCard = ({ pet, onCardPress, animationStyle }) => {
                 />
             ))}
         </View>
-    );
+    ), [pet.photos, activeImageIndex]);
 
-    const handleScroll = (event) => {
+    const handleScroll = useCallback((event) => {
         const contentOffset = event.nativeEvent.contentOffset.x;
         const viewSize = event.nativeEvent.layoutMeasurement.width;
         const newIndex = Math.round(contentOffset / viewSize);
         setActiveImageIndex(newIndex);
-    };
+    }, []);
+
+    // Memoize the pet details section to prevent unnecessary re-renders
+    const petDetailsSection = useMemo(() => (
+        <>
+            <View style={styles.headerSection}>
+                <View style={styles.nameContainer}>
+                    <Text style={styles.name}>{pet.name}</Text>
+                    <View style={styles.distanceBadge}>
+                        <Ionicons name="location" size={14} color="#666666" />
+                        <Text style={styles.distance}>{formatDistance(pet.distance)}</Text>
+                    </View>
+                </View>
+                <Text style={styles.breed}>{pet.breed}</Text>
+            </View>
+
+            <View style={styles.detailsRow}>
+                <DetailBadge 
+                    label="Gender" 
+                    value={DISPLAY_VALUES.GENDER[pet.gender]}
+                    icon={pet.gender === 'male' ? 'male' : 'female'} 
+                />
+                <DetailBadge 
+                    label="Size" 
+                    value={DISPLAY_VALUES.SIZE[pet.size]} 
+                />
+                <DetailBadge 
+                    label="Activity" 
+                    value={DISPLAY_VALUES.ACTIVITY[pet.activityLevel]} 
+                />
+            </View>
+
+            {pet.temperament && pet.temperament.length > 0 && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Temperament</Text>
+                    <View style={styles.tagsContainer}>
+                        {pet.temperament.map((tag, index) => (
+                            <View key={index} style={styles.tag}>
+                                <Text style={styles.tagText}>{tag}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {pet.description && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>About</Text>
+                    <Text style={styles.description}>{pet.description}</Text>
+                </View>
+            )}
+        </>
+    ), [pet, formatDistance]);
+
+    // Memoize the images carousel to prevent rendering issues
+    const imageCarousel = useMemo(() => (
+        <View style={styles.imageContainer}>
+            <FlatList
+                ref={flatListRef}
+                data={pet.photos?.length ? pet.photos : [PLACEHOLDER_IMAGE]}
+                renderItem={renderImageItem}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                removeClippedSubviews={true}
+            />
+            {renderPagingDots}
+        </View>
+    ), [pet.photos, renderImageItem, handleScroll, renderPagingDots]);
 
     return (
         <Animated.View style={[styles.container, animationStyle]}>
-            <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-                <View style={styles.imageContainer}>
-                    <FlatList
-                        ref={flatListRef}
-                        data={pet.photos?.length ? pet.photos : PLACEHOLDER_IMAGES}
-                        renderItem={renderImageItem}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        onScroll={handleScroll}
-                        scrollEventThrottle={16}
-                    />
-                    {renderPagingDots()}
-                </View>
-
+            <ScrollView 
+                style={styles.scrollContainer} 
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+            >
+                {imageCarousel}
+                
                 <View style={styles.contentContainer}>
-                    <View style={styles.headerSection}>
-                        <View style={styles.nameContainer}>
-                            <Text style={styles.name}>{pet.name}</Text>
-                            <View style={styles.distanceBadge}>
-                                <Ionicons name="location" size={14} color="#666666" />
-                                <Text style={styles.distance}>{formatDistance(pet.distance)}</Text>
-                            </View>
-                        </View>
-                        <Text style={styles.breed}>{pet.breed}</Text>
-                    </View>
-
-                    <View style={styles.detailsRow}>
-                        <DetailBadge 
-                            label="Gender" 
-                            value={DISPLAY_VALUES.GENDER[pet.gender]}
-                            icon={pet.gender === 'male' ? 'male' : 'female'} 
-                        />
-                        <DetailBadge 
-                            label="Size" 
-                            value={DISPLAY_VALUES.SIZE[pet.size]} 
-                        />
-                        <DetailBadge 
-                            label="Activity" 
-                            value={DISPLAY_VALUES.ACTIVITY[pet.activityLevel]} 
-                        />
-                    </View>
-
-                    {pet.temperament && pet.temperament.length > 0 && (
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Temperament</Text>
-                            <View style={styles.tagsContainer}>
-                                {pet.temperament.map((tag, index) => (
-                                    <View key={index} style={styles.tag}>
-                                        <Text style={styles.tagText}>{tag}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {pet.description && (
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>About</Text>
-                            <Text style={styles.description}>{pet.description}</Text>
-                        </View>
-                    )}
-
+                    {petDetailsSection}
                     <View style={styles.bottomSpacing} />
                 </View>
             </ScrollView>
         </Animated.View>
     );
-};
+});
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -150,9 +180,21 @@ const styles = StyleSheet.create({
         height: SCREEN_WIDTH,
         backgroundColor: '#f0f0f0',
     },
+    imageWrapper: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_WIDTH,
+        position: 'relative',
+    },
+    placeholderImage: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_WIDTH,
+        position: 'absolute',
+        backgroundColor: '#f0f0f0',
+    },
     image: {
         width: SCREEN_WIDTH,
         height: SCREEN_WIDTH,
+        position: 'absolute',
     },
     paginationDots: {
         flexDirection: 'row',
@@ -172,9 +214,11 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         padding: 20,
+        backfaceVisibility: 'hidden',
     },
     headerSection: {
         marginBottom: 20,
+        position: 'relative',
     },
     nameContainer: {
         flexDirection: 'row',
@@ -186,6 +230,8 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: '700',
         color: '#333333',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     distanceBadge: {
         flexDirection: 'row',
@@ -200,11 +246,15 @@ const styles = StyleSheet.create({
         color: '#666666',
         marginLeft: 4,
         fontWeight: '500',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     breed: {
         fontSize: 18,
         color: '#666666',
         fontWeight: '500',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     detailsRow: {
         flexDirection: 'row',
@@ -219,6 +269,8 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#333333',
         marginBottom: 12,
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     tagsContainer: {
         flexDirection: 'row',
@@ -235,14 +287,17 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666666',
         fontWeight: '500',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     description: {
         fontSize: 16,
         lineHeight: 24,
         color: '#666666',
+        includeFontPadding: false, 
     },
     bottomSpacing: {
-        height: 100, // Space for floating action buttons
+        height: 100,
     },
 });
 
