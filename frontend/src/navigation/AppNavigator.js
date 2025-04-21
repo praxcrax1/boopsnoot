@@ -79,17 +79,17 @@ const MainStack = () => (
         <Stack.Screen
             name="PetProfile"
             component={PetProfileScreen}
-            options={{ headerShown: true, title: "" }}
+            options={{ headerShown: false }}
         />
         <Stack.Screen
             name="EditPetProfile"
             component={EditPetProfileScreen}
-            options={{ headerShown: true, title: "Edit Pet Profile" }}
+            options={{ headerShown: false }}
         />
         <Stack.Screen
             name="PetProfileSetup"
             component={PetProfileSetupScreen}
-            options={{ headerShown: true, title: "Add Your Pet" }}
+            options={{ headerShown: false}}
         />
         <Stack.Screen
             name="Settings"

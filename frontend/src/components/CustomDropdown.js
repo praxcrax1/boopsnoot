@@ -20,6 +20,8 @@ const CustomDropdown = ({
     error = null,
     touched = false,
     onBlur = () => {},
+    style,
+    containerStyle,
 }) => {
     const [modalVisible, setModalVisible] = useState(false);
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -54,7 +56,7 @@ const CustomDropdown = ({
     });
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, containerStyle]}>
             {label && (
                 <Text style={styles.label}>
                     {label}{" "}
@@ -65,6 +67,7 @@ const CustomDropdown = ({
                 style={[
                     styles.dropdownButton,
                     error && touched && styles.errorDropdown,
+                    style,
                 ]}
                 onPress={() => setModalVisible(true)}>
                 <Text style={styles.dropdownButtonText}>
@@ -139,14 +142,15 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
     },
     dropdownButton: {
-        backgroundColor: theme.colors.backgroundVariant,
-        borderRadius: theme.borderRadius.sm,
-        padding: theme.spacing.md,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
         borderWidth: 1,
-        borderColor: "transparent",
+        borderColor: theme.colors.inputBorder,
+        borderRadius: theme.borderRadius.sm,
+        backgroundColor: theme.colors.backgroundVariant,
+        height: 48, // Match the InputField height
+        paddingHorizontal: theme.spacing.md,
     },
     errorDropdown: {
         borderColor: theme.colors.error,
@@ -155,6 +159,7 @@ const styles = StyleSheet.create({
     dropdownButtonText: {
         fontSize: theme.typography.fontSize.md,
         color: theme.colors.textPrimary,
+        flex: 1, // Take up available space
     },
     modalOverlay: {
         flex: 1,

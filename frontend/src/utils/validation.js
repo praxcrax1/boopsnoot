@@ -39,6 +39,7 @@ export const validateBreed = (value) => {
 };
 
 export const validatePhotos = (photos) => {
-  // Temporarily disabled photo validation
+  if (!photos || !Array.isArray(photos)) return 'Please add photos of your pet';
+  if (photos.length < 2) return 'Please add at least 2 photos of your pet';
   return null;
 };

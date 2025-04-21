@@ -14,7 +14,7 @@ import DetailBadge from "./DetailBadge";
 import { DISPLAY_VALUES } from "../../constants/petConstants";
 
 // Using icon.png as a placeholder image
-const PLACEHOLDER_IMAGE = require('../../../assets/icon.png');
+const PLACEHOLDER_IMAGE = "https://blocks.astratic.com/img/general-img-landscape.png"
 
 const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);

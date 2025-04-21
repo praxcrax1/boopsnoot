@@ -8,10 +8,13 @@ import {
     Image,
     ActivityIndicator,
     Alert,
+    Dimensions,
+    StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import PetService from "../services/PetService";
 import {
     validateName,
@@ -33,6 +36,10 @@ import {
 import InputField from "../components/InputField";
 import CustomDropdown from "../components/CustomDropdown";
 import Button from "../components/Button";
+import theme from "../styles/theme";
+
+const { width } = Dimensions.get("window");
+const photoSize = (width - 60) / 3;
 
 const EditPetProfileScreen = ({ route, navigation }) => {
     const { petId } = route.params;
@@ -45,6 +52,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     const [submitting, setSubmitting] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
+    const [currentSection, setCurrentSection] = useState('basic');
     
     // Form state
     const [petData, setPetData] = useState({
@@ -149,31 +157,26 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             <TouchableOpacity
                 style={styles.headerButton}
                 onPress={handleBackPress}>
-                <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-        );
-        
-        const headerRightButton = () => (
-            <TouchableOpacity
-                style={styles.headerButton}
-                onPress={handleSubmit}
-                disabled={submitting || !hasChanges || imageUploading}>
-                <Text
-                    style={[
-                        styles.saveButtonText,
-                        (submitting || !hasChanges || imageUploading) && styles.disabledButtonText,
-                    ]}>
-                    {submitting ? "Saving..." : "Save"}
-                </Text>
+                <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
             </TouchableOpacity>
         );
         
         navigation.setOptions({
             title: "Edit Pet Profile",
             headerLeft: headerLeftButton,
-            headerRight: headerRightButton,
+            headerRight: null,
+            headerTitleStyle: {
+                fontWeight: theme.typography.fontWeight.semiBold,
+                color: theme.colors.textPrimary
+            },
+            headerStyle: {
+                backgroundColor: theme.colors.background,
+                elevation: 0,
+                shadowOpacity: 0,
+                borderBottomWidth: 0,
+            }
         });
-    }, [navigation, submitting, hasChanges, imageUploading]);
+    }, [navigation]);
 
     // Check for form changes
     useEffect(() => {
@@ -424,8 +427,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     
     // Form submission
     const handleSubmit = useCallback(async () => {
-        console.log("Submit pressed, current petData:", petData);
-        
         // Check if there are pending uploads
         if (pendingUploads.length > 0) {
             Alert.alert(
@@ -486,7 +487,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B6B" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
@@ -496,181 +497,170 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         return uri && (uri.startsWith('file:') || uri.startsWith('content:') || pendingUploads.includes(uri));
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.formContainer}>
-                    <InputField
-                        label="Pet Name"
-                        required
-                        placeholder="e.g., Buddy"
-                        value={petData.name}
-                        onChangeText={(value) =>
-                            handleInputChange("name", value)
-                        }
-                        error={errors.name}
-                        touched={touched.name}
-                        onBlur={() => handleBlur("name")}
-                    />
-
-                    <InputField
-                        label="Breed"
-                        required
-                        placeholder="e.g., Golden Retriever"
-                        value={petData.breed}
-                        onChangeText={(value) =>
-                            handleInputChange("breed", value)
-                        }
-                        error={errors.breed}
-                        touched={touched.breed}
-                        onBlur={() => handleBlur("breed")}
-                    />
-
-                    <CustomDropdown
-                        label="Type"
-                        options={petTypeOptions}
-                        selectedValue={petData.type}
-                        onValueChange={(value) =>
-                            handleInputChange("type", value)
-                        }
-                    />
-
-                    <InputField
-                        label="Age"
-                        required
-                        placeholder="e.g., 2"
-                        isNumeric={true}
-                        value={petData.age}
-                        onChangeText={(value) =>
-                            handleInputChange("age", value)
-                        }
-                        keyboardType="default"
-                        error={errors.age}
-                        touched={touched.age}
-                        onBlur={() => handleBlur("age")}
-                    />
-
-                    <CustomDropdown
-                        label="Gender"
-                        options={genderOptions}
-                        selectedValue={petData.gender}
-                        onValueChange={(value) =>
-                            handleInputChange("gender", value)
-                        }
-                    />
-
-                    <CustomDropdown
-                        label="Size"
-                        options={sizeOptions}
-                        selectedValue={petData.size}
-                        onValueChange={(value) =>
-                            handleInputChange("size", value)
-                        }
-                    />
-
-                    <CustomDropdown
-                        label="Vaccinated"
-                        options={vaccinatedOptions}
-                        selectedValue={petData.vaccinated}
-                        onValueChange={(value) =>
-                            handleInputChange("vaccinated", value)
-                        }
-                    />
-
-                    <CustomDropdown
-                        label="Activity Level"
-                        options={activityOptions}
-                        selectedValue={petData.activityLevel}
-                        onValueChange={(value) =>
-                            handleInputChange("activityLevel", value)
-                        }
-                    />
-
-                    <Text style={styles.label}>
-                        Temperament (Select all that apply)
-                    </Text>
-                    <View style={styles.optionsContainer}>
-                        {TEMPERAMENTS.map((item) => (
-                            <TouchableOpacity
-                                key={item}
-                                style={[
-                                    styles.optionItem,
-                                    petData.temperament?.includes(item) &&
-                                        styles.selectedOption,
-                                ]}
-                                onPress={() =>
-                                    toggleArrayItem("temperament", item)
-                                }>
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        petData.temperament?.includes(item) &&
-                                            styles.selectedOptionText,
-                                    ]}>
-                                    {item}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+    // Section navigation
+    const renderSectionTabs = () => (
+        <View style={styles.sectionTabsContainer}>
+            <TouchableOpacity 
+                style={[styles.sectionTab, currentSection === 'basic' && styles.activeSectionTab]}
+                onPress={() => setCurrentSection('basic')}
+            >
+                <Ionicons 
+                    name="information-circle-outline" 
+                    size={20} 
+                    color={currentSection === 'basic' ? theme.colors.primary : theme.colors.textSecondary} 
+                />
+                <Text style={[
+                    styles.sectionTabText, 
+                    currentSection === 'basic' && styles.activeSectionTabText
+                ]}>
+                    Basic
+                </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+                style={[styles.sectionTab, currentSection === 'photos' && styles.activeSectionTab]}
+                onPress={() => setCurrentSection('photos')}
+            >
+                <Ionicons 
+                    name="images-outline" 
+                    size={20} 
+                    color={currentSection === 'photos' ? theme.colors.primary : theme.colors.textSecondary} 
+                />
+                <Text style={[
+                    styles.sectionTabText, 
+                    currentSection === 'photos' && styles.activeSectionTabText
+                ]}>
+                    Photos
+                </Text>
+                {errors.photos && (
+                    <View style={styles.errorBadge}>
+                        <Text style={styles.errorBadgeText}>!</Text>
                     </View>
+                )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+                style={[styles.sectionTab, currentSection === 'personality' && styles.activeSectionTab]}
+                onPress={() => setCurrentSection('personality')}
+            >
+                <Ionicons 
+                    name="happy-outline" 
+                    size={20} 
+                    color={currentSection === 'personality' ? theme.colors.primary : theme.colors.textSecondary} 
+                />
+                <Text style={[
+                    styles.sectionTabText, 
+                    currentSection === 'personality' && styles.activeSectionTabText
+                ]}>
+                    Personality
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
 
-                    <Text style={styles.label}>
-                        Preferred Playmates (Select all that apply)
-                    </Text>
-                    <View style={styles.optionsContainer}>
-                        {getPlaymatePreferences().map((item) => (
-                            <TouchableOpacity
-                                key={item}
-                                style={[
-                                    styles.optionItem,
-                                    petData.preferredPlaymates?.includes(
-                                        item
-                                    ) && styles.selectedOption,
-                                ]}
-                                onPress={() =>
-                                    toggleArrayItem("preferredPlaymates", item)
-                                }>
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        petData.preferredPlaymates?.includes(
-                                            item
-                                        ) && styles.selectedOptionText,
-                                    ]}>
-                                    {item}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+    // Render the appropriate section content
+    const renderSectionContent = () => {
+        switch (currentSection) {
+            case 'basic':
+                return (
+                    <View style={styles.sectionContent}>
+                        <InputField
+                            label="Pet Name"
+                            required
+                            placeholder="e.g., Buddy"
+                            value={petData.name}
+                            onChangeText={(value) => handleInputChange("name", value)}
+                            error={errors.name}
+                            touched={touched.name}
+                            onBlur={() => handleBlur("name")}
+                            style={styles.input}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <InputField
+                            label="Breed"
+                            required
+                            placeholder="e.g., Golden Retriever"
+                            value={petData.breed}
+                            onChangeText={(value) => handleInputChange("breed", value)}
+                            error={errors.breed}
+                            touched={touched.breed}
+                            onBlur={() => handleBlur("breed")}
+                            style={styles.input}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <CustomDropdown
+                            label="Type"
+                            options={petTypeOptions}
+                            selectedValue={petData.type}
+                            onValueChange={(value) => handleInputChange("type", value)}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <InputField
+                            label="Age"
+                            required
+                            placeholder="e.g., 2"
+                            isNumeric={true}
+                            value={petData.age}
+                            onChangeText={(value) => handleInputChange("age", value)}
+                            keyboardType="default"
+                            error={errors.age}
+                            touched={touched.age}
+                            onBlur={() => handleBlur("age")}
+                            style={styles.input}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <CustomDropdown
+                            label="Gender"
+                            options={genderOptions}
+                            selectedValue={petData.gender}
+                            onValueChange={(value) => handleInputChange("gender", value)}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <CustomDropdown
+                            label="Size"
+                            options={sizeOptions}
+                            selectedValue={petData.size}
+                            onValueChange={(value) => handleInputChange("size", value)}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <CustomDropdown
+                            label="Vaccinated"
+                            options={vaccinatedOptions}
+                            selectedValue={petData.vaccinated}
+                            onValueChange={(value) => handleInputChange("vaccinated", value)}
+                            containerStyle={styles.inputContainer}
+                        />
                     </View>
-
-                    <InputField
-                        label="Description"
-                        placeholder="Tell us a bit about your pet..."
-                        value={petData.description}
-                        onChangeText={(value) =>
-                            handleInputChange("description", value)
-                        }
-                        multiline
-                        numberOfLines={4}
-                        textAlignVertical="top"
-                        style={styles.textArea}
-                    />
-
-                    <View style={styles.photosSection}>
+                );
+                
+            case 'photos':
+                return (
+                    <View style={styles.sectionContent}>
                         <Text style={styles.label}>
-                            Pet Photos
+                            Pet Photos <Text style={styles.requiredMark}>*</Text>
                         </Text>
+                        <Text style={styles.photoHelperText}>
+                            Add at least 2 photos of your pet to help potential playmates get to know them better
+                        </Text>
+                        
                         <TouchableOpacity
                             style={styles.photoUploadButton}
                             onPress={pickImage}
                             disabled={imageUploading}>
                             {imageUploading ? (
-                                <ActivityIndicator size="small" color="#666" />
+                                <ActivityIndicator size="small" color={theme.colors.primary} />
                             ) : (
                                 <>
                                     <Ionicons
                                         name="add-circle-outline"
-                                        size={20}
-                                        color="#666"
+                                        size={24}
+                                        color={theme.colors.primary}
                                     />
                                     <Text style={styles.photoUploadButtonText}>
                                         Add Photo
@@ -680,12 +670,12 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                         </TouchableOpacity>
 
                         {touched.photos && errors.photos && (
-                            <Text style={styles.photoError}>
+                            <Text style={styles.errorText}>
                                 {errors.photos}
                             </Text>
                         )}
 
-                        <View style={styles.photoContainer}>
+                        <View style={styles.photoGridContainer}>
                             {petData.photos?.map((photo, index) => (
                                 <View key={index} style={styles.photoItem}>
                                     <Image
@@ -696,12 +686,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                                         style={styles.removePhotoButton}
                                         onPress={() => removeImage(index)}
                                         disabled={imageUploading}>
-                                        <Text
-                                            style={
-                                                styles.removePhotoButtonText
-                                            }>
-                                            ×
-                                        </Text>
+                                        <Ionicons 
+                                            name="close-circle" 
+                                            size={22} 
+                                            color="white" 
+                                        />
                                     </TouchableOpacity>
                                     {isLocalUri(photo) && (
                                         <View style={styles.uploadingOverlay}>
@@ -712,17 +701,155 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             ))}
                         </View>
                     </View>
+                );
+                
+            case 'personality':
+                return (
+                    <View style={styles.sectionContent}>
+                        <CustomDropdown
+                            label="Activity Level"
+                            options={activityOptions}
+                            selectedValue={petData.activityLevel}
+                            onValueChange={(value) => handleInputChange("activityLevel", value)}
+                            containerStyle={styles.inputContainer}
+                        />
 
-                    <Button
-                        title="Delete Pet"
-                        onPress={handleDeletePet}
-                        type="danger"
-                        icon="trash-outline"
-                        iconPosition="left"
-                        style={styles.deleteButton}
+                        <InputField
+                            label="Description"
+                            placeholder="Tell us a bit about your pet..."
+                            value={petData.description}
+                            onChangeText={(value) => handleInputChange("description", value)}
+                            multiline
+                            numberOfLines={4}
+                            textAlignVertical="top"
+                            style={styles.textArea}
+                            containerStyle={styles.inputContainer}
+                        />
+
+                        <Text style={styles.label}>Temperament</Text>
+                        <Text style={styles.sublabel}>Select all that apply</Text>
+                        <View style={styles.optionsContainer}>
+                            {TEMPERAMENTS.map((item) => (
+                                <TouchableOpacity
+                                    key={item}
+                                    style={[
+                                        styles.optionItem,
+                                        petData.temperament?.includes(item) &&
+                                            styles.selectedOption,
+                                    ]}
+                                    onPress={() =>
+                                        toggleArrayItem("temperament", item)
+                                    }>
+                                    <Text
+                                        style={[
+                                            styles.optionText,
+                                            petData.temperament?.includes(item) &&
+                                                styles.selectedOptionText,
+                                        ]}>
+                                        {item}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.label}>Preferred Playmates</Text>
+                        <Text style={styles.sublabel}>Select all that apply</Text>
+                        <View style={styles.optionsContainer}>
+                            {getPlaymatePreferences().map((item) => (
+                                <TouchableOpacity
+                                    key={item}
+                                    style={[
+                                        styles.optionItem,
+                                        petData.preferredPlaymates?.includes(item) &&
+                                            styles.selectedOption,
+                                    ]}
+                                    onPress={() =>
+                                        toggleArrayItem("preferredPlaymates", item)
+                                    }>
+                                    <Text
+                                        style={[
+                                            styles.optionText,
+                                            petData.preferredPlaymates?.includes(item) &&
+                                                styles.selectedOptionText,
+                                        ]}>
+                                        {item}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Button
+                            title="Delete Pet"
+                            onPress={handleDeletePet}
+                            type="danger"
+                            icon="trash-outline"
+                            iconPosition="left"
+                            style={styles.deleteButton}
+                        />
+                    </View>
+                );
+                
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Back Button */}
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={handleBackPress}
+                >
+                    <Ionicons
+                        name="chevron-back"
+                        size={28}
+                        color={theme.colors.textPrimary}
                     />
+                </TouchableOpacity>
+                
+                {/* Pet preview card */}
+                <View style={styles.previewCard}>
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.4)', 'transparent']}
+                        style={styles.gradientOverlay}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                    />
+                    
+                    {petData.photos && petData.photos.length > 0 && (
+                        <Image 
+                            source={{ uri: petData.photos[0] }} 
+                            style={styles.previewImage} 
+                            resizeMode="cover"
+                        />
+                    )}
+                    
+                    <View style={styles.previewInfo}>
+                        <Text style={styles.previewName}>{petData.name}</Text>
+                        <Text style={styles.previewBreed}>{petData.breed}</Text>
+                    </View>
                 </View>
+                
+                {renderSectionTabs()}
+                
+                {renderSectionContent()}
             </ScrollView>
+            
+            {/* Fixed action button */}
+            <View style={styles.fixedActionContainer}>
+                <Button
+                    title={submitting ? "Saving..." : "Save Changes"}
+                    onPress={handleSubmit}
+                    disabled={submitting || !hasChanges || imageUploading}
+                    loading={submitting}
+                    style={styles.submitButton}
+                />
+            </View>
         </SafeAreaView>
     );
 };
@@ -730,7 +857,8 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: theme.colors.background,
+        paddingTop: StatusBar.currentHeight || 0,
     },
     loadingContainer: {
         flex: 1,
@@ -738,107 +866,220 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     headerButton: {
-        marginHorizontal: 15,
+        padding: 8,
     },
-    saveButtonText: {
-        color: "#FF6B6B",
-        fontWeight: "bold",
-        fontSize: 16,
-    },
-    disabledButtonText: {
-        opacity: 0.6,
+    backButton: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        zIndex: 10,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: theme.colors.background + 'CC', // Semi-transparent
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...theme.shadows.small,
     },
     scrollContent: {
-        padding: 20,
+        paddingBottom: 100, // Space for fixed action button
+        paddingTop: 0,      // No padding at top since we have absolute header
     },
-    formContainer: {
+    previewCard: {
+        height: 200,
+        width: "100%",
+        position: "relative",
+        marginBottom: 16,
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    gradientOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '100%',
+        zIndex: 1,
+    },
+    previewInfo: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        zIndex: 2,
+    },
+    previewName: {
+        color: '#fff',
+        fontSize: theme.typography.fontSize.xxl,
+        fontWeight: theme.typography.fontWeight.bold,
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+    },
+    previewBreed: {
+        color: '#fff',
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        opacity: 0.9,
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+    },
+    sectionTabsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: theme.colors.background,
+        borderRadius: theme.borderRadius.lg,
+        marginHorizontal: 20,
         marginBottom: 20,
+        ...theme.shadows.medium,
+    },
+    sectionTab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        position: 'relative',
+    },
+    activeSectionTab: {
+        backgroundColor: theme.colors.primaryLight + '20', // 20% opacity
+        borderRadius: theme.borderRadius.md,
+    },
+    sectionTabText: {
+        marginLeft: 6,
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textSecondary,
+    },
+    activeSectionTabText: {
+        color: theme.colors.primary,
+        fontWeight: theme.typography.fontWeight.semiBold,
+    },
+    errorBadge: {
+        position: 'absolute',
+        top: 0,
+        right: 20,
+        backgroundColor: theme.colors.error,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    errorBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    sectionContent: {
+        paddingHorizontal: 20,
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: theme.colors.inputBorder,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+        fontSize: theme.typography.fontSize.md,
     },
     label: {
-        fontSize: 16,
-        fontWeight: "500",
-        color: "#333",
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
         marginBottom: 8,
     },
-    requiredMark: {
-        color: "#FF6B6B",
+    sublabel: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        marginBottom: 12,
+        marginTop: -4,
+    },
+    photoHelperText: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        marginBottom: 16,
     },
     textArea: {
-        height: 100,
+        height: 120,
         textAlignVertical: "top",
+        borderWidth: 1,
+        borderColor: theme.colors.inputBorder,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
     },
     optionsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
-        marginBottom: 20,
+        marginBottom: 24,
     },
     optionItem: {
         borderWidth: 1,
-        borderColor: "#DDD",
-        borderRadius: 20,
+        borderColor: theme.colors.inputBorder,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.xl,
         paddingVertical: 8,
-        paddingHorizontal: 15,
-        margin: 5,
+        paddingHorizontal: 16,
+        margin: 4,
+        marginBottom: 8,
+        ...theme.shadows.small,
     },
     selectedOption: {
-        backgroundColor: "#FF6B6B",
-        borderColor: "#FF6B6B",
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
     },
     optionText: {
-        color: "#333",
+        color: theme.colors.textPrimary,
+        fontSize: theme.typography.fontSize.sm,
     },
     selectedOptionText: {
-        color: "#FFF",
-    },
-    photosSection: {
-        marginBottom: 20,
+        color: theme.colors.onPrimary,
+        fontWeight: theme.typography.fontWeight.medium,
     },
     photoUploadButton: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#F0F0F0",
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: "#DDD",
+        backgroundColor: theme.colors.surface,
+        padding: 16,
+        borderRadius: theme.borderRadius.md,
+        marginBottom: 16,
+        borderWidth: 1.5,
+        borderColor: theme.colors.primary,
         borderStyle: "dashed",
     },
     photoUploadButtonText: {
-        color: "#666",
-        fontSize: 16,
-        marginLeft: 8,
+        color: theme.colors.primary,
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        marginLeft: 10,
     },
-    photoContainer: {
+    photoGridContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
-        marginBottom: 20,
+        marginHorizontal: -4,
+        marginBottom: 24,
     },
     photoItem: {
         position: "relative",
-        margin: 5,
+        margin: 4,
     },
     photo: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
+        width: photoSize,
+        height: photoSize,
+        borderRadius: theme.borderRadius.md,
     },
     removePhotoButton: {
         position: "absolute",
-        top: -5,
-        right: -5,
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    removePhotoButtonText: {
-        color: "#FFF",
-        fontSize: 18,
-        fontWeight: "bold",
+        top: 6,
+        right: 6,
+        zIndex: 10,
     },
     uploadingOverlay: {
         position: 'absolute',
@@ -846,20 +1087,39 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
-        borderRadius: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: theme.borderRadius.md,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    deleteButton: {
-        marginTop: 10,
+    requiredMark: {
+        color: theme.colors.error,
     },
-    photoError: {
-        color: "#FF3B30",
-        fontSize: 12,
-        marginTop: -10,
-        marginBottom: 10,
-        marginLeft: 5,
+    errorText: {
+        color: theme.colors.error,
+        fontSize: theme.typography.fontSize.sm,
+        marginTop: -8,
+        marginBottom: 12,
+        marginLeft: 4,
+    },
+    deleteButton: {
+        marginTop: 24,
+        marginBottom: 40,
+    },
+    fixedActionContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: theme.colors.background,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.divider,
+        ...theme.shadows.medium,
+    },
+    submitButton: {
+        borderRadius: theme.borderRadius.md,
     },
 });
 

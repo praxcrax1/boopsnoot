@@ -27,6 +27,14 @@ router.post('/', protect, async (req, res) => {
       preferredPlaymates
     } = req.body;
 
+    // Validation - require at least 2 photos
+    if (!photos || !Array.isArray(photos) || photos.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please add at least 2 photos of your pet'
+      });
+    }
+
     // Create pet with owner ID from authenticated user
     const pet = new Pet({
       owner: req.user.id,
@@ -230,6 +238,16 @@ router.put('/:id', protect, async (req, res) => {
         success: false,
         message: 'Not authorized to update this pet'
       });
+    }
+    
+    // Validate photos if they are being updated
+    if (req.body.photos) {
+      if (!Array.isArray(req.body.photos) || req.body.photos.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please include at least 2 photos of your pet'
+        });
+      }
     }
 
     // Update pet
