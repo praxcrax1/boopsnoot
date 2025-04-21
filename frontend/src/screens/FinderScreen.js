@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext, useCallback } from "react";
 import {
     View,
     StyleSheet,
@@ -7,6 +7,8 @@ import {
     Platform,
     Animated,
     Alert,
+    Easing,
+    Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +26,9 @@ import PetSelectorModal from "../components/finder/PetSelectorModal";
 import PetCard from "../components/finder/PetCard";
 import SkeletonLoader from "../components/finder/SkeletonLoader";
 import PawLoader from "../components/finder/PawLoader";
+import ActionAnimation from "../components/finder/ActionAnimation";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FinderScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -43,14 +48,45 @@ const FinderScreen = ({ navigation }) => {
     const [petSelectorVisible, setPetSelectorVisible] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMorePets, setHasMorePets] = useState(true);
+    
+    // Current visible pet state - to handle clean transitions
+    const [currentVisiblePet, setCurrentVisiblePet] = useState(null);
+    const [isCardVisible, setIsCardVisible] = useState(true);
+    
+    // Animation refs
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
-    const cardAnimation = useRef(new Animated.Value(1)).current;
     const cardScale = useRef(new Animated.Value(1)).current;
     const cardOpacity = useRef(new Animated.Value(1)).current;
+    const cardPosition = useRef(new Animated.Value(50)).current; // Start position for entrance animation
     const nextCardOpacity = useRef(new Animated.Value(0)).current;
+    
+    // Heart/X animation references
+    const actionIconScale = useRef(new Animated.Value(0)).current;
+    const actionIconOpacity = useRef(new Animated.Value(0)).current;
+    const actionIconPosition = useRef(new Animated.Value(100)).current;
+    const [currentAction, setCurrentAction] = useState(null); // 'like' or 'pass'
     const [isTransitioning, setIsTransitioning] = useState(false);
-    const [dataLoading, setDataLoading] = useState(true);
+    
+    // Prefetching logic
+    const [petQueue, setPetQueue] = useState([]);
+    const [prefetchingInProgress, setPrefetchingInProgress] = useState(false);
+    const prefetchThreshold = 3; // Start prefetching when we have this many pets left
+
+    // Navigate to chat when there's a match
+    const navigateToMatchChat = async (matchId) => {
+        try {
+            const chatResponse = await ChatService.getChatByMatch(matchId);
+            if (chatResponse && chatResponse.chat) {
+                navigation.navigate("ChatScreen", {
+                    chatId: chatResponse.chat._id,
+                    matchId,
+                });
+            }
+        } catch (error) {
+            console.error("Error navigating to match chat:", error);
+        }
+    };
 
     useEffect(() => {
         StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
@@ -62,12 +98,20 @@ const FinderScreen = ({ navigation }) => {
             useNativeDriver: true,
             delay: 100,
         }).start();
+        
+        return () => {
+            // Cleanup animations
+            actionIconScale.setValue(0);
+            actionIconOpacity.setValue(0);
+            actionIconPosition.setValue(100);
+        };
     }, []);
 
     useEffect(() => {
         if (selectedPetId) {
             setPage(0);
             setHasMorePets(true);
+            setPetQueue([]);
             fetchPotentialMatches(true);
         }
     }, [selectedPetId, activeFilters]);
@@ -78,10 +122,63 @@ const FinderScreen = ({ navigation }) => {
             setSelectedPet(pet);
         }
     }, [selectedPetId, userPets]);
+    
+    // Update current visible pet when currentIndex changes or potentialMatches updates
+    useEffect(() => {
+        if (potentialMatches.length > 0 && currentIndex < potentialMatches.length) {
+            setCurrentVisiblePet(potentialMatches[currentIndex]);
+            
+            // Reset position for entrance animation
+            cardPosition.setValue(50); // Start from 50 points below
+            
+            // Animate the card entry
+            Animated.parallel([
+                // Fade in the card
+                Animated.timing(cardOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                // Move up from bottom
+                Animated.timing(cardPosition, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                    easing: Easing.out(Easing.cubic),
+                })
+            ]).start();
+        } else {
+            setCurrentVisiblePet(null);
+        }
+    }, [currentIndex, potentialMatches]);
+    
+    // Prefetch logic - monitor when we need more pets
+    useEffect(() => {
+        const remainingPets = potentialMatches.length - currentIndex;
+        
+        // If we're running low on pets and not currently prefetching, prefetch more
+        if (remainingPets <= prefetchThreshold && hasMorePets && !prefetchingInProgress) {
+            prefetchMorePets();
+        }
+    }, [currentIndex, potentialMatches, hasMorePets, prefetchingInProgress]);
+    
+    // Merge prefetched pets into the main list when ready
+    useEffect(() => {
+        if (petQueue.length > 0 && !prefetchingInProgress) {
+            // Add prefetched pets to the main list
+            setPotentialMatches(prev => {
+                const existingIds = new Set(prev.map(pet => pet._id));
+                const uniquePets = petQueue.filter(pet => !existingIds.has(pet._id));
+                return [...prev, ...uniquePets];
+            });
+            
+            // Clear the queue
+            setPetQueue([]);
+        }
+    }, [petQueue, prefetchingInProgress]);
 
     const fetchUserPets = async () => {
         setLoading(true);
-        setDataLoading(true);
         try {
             const response = await PetService.getUserPets();
             if (response.pets && response.pets.length > 0) {
@@ -120,7 +217,6 @@ const FinderScreen = ({ navigation }) => {
         if (!selectedPetId) return;
 
         setLoading(true);
-        setDataLoading(true);
         try {
             const apiFilters = {
                 ...activeFilters,
@@ -161,7 +257,7 @@ const FinderScreen = ({ navigation }) => {
                 });
             }
 
-            setHasMorePets(newPets.length > 0);
+            setHasMorePets(newPets.length === 10); // If we got less than requested, there are no more
             if (newPets.length > 0) {
                 setPage(reset ? 1 : page + 1);
             }
@@ -174,57 +270,65 @@ const FinderScreen = ({ navigation }) => {
         } finally {
             setLoading(false);
             setInitialLoading(false);
-            setDataLoading(false);
+        }
+    };
+    
+    // Prefetch more pets in the background
+    const prefetchMorePets = async () => {
+        if (!hasMorePets || prefetchingInProgress || !selectedPetId) return;
+        
+        setPrefetchingInProgress(true);
+        
+        try {
+            const apiFilters = {
+                ...activeFilters,
+                skip: page * 10,
+                limit: 10,
+            };
+
+            const response = await MatchService.getPotentialMatches(
+                apiFilters,
+                selectedPetId
+            );
+            const newPets = response.pets || [];
+            
+            if (newPets.length > 0) {
+                setPetQueue(newPets);
+                setPage(page + 1);
+            }
+            
+            setHasMorePets(newPets.length === 10);
+        } catch (error) {
+            console.error("Error prefetching potential matches:", error);
+        } finally {
+            setPrefetchingInProgress(false);
         }
     };
 
-    const animateCardTransition = (isLike) => {
-        setIsTransitioning(true);
+    const handleLikeAction = useCallback(async () => {
+        if (currentIndex >= potentialMatches.length || isTransitioning) return;
         
-        // Animation for center outward effect (scaling + opacity)
+        const pet = potentialMatches[currentIndex];
+        setCurrentAction('like');
+        setIsTransitioning(true);
+        setIsCardVisible(false); // Hide card immediately to prevent old data from showing
+
+        // Start the card fade animation
         Animated.parallel([
             // Scale the card up slightly then down to 0
-            Animated.sequence([
-                Animated.timing(cardScale, {
-                    toValue: 1.05,
-                    duration: 100,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(cardScale, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                }),
-            ]),
+            Animated.timing(cardScale, {
+                toValue: 0.8,
+                duration: 300,
+                useNativeDriver: true,
+            }),
             // Fade out the card
             Animated.timing(cardOpacity, {
                 toValue: 0,
-                duration: 250,
+                duration: 300,
                 useNativeDriver: true,
             }),
-            // Prepare next card to appear
-            Animated.timing(nextCardOpacity, {
-                toValue: 1,
-                duration: 200,
-                delay: 150,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            // Reset animation values
-            cardScale.setValue(1);
-            cardOpacity.setValue(1);
-            nextCardOpacity.setValue(0);
-            setIsTransitioning(false);
-            goToNextPet();
-        });
-    };
-
-    const handleLike = async () => {
-        if (currentIndex >= potentialMatches.length || isTransitioning) return;
-
-        const pet = potentialMatches[currentIndex];
-        animateCardTransition(true);
-
+        ]).start();
+        
         try {
             const response = await MatchService.likeProfile(
                 selectedPetId,
@@ -232,45 +336,80 @@ const FinderScreen = ({ navigation }) => {
             );
 
             if (response.isMatch) {
-                Alert.alert("New Match!", `You matched with ${pet.name}!`, [
-                    {
-                        text: "Send Message",
-                        onPress: () => navigateToMatchChat(response.match._id),
-                    },
-                    {
-                        text: "Continue Browsing",
-                        style: "cancel",
-                    },
-                ]);
+                // Schedule match notification to appear after animation completes
+                setTimeout(() => {
+                    Alert.alert("New Match!", `You matched with ${pet.name}!`, [
+                        {
+                            text: "Send Message",
+                            onPress: () => navigateToMatchChat(response.match._id),
+                        },
+                        {
+                            text: "Continue Browsing",
+                            style: "cancel",
+                        },
+                    ]);
+                }, 1200); // Time to allow animation to finish
             }
         } catch (error) {
             console.error("Error liking profile:", error);
-            Alert.alert("Error", "Failed to like profile. Please try again.");
+            // Still show error but after animation is complete
+            setTimeout(() => {
+                Alert.alert("Error", "Failed to like profile. Please try again.");
+            }, 1200);
         }
-    };
+    }, [currentIndex, potentialMatches, isTransitioning, selectedPetId]);
 
-    const handlePass = async () => {
+    const handlePassAction = useCallback(async () => {
         if (currentIndex >= potentialMatches.length || isTransitioning) return;
-
+        
         const pet = potentialMatches[currentIndex];
-        animateCardTransition(false);
+        setCurrentAction('pass');
+        setIsTransitioning(true);
+        setIsCardVisible(false); // Hide card immediately to prevent old data from showing
 
+        // Start the card fade animation
+        Animated.parallel([
+            // Scale the card down
+            Animated.timing(cardScale, {
+                toValue: 0.8,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            // Fade out the card
+            Animated.timing(cardOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+        
         try {
             await MatchService.passProfile(selectedPetId, pet._id);
         } catch (error) {
             console.error("Error passing profile:", error);
-            Alert.alert("Error", "Failed to pass profile. Please try again.");
+            // Still show error but after animation is complete
+            setTimeout(() => {
+                Alert.alert("Error", "Failed to pass profile. Please try again.");
+            }, 1200);
         }
-    };
+    }, [currentIndex, potentialMatches, isTransitioning, selectedPetId]);
 
-    const goToNextPet = () => {
+    const onActionComplete = useCallback(() => {
+        // Move to next pet first, so the data is cleared
         const nextIndex = currentIndex + 1;
         setCurrentIndex(nextIndex);
-
-        if (hasMorePets && nextIndex >= potentialMatches.length - 2) {
-            fetchPotentialMatches(false);
-        }
-    };
+        
+        // Then reset animation values for next use
+        cardScale.setValue(1);
+        cardOpacity.setValue(1);
+        
+        // Reset transition state after a slight delay to ensure new data is loaded
+        setTimeout(() => {
+            setIsCardVisible(true);
+            setIsTransitioning(false);
+            setCurrentAction(null);
+        }, 100);
+    }, [currentIndex]);
 
     const handleFilterChange = (name, value) => {
         setTempFilters({
@@ -284,22 +423,38 @@ const FinderScreen = ({ navigation }) => {
         setFilterVisible(false);
     };
 
+    const renderActionAnimation = () => {
+        if (currentAction) {
+            const animationValues = {
+                scale: actionIconScale,
+                opacity: actionIconOpacity,
+                position: actionIconPosition,
+            };
+            
+            return (
+                <ActionAnimation 
+                    type={currentAction}
+                    animationValues={animationValues}
+                    onAnimationComplete={onActionComplete}
+                />
+            );
+        }
+        return null;
+    };
+
     const renderCurrentCard = () => {
         if (loading && !initialLoading) {
             return <PawLoader />;
         }
         
-        if (dataLoading) {
-            return <PawLoader />;
-        }
-
         if (potentialMatches.length === 0 || currentIndex >= potentialMatches.length) {
             return <EmptyState onRefresh={() => fetchPotentialMatches(true)} />;
         }
 
+        // Only render card when it's not transitioning
         return (
             <>
-                {currentIndex < potentialMatches.length - 1 && (
+                {isCardVisible && currentIndex < potentialMatches.length - 1 && (
                     <Animated.View style={[
                         styles.nextCardContainer,
                         { opacity: nextCardOpacity }
@@ -310,24 +465,28 @@ const FinderScreen = ({ navigation }) => {
                         />
                     </Animated.View>
                 )}
-                <Animated.View style={[
-                    styles.currentCardContainer,
-                    {
-                        transform: [
-                            { scale: cardScale }
-                        ],
-                        opacity: cardOpacity,
-                    }
-                ]}>
-                    <PetCard
-                        pet={potentialMatches[currentIndex]}
-                        onCardPress={() =>
-                            navigation.navigate("PetProfileScreen", {
-                                petId: potentialMatches[currentIndex]._id,
-                            })
+                {isCardVisible && currentVisiblePet && (
+                    <Animated.View style={[
+                        styles.currentCardContainer,
+                        {
+                            transform: [
+                                { scale: cardScale },
+                                { translateY: cardPosition }
+                            ],
+                            opacity: cardOpacity,
                         }
-                    />
-                </Animated.View>
+                    ]}>
+                        <PetCard
+                            key={`pet-${currentVisiblePet._id}`} // Force re-render on pet change
+                            pet={currentVisiblePet}
+                            onCardPress={() =>
+                                navigation.navigate("PetProfileScreen", {
+                                    petId: currentVisiblePet._id,
+                                })
+                            }
+                        />
+                    </Animated.View>
+                )}
             </>
         );
     };
@@ -363,23 +522,24 @@ const FinderScreen = ({ navigation }) => {
 
                 <View style={styles.contentContainer}>
                     {renderCurrentCard()}
+                    {renderActionAnimation()}
                 </View>
 
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
                     !loading &&
-                    !dataLoading && (
+                    !isTransitioning && (
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.passButton]}
-                                onPress={handlePass}
+                                onPress={handlePassAction}
                                 disabled={isTransitioning}>
                                 <Ionicons name="close" size={32} color="#FF6B6B" />
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.likeButton]}
-                                onPress={handleLike}
+                                onPress={handleLikeAction}
                                 disabled={isTransitioning}>
                                 <Ionicons name="heart" size={32} color="#FFFFFF" />
                             </TouchableOpacity>
@@ -434,6 +594,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         zIndex: 100,
+        paddingHorizontal: 48,
     },
     actionButton: {
         width: 72,
@@ -442,7 +603,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 16,
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
