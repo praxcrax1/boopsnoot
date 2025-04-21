@@ -3,7 +3,6 @@ import {
     View,
     StyleSheet,
     TouchableOpacity,
-    ActivityIndicator,
     StatusBar,
     Platform,
     Animated,
@@ -24,6 +23,7 @@ import FilterModal from "../components/finder/FilterModal";
 import PetSelectorModal from "../components/finder/PetSelectorModal";
 import PetCard from "../components/finder/PetCard";
 import SkeletonLoader from "../components/finder/SkeletonLoader";
+import PawLoader from "../components/finder/PawLoader";
 
 const FinderScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -45,6 +45,10 @@ const FinderScreen = ({ navigation }) => {
     const [hasMorePets, setHasMorePets] = useState(true);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
+    const cardAnimation = useRef(new Animated.Value(1)).current;
+    const cardPosition = useRef(new Animated.Value(0)).current;
+    const nextCardOpacity = useRef(new Animated.Value(0)).current;
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
     useEffect(() => {
         StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
@@ -169,13 +173,41 @@ const FinderScreen = ({ navigation }) => {
         }
     };
 
+    const animateCardTransition = (isLike) => {
+        setIsTransitioning(true);
+        const position = isLike ? 100 : -100;
+
+        Animated.parallel([
+            Animated.timing(cardPosition, {
+                toValue: position,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(cardAnimation, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(nextCardOpacity, {
+                toValue: 1,
+                duration: 200,
+                delay: 150,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            cardPosition.setValue(0);
+            cardAnimation.setValue(1);
+            nextCardOpacity.setValue(0);
+            setIsTransitioning(false);
+            goToNextPet();
+        });
+    };
+
     const handleLike = async () => {
-        if (currentIndex >= potentialMatches.length) return;
+        if (currentIndex >= potentialMatches.length || isTransitioning) return;
 
         const pet = potentialMatches[currentIndex];
-        const currentPetIndex = currentIndex;
-
-        goToNextPet();
+        animateCardTransition(true);
 
         try {
             const response = await MatchService.likeProfile(
@@ -198,24 +230,20 @@ const FinderScreen = ({ navigation }) => {
         } catch (error) {
             console.error("Error liking profile:", error);
             Alert.alert("Error", "Failed to like profile. Please try again.");
-            setCurrentIndex(currentPetIndex);
         }
     };
 
     const handlePass = async () => {
-        if (currentIndex >= potentialMatches.length) return;
+        if (currentIndex >= potentialMatches.length || isTransitioning) return;
 
         const pet = potentialMatches[currentIndex];
-        const currentPetIndex = currentIndex;
-
-        goToNextPet();
+        animateCardTransition(false);
 
         try {
             await MatchService.passProfile(selectedPetId, pet._id);
         } catch (error) {
             console.error("Error passing profile:", error);
             Alert.alert("Error", "Failed to pass profile. Please try again.");
-            setCurrentIndex(currentPetIndex);
         }
     };
 
@@ -240,6 +268,51 @@ const FinderScreen = ({ navigation }) => {
         setFilterVisible(false);
     };
 
+    const renderCurrentCard = () => {
+        if (loading && !initialLoading) {
+            return <PawLoader />;
+        }
+
+        if (potentialMatches.length === 0 || currentIndex >= potentialMatches.length) {
+            return <EmptyState onRefresh={() => fetchPotentialMatches(true)} />;
+        }
+
+        return (
+            <>
+                {currentIndex < potentialMatches.length - 1 && (
+                    <Animated.View style={[
+                        styles.nextCardContainer,
+                        { opacity: nextCardOpacity }
+                    ]}>
+                        <PetCard
+                            pet={potentialMatches[currentIndex + 1]}
+                            onCardPress={() => {}}
+                        />
+                    </Animated.View>
+                )}
+                <Animated.View style={[
+                    styles.currentCardContainer,
+                    {
+                        transform: [
+                            { translateX: cardPosition },
+                            { scale: cardAnimation }
+                        ],
+                        opacity: cardAnimation,
+                    }
+                ]}>
+                    <PetCard
+                        pet={potentialMatches[currentIndex]}
+                        onCardPress={() =>
+                            navigation.navigate("PetProfileScreen", {
+                                petId: potentialMatches[currentIndex]._id,
+                            })
+                        }
+                    />
+                </Animated.View>
+            </>
+        );
+    };
+
     if (initialLoading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -261,7 +334,7 @@ const FinderScreen = ({ navigation }) => {
                 backgroundColor="#F8F9FA" 
             />
 
-            <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+            <View style={styles.mainContainer}>
                 <Header
                     title="Find Playmates"
                     selectedPet={selectedPet}
@@ -270,20 +343,7 @@ const FinderScreen = ({ navigation }) => {
                 />
 
                 <View style={styles.contentContainer}>
-                    {loading && !initialLoading ? (
-                        <SkeletonLoader />
-                    ) : potentialMatches.length === 0 || currentIndex >= potentialMatches.length ? (
-                        <EmptyState onRefresh={() => fetchPotentialMatches(true)} />
-                    ) : (
-                        <PetCard
-                            pet={potentialMatches[currentIndex]}
-                            onCardPress={() =>
-                                navigation.navigate("PetProfileScreen", {
-                                    petId: potentialMatches[currentIndex]._id,
-                                })
-                            }
-                        />
-                    )}
+                    {renderCurrentCard()}
                 </View>
 
                 {potentialMatches.length > 0 &&
@@ -292,14 +352,16 @@ const FinderScreen = ({ navigation }) => {
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.passButton]}
-                                onPress={handlePass}>
-                                <Ionicons name="close" size={32} color="#fff" />
+                                onPress={handlePass}
+                                disabled={isTransitioning}>
+                                <Ionicons name="close" size={32} color="#FF6B6B" />
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.likeButton]}
-                                onPress={handleLike}>
-                                <Ionicons name="heart" size={32} color="#fff" />
+                                onPress={handleLike}
+                                disabled={isTransitioning}>
+                                <Ionicons name="heart" size={32} color="#FFFFFF" />
                             </TouchableOpacity>
                         </View>
                     )}
@@ -322,7 +384,7 @@ const FinderScreen = ({ navigation }) => {
                         setPetSelectorVisible(false);
                     }}
                 />
-            </Animated.View>
+            </View>
         </SafeAreaView>
     );
 };
@@ -331,6 +393,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#F8F9FA",
+    },
+    mainContainer: {
+        flex: 1,
+        position: 'relative',
     },
     contentContainer: {
         flex: 1,
@@ -341,38 +407,47 @@ const styles = StyleSheet.create({
     },
     actionsContainer: {
         position: 'absolute',
-        bottom: 24,
+        bottom: 32,
         left: 0,
         right: 0,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        gap: 20,
-        paddingHorizontal: 20,
+        zIndex: 100,
     },
     actionButton: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
+        marginHorizontal: 16,
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
                 shadowRadius: 8,
             },
             android: {
-                elevation: 6,
+                elevation: 8,
             },
         }),
     },
     likeButton: {
-        backgroundColor: theme.colors.secondary,
+        backgroundColor: '#FF6B6B',
     },
     passButton: {
-        backgroundColor: theme.colors.primary,
+        backgroundColor: '#FFFFFF',
+    },
+    nextCardContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 1,
+    },
+    currentCardContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 2,
     },
 });
 

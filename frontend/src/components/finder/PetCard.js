@@ -7,6 +7,7 @@ import {
     Dimensions,
     FlatList,
     ScrollView,
+    Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
@@ -20,7 +21,7 @@ const PLACEHOLDER_IMAGES = [
     require('../../assets/default-pet.png'),
 ];
 
-const PetCard = ({ pet, onCardPress }) => {
+const PetCard = ({ pet, onCardPress, animationStyle }) => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const flatListRef = useRef(null);
 
@@ -64,7 +65,7 @@ const PetCard = ({ pet, onCardPress }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <Animated.View style={[styles.container, animationStyle]}>
             <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
                 <View style={styles.imageContainer}>
                     <FlatList
@@ -131,7 +132,7 @@ const PetCard = ({ pet, onCardPress }) => {
                     <View style={styles.bottomSpacing} />
                 </View>
             </ScrollView>
-        </View>
+        </Animated.View>
     );
 };
 
