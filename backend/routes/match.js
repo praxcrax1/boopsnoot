@@ -380,19 +380,30 @@ router.get("/:petId", protect, async (req, res) => {
             return errorResponse(res, 404, "Pet not found or does not belong to you");
         }
 
-        // Find matches
+        // Find matches ensuring both pets exist
         const matches = await Match.find({
             $or: [{ pet1: pet._id }, { pet2: pet._id }],
             isMatch: true,
         })
-            .populate("pet1", "name breed photos")
-            .populate("pet2", "name breed photos")
+            .populate({
+                path: 'pet1',
+                select: 'name breed photos',
+                match: { _id: { $exists: true } }  // Only populate if pet exists
+            })
+            .populate({
+                path: 'pet2',
+                select: 'name breed photos',
+                match: { _id: { $exists: true } }  // Only populate if pet exists
+            })
             .sort({ matchDate: -1 });
+
+        // Filter out matches where either pet no longer exists
+        const validMatches = matches.filter(match => match.pet1 && match.pet2);
 
         res.json({
             success: true,
-            count: matches.length,
-            matches: matches.map((match) => {
+            count: validMatches.length,
+            matches: validMatches.map((match) => {
                 const matchedPet =
                     match.pet1._id.toString() === pet._id.toString()
                         ? match.pet2

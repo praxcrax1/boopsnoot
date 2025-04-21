@@ -10,7 +10,7 @@ const DetailBadge = ({ label, value, icon }) => (
                 <Ionicons
                     name={icon}
                     size={16}
-                    color="#FFFFFF"
+                    color="#666666"
                     style={styles.icon}
                 />
             )}
@@ -21,19 +21,18 @@ const DetailBadge = ({ label, value, icon }) => (
 
 const styles = StyleSheet.create({
     detailBadge: {
-        backgroundColor: "rgba(255, 255, 255, 0.15)",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 14,
-        marginRight: 5,
-        borderWidth: 1,
-        borderColor: "rgba(255, 255, 255, 0.2)",
         flex: 1,
+        backgroundColor: "#F8F9FA",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#EEEEEE",
     },
     detailLabel: {
         fontSize: 12,
-        color: "rgba(255, 255, 255, 0.7)",
-        marginBottom: 2,
+        color: "#666666",
+        marginBottom: 4,
         fontWeight: "500",
     },
     valueContainer: {
@@ -45,8 +44,8 @@ const styles = StyleSheet.create({
     },
     detailValue: {
         fontSize: 14,
-        fontWeight: "700",
-        color: "#FFFFFF",
+        fontWeight: "600",
+        color: "#333333",
     },
 });
 

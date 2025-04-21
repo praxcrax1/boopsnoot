@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
     View,
     StyleSheet,
@@ -6,15 +6,14 @@ import {
     ActivityIndicator,
     StatusBar,
     Platform,
-    useWindowDimensions,
     Animated,
-    PanResponder,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import MatchService from "../services/MatchService";
 import PetService from "../services/PetService";
+import theme from "../styles/theme";
 import ChatService from "../services/ChatService";
 import { AuthContext } from "../contexts/AuthContext";
 
@@ -44,148 +43,11 @@ const FinderScreen = ({ navigation }) => {
     const [petSelectorVisible, setPetSelectorVisible] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMorePets, setHasMorePets] = useState(true);
-    const [swipingEnabled, setSwipingEnabled] = useState(true);
-    const [isSwipingBack, setIsSwipingBack] = useState(false);
-    const { requestAndUpdateLocation } = useContext(AuthContext);
-
-    const position = useRef(new Animated.ValueXY()).current;
-    const swipeDirection = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const cardOpacity = useRef(new Animated.Value(1)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
-    const buttonScale = useRef(new Animated.Value(1)).current;
-
-    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-
-    const swipeProgress = position.x.interpolate({
-        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
-        outputRange: [1, 0, 1],
-        extrapolate: "clamp",
-    });
-
-    const likeButtonScale = position.x.interpolate({
-        inputRange: [0, windowWidth / 4],
-        outputRange: [1, 1.15],
-        extrapolate: "clamp",
-    });
-
-    const dislikeButtonScale = position.x.interpolate({
-        inputRange: [-windowWidth / 4, 0],
-        outputRange: [1.15, 1],
-        extrapolate: "clamp",
-    });
-
-    const nextCardOpacity = position.x.interpolate({
-        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
-        outputRange: [1, 0.65, 1],
-        extrapolate: "clamp",
-    });
-
-    const nextCardScale = position.x.interpolate({
-        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
-        outputRange: [1, 0.85, 1],
-        extrapolate: "clamp",
-    });
-
-    const nextCardTranslateY = position.x.interpolate({
-        inputRange: [-windowWidth / 2, 0, windowWidth / 2],
-        outputRange: [0, 20, 0],
-        extrapolate: "clamp",
-    });
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (_, gesture) => {
-                return swipingEnabled && Math.abs(gesture.dx) > Math.abs(gesture.dy * 2);
-            },
-            onPanResponderGrant: () => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-                position.setOffset({
-                    x: position.x._value,
-                    y: position.y._value,
-                });
-                position.setValue({ x: 0, y: 0 });
-
-                Animated.spring(buttonScale, {
-                    toValue: 1.1,
-                    friction: 5,
-                    tension: 40,
-                    useNativeDriver: true,
-                }).start();
-            },
-            onPanResponderMove: (_, gesture) => {
-                if (!swipingEnabled) return;
-
-                position.setValue({ x: gesture.dx, y: gesture.dy * 0.15 });
-
-                if (gesture.dx > 0) {
-                    swipeDirection.setValue(
-                        gesture.dx / windowWidth > 1
-                            ? 1
-                            : gesture.dx / windowWidth
-                    );
-                } else {
-                    swipeDirection.setValue(
-                        gesture.dx / windowWidth < -1
-                            ? -1
-                            : gesture.dx / windowWidth
-                    );
-                }
-
-                const thresholdDxPositive = Math.round(windowWidth * 0.9);
-                const thresholdDxNegative = -Math.round(windowWidth * 0.9);
-
-                if (
-                    Math.abs(gesture.dx) >= thresholdDxPositive &&
-                    Math.abs(gesture.dx) <= thresholdDxPositive + 5
-                ) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                }
-
-                if (
-                    Math.abs(gesture.dx) >= Math.abs(thresholdDxNegative) &&
-                    Math.abs(gesture.dx) <= Math.abs(thresholdDxNegative) + 5
-                ) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                }
-            },
-            onPanResponderRelease: (_, gesture) => {
-                if (!swipingEnabled) return;
-
-                position.flattenOffset();
-                Animated.spring(buttonScale, {
-                    toValue: 1,
-                    friction: 5,
-                    tension: 40,
-                    useNativeDriver: true,
-                }).start();
-
-                const swipeThreshold = windowWidth * 0.4; // 40% of screen width for swipe threshold
-
-                if (gesture.dx > swipeThreshold) {
-                    swipeRight();
-                } else if (gesture.dx < -swipeThreshold) {
-                    swipeLeft();
-                } else {
-                    resetPosition();
-                }
-            },
-            onPanResponderTerminate: () => {
-                resetPosition();
-                Animated.spring(buttonScale, {
-                    toValue: 1,
-                    friction: 5,
-                    tension: 40,
-                    useNativeDriver: true,
-                }).start();
-            },
-        })
-    ).current;
 
     useEffect(() => {
-        StatusBar.setBarStyle("dark-content");
+        StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
         fetchUserPets();
 
         Animated.timing(fadeAnim, {
@@ -194,11 +56,6 @@ const FinderScreen = ({ navigation }) => {
             useNativeDriver: true,
             delay: 100,
         }).start();
-
-        return () => {
-            position.setValue({ x: 0, y: 0 });
-            swipeDirection.setValue(0);
-        };
     }, []);
 
     useEffect(() => {
@@ -215,16 +72,6 @@ const FinderScreen = ({ navigation }) => {
             setSelectedPet(pet);
         }
     }, [selectedPetId, userPets]);
-
-    useEffect(() => {
-        if (!initialLoading && potentialMatches.length > 0) {
-            Animated.timing(contentOpacity, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            }).start();
-        }
-    }, [initialLoading, potentialMatches]);
 
     const fetchUserPets = async () => {
         setLoading(true);
@@ -322,87 +169,6 @@ const FinderScreen = ({ navigation }) => {
         }
     };
 
-    const swipeRight = () => {
-        setSwipingEnabled(false);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        Animated.spring(position, {
-            toValue: { x: windowWidth + 100, y: 30 },
-            friction: 6,
-            tension: 40,
-            velocity: 5,
-            useNativeDriver: false,
-        }).start(() => {
-            handleLike();
-            position.setValue({ x: 0, y: 0 });
-            swipeDirection.setValue(0);
-            setSwipingEnabled(true);
-        });
-    };
-
-    const swipeLeft = () => {
-        setSwipingEnabled(false);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        Animated.spring(position, {
-            toValue: { x: -windowWidth - 100, y: 30 },
-            friction: 6,
-            tension: 40,
-            velocity: 5,
-            useNativeDriver: false,
-        }).start(() => {
-            handlePass();
-            position.setValue({ x: 0, y: 0 });
-            swipeDirection.setValue(0);
-            setSwipingEnabled(true);
-        });
-    };
-
-    const resetPosition = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        Animated.spring(position, {
-            toValue: { x: 0, y: 0 },
-            friction: 6,
-            tension: 60,
-            useNativeDriver: false,
-        }).start();
-
-        Animated.spring(swipeDirection, {
-            toValue: 0,
-            friction: 6,
-            tension: 60,
-            useNativeDriver: false,
-        }).start();
-    };
-
-    const navigateToMatchChat = useCallback(
-        async (matchId) => {
-            try {
-                setLoading(true);
-
-                const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
-
-                if (chatResponse.success && chatResponse.chat) {
-                    navigation.navigate("Chat", {
-                        chatId: chatResponse.chat._id,
-                    });
-                } else {
-                    console.error("Failed to get or create chat:", chatResponse);
-                    navigation.navigate("Chat", {
-                        chatId: matchId,
-                    });
-                }
-            } catch (error) {
-                console.error("Error navigating to chat:", error);
-                Alert.alert("Error", "Failed to open chat. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        },
-        [navigation]
-    );
-
     const handleLike = async () => {
         if (currentIndex >= potentialMatches.length) return;
 
@@ -418,10 +184,6 @@ const FinderScreen = ({ navigation }) => {
             );
 
             if (response.isMatch) {
-                Haptics.notificationAsync(
-                    Haptics.NotificationFeedbackType.Success
-                );
-
                 Alert.alert("New Match!", `You matched with ${pet.name}!`, [
                     {
                         text: "Send Message",
@@ -478,93 +240,6 @@ const FinderScreen = ({ navigation }) => {
         setFilterVisible(false);
     };
 
-    const handleOpenFilterModal = () => {
-        setTempFilters({ ...activeFilters });
-        setFilterVisible(true);
-    };
-
-    const renderCards = () => {
-        if (
-            potentialMatches.length === 0 ||
-            currentIndex >= potentialMatches.length
-        ) {
-            return <EmptyState onRefresh={() => fetchPotentialMatches(true)} />;
-        }
-
-        return potentialMatches
-            .map((pet, i) => {
-                if (i < currentIndex) return null;
-
-                if (i === currentIndex) {
-                    return (
-                        <Animated.View
-                            key={pet._id}
-                            style={{
-                                zIndex: 10,
-                                opacity: cardOpacity,
-                            }}>
-                            <PetCard
-                                pet={pet}
-                                position={position}
-                                swipeDirection={swipeDirection}
-                                panHandlers={panResponder.panHandlers}
-                                isActive={true}
-                                cardStyle={{ zIndex: 10 }}
-                                onCardPress={() =>
-                                    navigation.navigate("PetProfileScreen", {
-                                        petId: pet._id,
-                                    })
-                                }
-                            />
-                        </Animated.View>
-                    );
-                }
-
-                if (i === currentIndex + 1) {
-                    return (
-                        <PetCard
-                            key={pet._id}
-                            pet={pet}
-                            isActive={false}
-                            nextCardStyle={{
-                                opacity: nextCardOpacity,
-                                transform: [
-                                    { scale: nextCardScale },
-                                    { translateY: nextCardTranslateY },
-                                ],
-                                zIndex: 1,
-                            }}
-                        />
-                    );
-                }
-
-                return null;
-            })
-            .reverse();
-    };
-
-    const renderActionButtons = () => (
-        <View style={styles.actionsContainer}>
-                <View style={styles.buttonRow}>
-
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.mainButton, styles.passButton]}
-                        onPress={swipeLeft}
-                        disabled={!swipingEnabled}>
-                        <Ionicons name="close" size={32} color="#fff" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.mainButton, styles.likeButton]}
-                        onPress={swipeRight}
-                        disabled={!swipingEnabled}>
-                        <Ionicons name="heart" size={32} color="#fff" />
-                    </TouchableOpacity>
-
-                </View>
-        </View>
-    );
-
     if (initialLoading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -580,7 +255,7 @@ const FinderScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top"]}>
             <StatusBar 
                 barStyle={Platform.OS === 'ios' ? "dark-content" : "light-content"}
                 backgroundColor="#F8F9FA" 
@@ -590,22 +265,44 @@ const FinderScreen = ({ navigation }) => {
                 <Header
                     title="Find Playmates"
                     selectedPet={selectedPet}
-                    onFilterPress={handleOpenFilterModal}
+                    onFilterPress={() => setFilterVisible(true)}
                     onPetSelectorPress={() => setPetSelectorVisible(true)}
                 />
 
-                <Animated.View style={[styles.cardsContainer, { opacity: contentOpacity }]}>
-                    {loading && !initialLoading && currentIndex === 0 ? (
+                <View style={styles.contentContainer}>
+                    {loading && !initialLoading ? (
                         <SkeletonLoader />
+                    ) : potentialMatches.length === 0 || currentIndex >= potentialMatches.length ? (
+                        <EmptyState onRefresh={() => fetchPotentialMatches(true)} />
                     ) : (
-                        renderCards()
+                        <PetCard
+                            pet={potentialMatches[currentIndex]}
+                            onCardPress={() =>
+                                navigation.navigate("PetProfileScreen", {
+                                    petId: potentialMatches[currentIndex]._id,
+                                })
+                            }
+                        />
                     )}
-                </Animated.View>
+                </View>
 
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
-                    !loading &&
-                    renderActionButtons()}
+                    !loading && (
+                        <View style={styles.actionsContainer}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.passButton]}
+                                onPress={handlePass}>
+                                <Ionicons name="close" size={32} color="#fff" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.likeButton]}
+                                onPress={handleLike}>
+                                <Ionicons name="heart" size={32} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                 <FilterModal
                     visible={filterVisible}
@@ -635,58 +332,47 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#F8F9FA",
     },
-    cardsContainer: {
+    contentContainer: {
         flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        height: "90%",
-        marginBottom: 0,
+        position: 'relative',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     actionsContainer: {
-        height: "5%",
-        width: "100%",
-        position: "absolute",
-        bottom: 0,
-        alignItems: "center",
-        backgroundColor: 'transparent',
-    },
-    buttonRow: {
-        width: "100%",
-        flexDirection: "row",
-        justifyContent: "space-evenly",
-        alignItems: "center",
-        height: "100%", // Take up full height of the actions container
+        position: 'absolute',
+        bottom: 24,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 20,
+        paddingHorizontal: 20,
     },
     actionButton: {
-        justifyContent: "center",
-        alignItems: "center",
-        borderRadius: 50,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
         ...Platform.select({
             ios: {
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
+                shadowOpacity: 0.25,
                 shadowRadius: 8,
             },
             android: {
-                elevation: 4,
+                elevation: 6,
             },
         }),
     },
-    mainButton: {
-        width: 64,
-        height: 64,
-    },
-    smallButton: {
-        width: 48,
-        height: 48,
-        backgroundColor: "#FFFFFF",
-    },
     likeButton: {
-        backgroundColor: "#4CAF50",
+        backgroundColor: theme.colors.secondary,
     },
     passButton: {
-        backgroundColor: "#FF5252",
+        backgroundColor: theme.colors.primary,
     },
 });
 

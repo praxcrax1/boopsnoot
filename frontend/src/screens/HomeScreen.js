@@ -33,6 +33,8 @@ const HomeScreen = ({ navigation, route }) => {
     const [matches, setMatches] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null);
 
+    console.log(matches)
+
     // Animation value for the matches section
     const matchesOpacity = new Animated.Value(1);
 
@@ -183,7 +185,7 @@ const HomeScreen = ({ navigation, route }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top"]}>
             <StatusBar backgroundColor={theme.colors.background} barStyle="dark-content" />
             
             <View style={styles.header}>
@@ -365,7 +367,7 @@ const HomeScreen = ({ navigation, route }) => {
                                             style={styles.matchImage}
                                         />
                                         <Text style={styles.matchName}>
-                                            {match.pet?.name}
+                                            {match?.pet?.name}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
