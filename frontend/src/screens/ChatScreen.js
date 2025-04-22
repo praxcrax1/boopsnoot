@@ -109,11 +109,30 @@ const ChatScreen = ({ route, navigation }) => {
                 }
 
                 setMessages(chatResponse.messages || []);
+                
+                // Mark chat as read when opened
+                markChatAsRead();
             } catch (error) {
                 console.error("Error loading chat data:", error);
                 Alert.alert("Error", "Failed to load chat. Please try again.");
             } finally {
                 setLoading(false);
+            }
+        };
+        
+        // Mark the chat as read in storage
+        const markChatAsRead = async () => {
+            try {
+                const unreadData = await AsyncStorage.getItem('unreadChats');
+                if (unreadData) {
+                    const unreadChats = JSON.parse(unreadData);
+                    if (unreadChats[chatId]) {
+                        delete unreadChats[chatId];
+                        await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                    }
+                }
+            } catch (error) {
+                console.error("Error marking chat as read:", error);
             }
         };
 
@@ -502,7 +521,6 @@ const styles = StyleSheet.create({
         padding: theme.spacing.md,
         borderRadius: theme.borderRadius.lg,
         minWidth: 80,
-        ...theme.shadows.small,
     },
     currentUserBubble: {
         backgroundColor: theme.colors.primary,

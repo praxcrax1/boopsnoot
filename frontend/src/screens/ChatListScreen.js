@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     View,
     Text,
@@ -7,38 +7,186 @@ import {
     TouchableOpacity,
     Image,
     ActivityIndicator,
+    AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
+import SocketService from "../services/SocketService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import theme, { withOpacity } from "../styles/theme";
 
 const ChatListScreen = ({ navigation }) => {
     const [chats, setChats] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchChats = async () => {
-            setLoading(true);
-            try {
-                const response = await ChatService.getChats();
-                setChats(response.chats || []);
-            } catch (error) {
-                console.error("Error fetching chats:", error);
-            } finally {
-                setLoading(false);
+    const [unreadChats, setUnreadChats] = useState({});
+    const appState = useRef(AppState.currentState);
+    const socketInitialized = useRef(false);
+    
+    // Fetch all chats from API
+    const fetchChats = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await ChatService.getChats();
+            setChats(response.chats || []);
+            
+            // Load saved unread state
+            const unreadState = await loadUnreadState();
+            setUnreadChats(unreadState || {});
+        } catch (error) {
+            console.error("Error fetching chats:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    
+    // Load unread state from storage
+    const loadUnreadState = async () => {
+        try {
+            const unreadData = await AsyncStorage.getItem('unreadChats');
+            return unreadData ? JSON.parse(unreadData) : {};
+        } catch (error) {
+            console.error("Error loading unread state:", error);
+            return {};
+        }
+    };
+    
+    // Save unread state to storage
+    const saveUnreadState = async (unreadState) => {
+        try {
+            await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadState));
+        } catch (error) {
+            console.error("Error saving unread state:", error);
+        }
+    };
+    
+    // Handle new message from socket
+    const handleNewMessage = useCallback((message) => {
+        if (!message || !message.chatId) return;
+        
+        // Get the active screen to check if user is in the chat
+        // Don't mark as unread if user is currently viewing the chat
+        const currentRoute = navigation.getCurrentRoute();
+        const isInChatScreen = currentRoute?.name === 'Chat' && 
+                               currentRoute?.params?.chatId === message.chatId;
+        
+        if (isInChatScreen) return;
+        
+        // Add to unread messages
+        setUnreadChats(prev => {
+            const newState = { 
+                ...prev, 
+                [message.chatId]: true 
+            };
+            saveUnreadState(newState);
+            return newState;
+        });
+        
+        // Update chat list to show the new message
+        setChats(prevChats => {
+            // Find the chat that received the message
+            const chatIndex = prevChats.findIndex(chat => chat._id === message.chatId);
+            if (chatIndex === -1) {
+                // If chat doesn't exist in the list (rare case), fetch all chats again
+                fetchChats();
+                return prevChats;
             }
-        };
-
+            
+            const updatedChats = [...prevChats];
+            
+            // Update the chat with new last message
+            updatedChats[chatIndex] = {
+                ...updatedChats[chatIndex],
+                lastMessage: {
+                    content: message.content,
+                    createdAt: message.createdAt || new Date().toISOString(),
+                    unread: true
+                }
+            };
+            
+            // Move the updated chat to the top
+            const updatedChat = updatedChats.splice(chatIndex, 1)[0];
+            updatedChats.unshift(updatedChat);
+            
+            return updatedChats;
+        });
+    }, [navigation, fetchChats]);
+    
+    // Initialize socket listeners
+    const initializeSocket = useCallback(async () => {
+        if (socketInitialized.current) return;
+        
+        try {
+            await SocketService.connect();
+            SocketService.addGlobalMessageListener(handleNewMessage);
+            socketInitialized.current = true;
+            console.log("Socket initialized for ChatListScreen");
+        } catch (error) {
+            console.error("Error initializing socket in ChatListScreen:", error);
+        }
+    }, [handleNewMessage]);
+    
+    // Mark chat as read when entering it
+    const handleChatPress = useCallback((chatId) => {
+        navigation.navigate("Chat", { chatId });
+        
+        // Mark as read
+        setUnreadChats(prev => {
+            const newState = { ...prev };
+            delete newState[chatId];
+            saveUnreadState(newState);
+            return newState;
+        });
+        
+        // Update the local chat state to remove unread indicator
+        setChats(prevChats => {
+            return prevChats.map(chat => {
+                if (chat._id === chatId && chat.lastMessage) {
+                    return {
+                        ...chat,
+                        lastMessage: {
+                            ...chat.lastMessage,
+                            unread: false
+                        }
+                    };
+                }
+                return chat;
+            });
+        });
+    }, [navigation]);
+    
+    useEffect(() => {
+        // Initial fetch
         fetchChats();
-
+        
+        // Set up socket listener
+        initializeSocket();
+        
+        // Handle app state changes to reconnect socket when app comes back to foreground
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+                console.log('App has come to the foreground!');
+                initializeSocket();
+                fetchChats();
+            }
+            
+            appState.current = nextAppState;
+        });
+        
         // Refresh chats when the screen is focused
-        const unsubscribe = navigation.addListener("focus", () => {
+        const unsubscribeFocus = navigation.addListener("focus", () => {
             fetchChats();
         });
 
-        return unsubscribe;
-    }, [navigation]);
+        return () => {
+            // Clean up on unmount
+            subscription.remove();
+            unsubscribeFocus();
+            if (socketInitialized.current) {
+                SocketService.removeGlobalMessageListener(handleNewMessage);
+            }
+        };
+    }, [navigation, fetchChats, initializeSocket, handleNewMessage]);
 
     const formatTimestamp = (timestamp) => {
         const date = new Date(timestamp);
@@ -69,13 +217,12 @@ const ChatListScreen = ({ navigation }) => {
     const renderChatItem = ({ item }) => {
         const otherPet = item.participants.find((p) => !p.isCurrentUser);
         const lastMessage = item.lastMessage || {};
+        const isUnread = unreadChats[item._id] || lastMessage.unread;
 
         return (
             <TouchableOpacity
                 style={styles.chatItem}
-                onPress={() =>
-                    navigation.navigate("Chat", { chatId: item._id })
-                }
+                onPress={() => handleChatPress(item._id)}
                 activeOpacity={0.7}>
                 <Image
                     style={styles.avatar}
@@ -90,7 +237,10 @@ const ChatListScreen = ({ navigation }) => {
                 />
                 <View style={styles.chatInfo}>
                     <View style={styles.chatHeader}>
-                        <Text style={styles.petName}>
+                        <Text style={[
+                            styles.petName,
+                            isUnread && styles.boldText
+                        ]}>
                             {otherPet && otherPet.pet
                                 ? otherPet.pet.name
                                 : "Unknown Pet"}
@@ -104,14 +254,14 @@ const ChatListScreen = ({ navigation }) => {
                     <Text
                         style={[
                             styles.messagePreview,
-                            lastMessage.unread ? styles.unreadMessage : null,
+                            isUnread ? styles.unreadMessage : null,
                         ]}
                         numberOfLines={1}
                         ellipsizeMode="tail">
                         {lastMessage.content || "No messages yet"}
                     </Text>
                 </View>
-                {lastMessage.unread && <View style={styles.unreadIndicator} />}
+                {isUnread && <View style={styles.unreadIndicator} />}
             </TouchableOpacity>
         );
     };
@@ -220,6 +370,9 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.fontSize.lg,
         fontWeight: theme.typography.fontWeight.semiBold,
         color: theme.colors.textPrimary,
+    },
+    boldText: {
+        fontWeight: theme.typography.fontWeight.bold,
     },
     timestamp: {
         fontSize: theme.typography.fontSize.xs,
