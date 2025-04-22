@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import io from "socket.io-client";
 import { SOCKET_URL } from "../constants/apiConfig";
+import * as Notifications from 'expo-notifications';
+import { AppState } from 'react-native';
+import { navigationRef } from '../../App';
 
 class SocketService {
     socket = null;
@@ -287,9 +290,50 @@ class SocketService {
 
             console.log("[SocketService LOG] Preparing to notify global listeners with message:", JSON.stringify(standardizedMessage, null, 2));
             this.notifyGlobalListeners(standardizedMessage);
+            
+            // Create local notification for the received message
+            this.createLocalNotification(standardizedMessage);
         });
 
         console.log("[SocketService LOG] Global 'receive_message' listener setup complete.");
+    }
+
+    async createLocalNotification(message) {
+        try {
+            // Check if app is in foreground and user is already in the specific chat
+            const appState = AppState.currentState;
+            const currentRoute = navigationRef.current?.getCurrentRoute?.();
+            const chatId = message.chatId;
+            
+            // Only show notification if NOT already in the chat screen with this chatId
+            const isOnRelevantChatScreen = 
+                appState === 'active' && 
+                currentRoute?.name === 'Chat' && 
+                currentRoute.params?.chatId === chatId;
+
+            if (isOnRelevantChatScreen) {
+                console.log("[SocketService LOG] User already in chat, skipping notification");
+                return;
+            }
+
+            // Get sender name or use a default
+            const senderName = message.sender?.name || message.sender?.username || "Someone";
+            
+            // Create notification content
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: `${senderName} sent a message`,
+                    body: message.text || "New message received",
+                    data: { chatId: chatId, messageId: message._id },
+                    sound: true,
+                },
+                trigger: null, // Show immediately
+            });
+            
+            console.log("[SocketService LOG] Local notification created for message");
+        } catch (error) {
+            console.error("[SocketService LOG] Error creating notification:", error);
+        }
     }
 
     async onReceiveMessage(callback) {
