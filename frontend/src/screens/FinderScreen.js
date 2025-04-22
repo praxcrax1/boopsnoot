@@ -128,21 +128,31 @@ const FinderScreen = ({ navigation }) => {
         if (potentialMatches.length > 0 && currentIndex < potentialMatches.length) {
             setCurrentVisiblePet(potentialMatches[currentIndex]);
             
-            // Reset position for entrance animation
-            cardPosition.setValue(50); // Start from 50 points below
+            // Reset position and opacity for entrance animation
+            cardOpacity.setValue(0); // Start fully transparent
+            cardPosition.setValue(100); // Start from 100 points below (more pronounced movement)
+            cardScale.setValue(0.95); // Start slightly smaller
             
-            // Animate the card entry
+            // Animate the card entry with a sleek bottom-to-top animation
             Animated.parallel([
                 // Fade in the card
                 Animated.timing(cardOpacity, {
                     toValue: 1,
-                    duration: 300,
+                    duration: 400,
                     useNativeDriver: true,
+                    easing: Easing.out(Easing.cubic),
                 }),
                 // Move up from bottom
                 Animated.timing(cardPosition, {
                     toValue: 0,
-                    duration: 300,
+                    duration: 450,
+                    useNativeDriver: true,
+                    easing: Easing.out(Easing.cubic),
+                }),
+                // Scale to normal size
+                Animated.timing(cardScale, {
+                    toValue: 1,
+                    duration: 450,
                     useNativeDriver: true,
                     easing: Easing.out(Easing.cubic),
                 })
