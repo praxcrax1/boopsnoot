@@ -227,10 +227,11 @@ const HomeScreen = ({ navigation, route }) => {
                                 <TouchableOpacity
                                     key={pet._id}
                                     style={[
-                                        styles.petSelectorCard,
-                                        isSelected && styles.selectedPetCard,
+                                        styles.petSelectorTab,
+                                        isSelected && styles.selectedPetTab,
                                     ]}
-                                    onPress={() => handlePetChange(pet._id)}>
+                                    onPress={() => handlePetChange(pet._id)}
+                                    activeOpacity={0.7}>
                                     <Image
                                         source={
                                             pet.photos && pet.photos.length > 0
@@ -250,7 +251,7 @@ const HomeScreen = ({ navigation, route }) => {
                                         {pet?.name}
                                     </Text>
                                     {isSelected && (
-                                        <View style={styles.selectedPetIndicator} />
+                                        <View style={styles.selectedPetDot} />
                                     )}
                                 </TouchableOpacity>
                             );
@@ -485,52 +486,42 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     petSelectorContainer: {
-        backgroundColor: theme.colors.background,
-        paddingTop: 30,
-        paddingBottom: 10,
-        marginBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
-        ...theme.shadows.small,
+        backgroundColor: 'transparent',
+        paddingTop: 25,
+        paddingBottom: 8,
+        zIndex: 10,
     },
     petTabsContainer: {
-        paddingVertical: theme.spacing.xs,
+        paddingVertical: 0,
     },
     petTabsContent: {
         alignItems: "center",
-        paddingVertical: theme.spacing.xs,
         paddingHorizontal: theme.spacing.xl,
     },
-    petSelectorCard: {
-        alignItems: "center",
-        marginHorizontal: 10,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: 12,
-        borderRadius: theme.borderRadius.lg,
+    petSelectorTab: {
         flexDirection: "row",
-        backgroundColor: theme.colors.surface,
-        ...theme.shadows.small,
-        borderWidth: 2,
+        alignItems: "center",
+        marginHorizontal: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: withOpacity(theme.colors.surface, 0.8),
+    },
+    selectedPetTab: {
+        backgroundColor: withOpacity(theme.colors.primary, 0.15),
         borderColor: 'transparent',
     },
-    selectedPetCard: {
-        backgroundColor: withOpacity(theme.colors.primary, 0.15),
-        borderColor: theme.colors.primary,
-        ...theme.shadows.medium,
-    },
     petSelectorImage: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        marginRight: theme.spacing.xs,
-        borderWidth: 2,
-        borderColor: theme.colors.background,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: withOpacity(theme.colors.divider, 0.3),
     },
     selectedPetImage: {
         borderColor: theme.colors.primary,
-        width: 45,
-        height: 45,
-        borderRadius: 22.5,
+        borderWidth: 2,
     },
     petSelectorName: {
         fontSize: theme.typography.fontSize.sm,
@@ -538,15 +529,15 @@ const styles = StyleSheet.create({
         fontWeight: theme.typography.fontWeight.medium,
     },
     selectedPetName: {
-        fontWeight: theme.typography.fontWeight.bold,
+        fontWeight: theme.typography.fontWeight.semiBold,
         color: theme.colors.primary,
     },
-    selectedPetIndicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+    selectedPetDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
         backgroundColor: theme.colors.primary,
-        marginLeft: theme.spacing.xs,
+        marginLeft: 6,
     },
     scrollContainer: {
         flex: 1,
@@ -624,7 +615,6 @@ const styles = StyleSheet.create({
     emptyStateContainer: {
         padding: theme.spacing.xl,
         alignItems: "center",
-        backgroundColor: theme.colors.backgroundVariant,
         borderRadius: theme.borderRadius.lg,
         margin: theme.spacing.sm,
     },
