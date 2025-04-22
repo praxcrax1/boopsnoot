@@ -4,6 +4,7 @@ import React, {
     useContext,
     useMemo,
     useCallback,
+    useRef,
 } from "react";
 import {
     View,
@@ -16,9 +17,11 @@ import {
     Animated,
     Alert,
     StatusBar,
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { AuthContext } from "../contexts/AuthContext";
 import PetService from "../services/PetService";
 import MatchService from "../services/MatchService";
@@ -185,59 +188,73 @@ const HomeScreen = ({ navigation, route }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={["top"]}>
-            <StatusBar backgroundColor={theme.colors.background} barStyle="dark-content" />
+        <SafeAreaView style={styles.container} edges={["left", "right"]}>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
             
-            <View style={styles.header}>
-                <View>
-                    <Text style={styles.welcomeText}>
+            <LinearGradient
+                colors={[theme.colors.primaryLight, theme.colors.background]}
+                style={styles.gradientHeader}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+            >
+                <View style={styles.headerContainer}>
+                    <Text style={styles.headerText}>
                         Welcome, {user?.name || "Pet Lover"}!
                     </Text>
                     {selectedPet && (
-                        <Text style={styles.petWelcome}>& {selectedPet?.name}</Text>
+                        <Text style={styles.subHeaderText}>
+                            & {selectedPet?.name}
+                        </Text>
                     )}
                 </View>
-            </View>
+            </LinearGradient>
 
             {/* Pet Selection Tabs (Only show if user has multiple pets) */}
             {pets.length > 1 && (
-                <View style={styles.petTabsWrapper}>
+                <View style={styles.petSelectorContainer}>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.petTabsContainer}
                         contentContainerStyle={styles.petTabsContent}>
-                        {pets.map((pet) => (
-                            <TouchableOpacity
-                                key={pet._id}
-                                style={[
-                                    styles.petTab,
-                                    selectedPetId === pet._id &&
-                                        styles.activePetTab,
-                                ]}
-                                onPress={() => handlePetChange(pet._id)}>
-                                <Image
-                                    source={
-                                        pet.photos && pet.photos.length > 0
-                                            ? { uri: pet.photos[0] }
-                                            : require("../assets/default-pet.png")
-                                    }
+                        {pets.map((pet) => {
+                            const isSelected = selectedPetId === pet._id;
+                            return (
+                                <TouchableOpacity
+                                    key={pet._id}
                                     style={[
-                                        styles.petTabImage,
-                                        selectedPetId === pet._id &&
-                                            styles.activePetTabImage
+                                        styles.petSelectorCard,
+                                        isSelected && styles.selectedPetCard,
                                     ]}
-                                />
-                                <Text
-                                    style={[
-                                        styles.petTabName,
-                                        selectedPetId === pet._id &&
-                                            styles.activePetTabName,
-                                    ]}>
-                                    {pet?.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                                    onPress={() => handlePetChange(pet._id)}>
+                                    <Image
+                                        source={
+                                            pet.photos && pet.photos.length > 0
+                                                ? { uri: pet.photos[0] }
+                                                : require("../assets/default-pet.png")
+                                        }
+                                        style={[
+                                            styles.petSelectorImage,
+                                            isSelected && styles.selectedPetImage
+                                        ]}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.petSelectorName,
+                                            isSelected && styles.selectedPetName,
+                                        ]}>
+                                        {pet?.name}
+                                    </Text>
+                                    {isSelected && (
+                                        <View style={styles.selectedPetIndicator} />
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </ScrollView>
                 </View>
             )}
@@ -441,77 +458,95 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: theme.colors.background,
     },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    gradientHeader: {
+        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
+        paddingBottom: 40,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        marginBottom: -20,
+        zIndex: 10,
         paddingHorizontal: theme.spacing.xl,
-        paddingTop: theme.spacing.lg,
-        paddingBottom: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
     },
-    headerIcon: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: theme.borderRadius.circle,
-        backgroundColor: withOpacity(theme.colors.primary, 0.1),
+    headerContainer: {
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "flex-start",
+        marginTop: Platform.OS === 'ios' ? 15 : 5,
     },
-    welcomeText: {
-        fontSize: theme.typography.fontSize.xl,
+    headerText: {
+        fontSize: theme.typography.fontSize.xxl,
         fontWeight: theme.typography.fontWeight.bold,
         color: theme.colors.textPrimary,
+        marginBottom: 8,
     },
-    petWelcome: {
-        fontSize: theme.typography.fontSize.md,
+    subHeaderText: {
+        fontSize: theme.typography.fontSize.lg,
         color: theme.colors.textSecondary,
         marginTop: 2,
     },
-    petTabsWrapper: {
+    petSelectorContainer: {
+        backgroundColor: theme.colors.background,
+        paddingTop: 30,
+        paddingBottom: 10,
+        marginBottom: 10,
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.divider,
-        backgroundColor: theme.colors.backgroundVariant,
+        ...theme.shadows.small,
     },
     petTabsContainer: {
         paddingVertical: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.md,
     },
     petTabsContent: {
         alignItems: "center",
         paddingVertical: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.xl,
     },
-    petTab: {
+    petSelectorCard: {
         alignItems: "center",
-        marginHorizontal: theme.spacing.xs,
+        marginHorizontal: 10,
         paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
+        paddingVertical: 12,
         borderRadius: theme.borderRadius.lg,
         flexDirection: "row",
+        backgroundColor: theme.colors.surface,
+        ...theme.shadows.small,
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
-    activePetTab: {
+    selectedPetCard: {
         backgroundColor: withOpacity(theme.colors.primary, 0.15),
+        borderColor: theme.colors.primary,
+        ...theme.shadows.medium,
     },
-    petTabImage: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    petSelectorImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         marginRight: theme.spacing.xs,
         borderWidth: 2,
         borderColor: theme.colors.background,
     },
-    activePetTabImage: {
+    selectedPetImage: {
         borderColor: theme.colors.primary,
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
     },
-    petTabName: {
+    petSelectorName: {
         fontSize: theme.typography.fontSize.sm,
         color: theme.colors.textSecondary,
         fontWeight: theme.typography.fontWeight.medium,
     },
-    activePetTabName: {
+    selectedPetName: {
         fontWeight: theme.typography.fontWeight.bold,
         color: theme.colors.primary,
+    },
+    selectedPetIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: theme.colors.primary,
+        marginLeft: theme.spacing.xs,
     },
     scrollContainer: {
         flex: 1,

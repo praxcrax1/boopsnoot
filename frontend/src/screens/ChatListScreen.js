@@ -8,9 +8,12 @@ import {
     Image,
     ActivityIndicator,
     AppState,
+    StatusBar,
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -328,10 +331,26 @@ const ChatListScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Messages</Text>
-            </View>
+        <SafeAreaView style={styles.container} edges={["left", "right"]}>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
+            
+            <LinearGradient
+                colors={[theme.colors.primaryLight, theme.colors.background]}
+                style={styles.gradientHeader}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+            >
+                <View style={styles.headerContainer}>
+                    <Text style={styles.headerText}>Messages</Text>
+                    <Text style={styles.subHeaderText}>
+                        Connect with your pet's playmates
+                    </Text>
+                </View>
+            </LinearGradient>
 
             {chats.length > 0 ? (
                 <FlatList
@@ -378,28 +397,38 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: theme.colors.background,
     },
-    header: {
-        paddingHorizontal: theme.spacing.lg,
-        paddingVertical: theme.spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
-        backgroundColor: theme.colors.surface,
+    gradientHeader: {
+        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
+        paddingBottom: 40,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        marginBottom: -20,
+        zIndex: 10,
+        paddingHorizontal: theme.spacing.xl,
     },
-    headerTitle: {
-        fontSize: theme.typography.fontSize.xl,
-        fontWeight: theme.typography.fontWeight.semiBold,
+    headerContainer: {
+        alignItems: "center",
+        marginTop: Platform.OS === 'ios' ? 15 : 5,
+    },
+    headerText: {
+        fontSize: theme.typography.fontSize.xxl,
+        fontWeight: theme.typography.fontWeight.bold,
         color: theme.colors.textPrimary,
+        marginBottom: 8,
+    },
+    subHeaderText: {
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
     },
     listContainer: {
+        paddingTop: 30,
         paddingVertical: theme.spacing.sm,
     },
     chatItem: {
         flexDirection: "row",
         alignItems: "center",
-        padding: theme.spacing.md,
+        padding: theme.spacing.lg,
         marginBottom: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
     },
     avatar: {
@@ -408,6 +437,8 @@ const styles = StyleSheet.create({
         borderRadius: 28,
         marginRight: theme.spacing.lg,
         backgroundColor: theme.colors.backgroundVariant,
+        borderWidth: 2,
+        borderColor: withOpacity(theme.colors.primary, 0.2),
     },
     chatInfo: {
         flex: 1,
