@@ -12,6 +12,7 @@ import {
     Platform,
     StatusBar,
     PanResponder,
+    Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -59,6 +60,10 @@ const PetProfileSetupScreen = ({ navigation }) => {
         preferredPlaymates: [],
     });
     
+    // Animation values
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+    
     // Local image URIs and cloud URLs mapping
     const [localImages, setLocalImages] = useState([]);
     const [cloudinaryUrls, setCloudinaryUrls] = useState([]);
@@ -88,6 +93,21 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images!');
             }
         })();
+        
+        // Run entrance animation
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+        ]).start();
+        
     }, []);
 
     // Get appropriate playmates based on pet type
@@ -613,32 +633,39 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 backgroundColor="transparent"
                 translucent={true}
             />
-            <LinearGradient
-                colors={[theme.colors.primaryLight, theme.colors.background]}
-                style={styles.gradientHeader}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
+            <Animated.View
+                style={[
+                    { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+                    { flex: 1 }
+                ]}
             >
-                {/* Removed back button as requested */}
-                
-                <View style={styles.headerContainer}>
-                    <Text style={styles.headerText}>Set Up Pet Profile</Text>
-                    <Text style={styles.subHeaderText}>
-                        Let's create a profile for your pet to help find playmates!
-                    </Text>
-                    {renderStepIndicators()}
-                </View>
-            </LinearGradient>
-            
-            {/* Apply pan responder to the ScrollView */}
-            <View {...panResponder.panHandlers} style={styles.swipeContainer}>
-                <ScrollView 
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
+                <LinearGradient
+                    colors={[theme.colors.primaryLight, theme.colors.background]}
+                    style={styles.gradientHeader}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
                 >
-                    {renderStepContent()}
-                </ScrollView>
-            </View>
+                    {/* Removed back button as requested */}
+                    
+                    <View style={styles.headerContainer}>
+                        <Text style={styles.headerText}>Set Up Pet Profile</Text>
+                        <Text style={styles.subHeaderText}>
+                            Let's create a profile for your pet to help find playmates!
+                        </Text>
+                        {renderStepIndicators()}
+                    </View>
+                </LinearGradient>
+                
+                {/* Apply pan responder to the ScrollView */}
+                <View {...panResponder.panHandlers} style={styles.swipeContainer}>
+                    <ScrollView 
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {renderStepContent()}
+                    </ScrollView>
+                </View>
+            </Animated.View>
         </SafeAreaView>
     );
 };

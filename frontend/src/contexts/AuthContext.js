@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
     const [locationPermissionStatus, setLocationPermissionStatus] = useState(null);
     const [hasPets, setHasPets] = useState(false);
     const [checkingPetStatus, setCheckingPetStatus] = useState(true);
+    const [transitioningToPetSetup, setTransitioningToPetSetup] = useState(false);
 
     // Check for existing token and load user data on app start
     useEffect(() => {
@@ -57,24 +58,37 @@ export const AuthProvider = ({ children }) => {
                 setUser(null);
                 setCheckingPetStatus(false);
             } finally {
-                setIsLoading(false);
+                // Add slight delay before removing the loading state
+                // to ensure smoother transitions
+                setTimeout(() => {
+                    setIsLoading(false);
+                }, 300);
             }
         };
 
         loadUser();
     }, []);
     
-    // Check if user has pets
+    // Check if user has pets with a smooth transition
     const checkUserPets = async () => {
         try {
             setCheckingPetStatus(true);
             const petsResponse = await PetService.getUserPets();
             const hasUserPets = petsResponse.pets && petsResponse.pets.length > 0;
-            setHasPets(hasUserPets);
+            
+            // Use a slight delay to make transition smoother
+            if (!hasUserPets) {
+                setTransitioningToPetSetup(true);
+            }
+
+            setTimeout(() => {
+                setHasPets(hasUserPets);
+                setCheckingPetStatus(false);
+            }, 300);
+            
         } catch (error) {
             console.error("Error checking pet status:", error);
             setHasPets(false);
-        } finally {
             setCheckingPetStatus(false);
         }
     };
@@ -154,9 +168,12 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setIsAuthenticated(true);
             
-            // Set initial pet status to false for new user
-            setHasPets(false);
-            setCheckingPetStatus(false);
+            // Set initial pet status to false for new user with a transition
+            setTransitioningToPetSetup(true);
+            setTimeout(() => {
+                setHasPets(false);
+                setCheckingPetStatus(false);
+            }, 300);
             
             // After successful registration, request location
             requestAndUpdateLocation();
@@ -181,7 +198,7 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setIsAuthenticated(true);
             
-            // Check if user has pets after login
+            // Check if user has pets after login with smooth transition
             checkUserPets();
             
             // Check if we need to request location after login
@@ -212,7 +229,7 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setIsAuthenticated(true);
             
-            // Check if user has pets after Google login
+            // Check if user has pets after Google login with smooth transition
             checkUserPets();
             
             // Check if we need to request location after Google login
@@ -261,10 +278,18 @@ export const AuthProvider = ({ children }) => {
         });
     };
 
-    // Update pets status after creating a new pet
+    // Update pets status after creating a new pet with a smooth transition
     const updatePetStatus = (hasUserPets = true) => {
-        setHasPets(hasUserPets);
-        setCheckingPetStatus(false);
+        // First set transitions
+        if (hasUserPets) {
+            setTransitioningToPetSetup(false);
+        }
+        
+        // Then update the pet status after a slight delay
+        setTimeout(() => {
+            setHasPets(hasUserPets);
+            setCheckingPetStatus(false);
+        }, 300);
     };
 
     // Clear any auth errors
@@ -290,7 +315,8 @@ export const AuthProvider = ({ children }) => {
                 hasPets,
                 checkingPetStatus,
                 updatePetStatus,
-                checkUserPets
+                checkUserPets,
+                transitioningToPetSetup
             }}>
             {children}
         </AuthContext.Provider>

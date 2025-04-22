@@ -133,18 +133,7 @@ const RegisterScreen = ({ navigation }) => {
             });
 
             if (result.success) {
-                Alert.alert(
-                    "Registration Successful",
-                    "Let's set up your pet profile!",
-                    [
-                        {
-                            text: "Continue",
-                            onPress: () =>
-                                navigation.navigate("PetProfileSetup"),
-                        },
-                    ],
-                    { cancelable: false }
-                );
+                navigation.navigate("PetProfileSetup")
             }
         } catch (error) {
             Alert.alert(
