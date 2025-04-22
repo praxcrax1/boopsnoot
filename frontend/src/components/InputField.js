@@ -103,9 +103,6 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: theme.spacing.md,
         fontSize: theme.typography.fontSize.md,
-        borderWidth: 1,
-        borderColor: theme.colors.inputBorder,
-        borderRadius: theme.borderRadius.sm,
         color: theme.colors.textPrimary,
     },
     textArea: {

@@ -145,12 +145,10 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        borderWidth: 1,
-        borderColor: theme.colors.inputBorder,
-        borderRadius: theme.borderRadius.sm,
-        backgroundColor: theme.colors.backgroundVariant,
-        height: 48, // Match the InputField height
         paddingHorizontal: theme.spacing.md,
+        backgroundColor: theme.colors.backgroundVariant,
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.borderRadius.sm,
     },
     errorDropdown: {
         borderColor: theme.colors.error,
