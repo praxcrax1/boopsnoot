@@ -31,6 +31,8 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
         return "Nearby";
     }, []);
 
+    console.log(pet)
+
     const handleImageLoad = useCallback((index) => {
         setImagesLoaded(prev => ({
             ...prev,

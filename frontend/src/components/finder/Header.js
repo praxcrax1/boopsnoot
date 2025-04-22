@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import theme from "../../styles/theme";
 
 const Header = ({ title, selectedPet, onFilterPress, onPetSelectorPress }) => (
     <View style={styles.header}>
@@ -43,14 +44,12 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: "#FFFFFF",
-        borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        backgroundColor: "transparent",
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: "600",
-        color: "#333333",
+        fontSize: 22,
+        fontWeight: "700",
+        color: theme.colors.textPrimary,
     },
     headerButtons: {
         flexDirection: "row",
@@ -62,7 +61,6 @@ const styles = StyleSheet.create({
     selectedPetPreview: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#F5F5F5",
         borderRadius: 20,
         paddingVertical: 6,
         paddingHorizontal: 10,
@@ -72,17 +70,19 @@ const styles = StyleSheet.create({
         height: 24,
         borderRadius: 12,
         marginRight: 6,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
     },
     selectedPetName: {
         fontSize: 14,
         color: "#333333",
         marginRight: 4,
+        fontWeight: "500",
     },
     filterButton: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: "#F5F5F5",
         alignItems: "center",
         justifyContent: "center",
     },
