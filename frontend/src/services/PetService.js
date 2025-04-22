@@ -46,7 +46,7 @@ class PetService {
         }
     }
 
-    // New method to handle image uploads
+    // Updated method to handle image uploads that works with any image service provider
     async uploadPetImage(imageUri) {
         try {
             // Create form data
@@ -69,7 +69,14 @@ class PetService {
                 }
             };
 
+            // The backend now handles the upload provider internally
             const response = await apiClient.post('/pets/upload', formData, config);
+            
+            // Check if response has the expected format
+            if (!response.data || !response.data.imageUrl) {
+                throw new Error('Invalid image upload response');
+            }
+            
             return response.data;
         } catch (error) {
             throw handleApiError(error);

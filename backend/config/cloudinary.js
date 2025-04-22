@@ -1,13 +1,11 @@
-const cloudinary = require("cloudinary").v2;
-const dotenv = require("dotenv");
+/**
+ * This file is kept for backward compatibility.
+ * New code should use the imageService abstraction instead.
+ */
 
-dotenv.config();
+// Import the image service that contains the configured provider
+const imageService = require('../services/imageService');
+const cloudinary = require('cloudinary').v2;
 
-// Configure Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
+// This file now returns cloudinary for backward compatibility
 module.exports = cloudinary;

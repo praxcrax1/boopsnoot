@@ -1,5 +1,5 @@
 const Pet = require("../models/Pet");
-const cloudinary = require("../config/cloudinary");
+const imageService = require("../services/imageService");
 const fs = require("fs");
 const path = require("path");
 
@@ -83,22 +83,18 @@ exports.uploadImage = async (req, res) => {
         // Get file path
         const filePath = req.file.path;
 
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(filePath, {
+        // Upload using the image service
+        const result = await imageService.uploadImage(filePath, {
             folder: "pet_images",
-            use_filename: true,
-            unique_filename: true,
+            deleteLocal: true, // Auto-delete local file after upload
         });
 
-        // Delete the local file after upload
-        fs.unlinkSync(filePath);
-
-        // Return success response with Cloudinary info
+        // Return success response with image info
         res.status(200).json({
             success: true,
             message: "Image uploaded successfully",
-            imageUrl: result.secure_url,
-            publicId: result.public_id,
+            imageUrl: result.url,
+            publicId: result.publicId,
         });
     } catch (error) {
         console.error("Image upload error:", error);
