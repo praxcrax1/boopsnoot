@@ -33,6 +33,7 @@ const AuthStack = () => (
         <Stack.Screen
             name="PetProfileSetup"
             component={PetProfileSetupScreen}
+            options={{ gestureEnabled: false }}
         />
     </Stack.Navigator>
 );
@@ -89,7 +90,7 @@ const MainStack = () => (
         <Stack.Screen
             name="PetProfileSetup"
             component={PetProfileSetupScreen}
-            options={{ headerShown: false}}
+            options={{ headerShown: false }}
         />
         <Stack.Screen
             name="Settings"
@@ -101,16 +102,30 @@ const MainStack = () => (
 
 // Root navigator that handles auth state
 const AppNavigator = () => {
-    const { isAuthenticated, isLoading } = useContext(AuthContext);
+    const { isAuthenticated, isLoading, hasPets, checkingPetStatus } = useContext(AuthContext);
 
-    // If still checking auth state, show nothing or a loading screen
-    if (isLoading) {
+    // If still checking auth state or pet status, show loading screen
+    if (isLoading || (isAuthenticated && checkingPetStatus)) {
         return <SplashScreen />;
     }
 
     return (
         <NavigationContainer>
-            {isAuthenticated ? <MainStack /> : <AuthStack />}
+            {isAuthenticated ? (
+                hasPets ? (
+                    <MainStack />
+                ) : (
+                    <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: false }}>
+                        <Stack.Screen 
+                            name="PetProfileSetup" 
+                            component={PetProfileSetupScreen}
+                            options={{ gestureEnabled: false }}
+                        />
+                    </Stack.Navigator>
+                )
+            ) : (
+                <AuthStack />
+            )}
         </NavigationContainer>
     );
 };

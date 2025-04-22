@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
     Dimensions,
     Platform,
     StatusBar,
+    PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,7 +43,7 @@ const { width } = Dimensions.get("window");
 const photoSize = (width - 48) / 3;
 
 const PetProfileSetupScreen = ({ navigation }) => {
-    const { user } = useContext(AuthContext);
+    const { user, updatePetStatus } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
     const [petData, setPetData] = useState({
@@ -264,12 +265,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
             };
 
             await PetService.createPet(petWithOwner);
+            
+            // Update pet status in AuthContext
+            if (updatePetStatus) {
+                updatePetStatus(true);
+            }
 
-            // Navigate to Home tab
-            navigation.reset({
-                index: 0,
-                routes: [{ name: "MainTabs" }],
-            });
+            // Fixed navigation - use CommonActions instead of reset
+            // This works regardless of which navigator stack we're in
+            navigation.navigate("MainTabs");
         } catch (error) {
             console.error("Error creating pet:", error);
             Alert.alert(
@@ -319,21 +323,23 @@ const PetProfileSetupScreen = ({ navigation }) => {
         setCurrentStep(prev => Math.max(prev - 1, 1));
     };
 
-    // Handle back button press
-    const handleBackPress = () => {
-        Alert.alert(
-            "Cancel Setup",
-            "Are you sure you want to cancel pet profile setup? Your progress will be lost.",
-            [
-                { text: "Continue Setup", style: "cancel" },
-                { 
-                    text: "Cancel Setup", 
-                    style: "destructive",
-                    onPress: () => navigation.goBack() 
+    // Set up Pan Responder for swipe gestures
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (e, gestureState) => {
+                // Only recognize horizontal gestures that are significant enough
+                return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+            },
+            onPanResponderRelease: (e, gestureState) => {
+                // If user swiped right with enough force and we're not on the first step
+                if (gestureState.dx > 100 && currentStep > 1) {
+                    prevStep();
                 }
-            ]
-        );
-    };
+                // We could add swipe left to go to next step, but we'll leave that to the buttons for clarity
+            }
+        })
+    ).current;
 
     // Render step indicators
     const renderStepIndicators = () => (
@@ -613,12 +619,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
             >
-                {/* Updated Back Button to match PetProfileScreen */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={handleBackPress}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
-                </TouchableOpacity>
+                {/* Removed back button as requested */}
                 
                 <View style={styles.headerContainer}>
                     <Text style={styles.headerText}>Set Up Pet Profile</Text>
@@ -629,12 +630,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 </View>
             </LinearGradient>
             
-            <ScrollView 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {renderStepContent()}
-            </ScrollView>
+            {/* Apply pan responder to the ScrollView */}
+            <View {...panResponder.panHandlers} style={styles.swipeContainer}>
+                <ScrollView 
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {renderStepContent()}
+                </ScrollView>
+            </View>
         </SafeAreaView>
     );
 };
@@ -643,17 +647,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,
-    },
-    backButton: {
-        position: 'absolute',
-        top: Platform.OS === 'ios' ? 60 : 45,
-        left: 15,
-        zIndex: 10,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: "center",
-        alignItems: "center",
     },
     gradientHeader: {
         paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
@@ -836,6 +829,10 @@ const styles = StyleSheet.create({
         flex: 1,
         marginHorizontal: 4,
         marginTop: 20,
+    },
+    swipeContainer: {
+        flex: 1,
+        width: '100%',
     },
 });
 

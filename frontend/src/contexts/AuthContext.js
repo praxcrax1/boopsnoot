@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from 'expo-location';
 import AuthService from "../services/AuthService";
+import PetService from "../services/PetService";
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -12,6 +13,8 @@ export const AuthProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [authError, setAuthError] = useState(null);
     const [locationPermissionStatus, setLocationPermissionStatus] = useState(null);
+    const [hasPets, setHasPets] = useState(false);
+    const [checkingPetStatus, setCheckingPetStatus] = useState(true);
 
     // Check for existing token and load user data on app start
     useEffect(() => {
@@ -25,6 +28,9 @@ export const AuthProvider = ({ children }) => {
                         setUser(userData.user);
                         setIsAuthenticated(true);
                         
+                        // Check if user has pets
+                        checkUserPets();
+                        
                         // Check if we need to request location
                         if (!userData.user.location || 
                             (!userData.user.location.coordinates || 
@@ -37,16 +43,19 @@ export const AuthProvider = ({ children }) => {
                         await AsyncStorage.removeItem("token");
                         setIsAuthenticated(false);
                         setUser(null);
+                        setCheckingPetStatus(false);
                     }
                 } else {
                     setIsAuthenticated(false);
                     setUser(null);
+                    setCheckingPetStatus(false);
                 }
             } catch (error) {
                 console.error("Error loading user:", error);
                 setAuthError(error.message);
                 setIsAuthenticated(false);
                 setUser(null);
+                setCheckingPetStatus(false);
             } finally {
                 setIsLoading(false);
             }
@@ -54,6 +63,21 @@ export const AuthProvider = ({ children }) => {
 
         loadUser();
     }, []);
+    
+    // Check if user has pets
+    const checkUserPets = async () => {
+        try {
+            setCheckingPetStatus(true);
+            const petsResponse = await PetService.getUserPets();
+            const hasUserPets = petsResponse.pets && petsResponse.pets.length > 0;
+            setHasPets(hasUserPets);
+        } catch (error) {
+            console.error("Error checking pet status:", error);
+            setHasPets(false);
+        } finally {
+            setCheckingPetStatus(false);
+        }
+    };
 
     // Request location permission and update user location
     const requestAndUpdateLocation = async () => {
@@ -130,6 +154,10 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setIsAuthenticated(true);
             
+            // Set initial pet status to false for new user
+            setHasPets(false);
+            setCheckingPetStatus(false);
+            
             // After successful registration, request location
             requestAndUpdateLocation();
             
@@ -152,6 +180,9 @@ export const AuthProvider = ({ children }) => {
             const response = await AuthService.login(email, password);
             setUser(response.user);
             setIsAuthenticated(true);
+            
+            // Check if user has pets after login
+            checkUserPets();
             
             // Check if we need to request location after login
             if (!response.user.location || 
@@ -181,6 +212,9 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setIsAuthenticated(true);
             
+            // Check if user has pets after Google login
+            checkUserPets();
+            
             // Check if we need to request location after Google login
             if (!response.user.location || 
                 (!response.user.location.coordinates || 
@@ -207,6 +241,8 @@ export const AuthProvider = ({ children }) => {
             await AuthService.logout();
             setUser(null);
             setIsAuthenticated(false);
+            setHasPets(false);
+            setCheckingPetStatus(false);
             return { success: true };
         } catch (error) {
             console.error("Logout error:", error);
@@ -223,6 +259,12 @@ export const AuthProvider = ({ children }) => {
             ...user,
             ...userData,
         });
+    };
+
+    // Update pets status after creating a new pet
+    const updatePetStatus = (hasUserPets = true) => {
+        setHasPets(hasUserPets);
+        setCheckingPetStatus(false);
     };
 
     // Clear any auth errors
@@ -244,7 +286,11 @@ export const AuthProvider = ({ children }) => {
                 updateUser,
                 clearAuthError,
                 requestAndUpdateLocation,
-                locationPermissionStatus
+                locationPermissionStatus,
+                hasPets,
+                checkingPetStatus,
+                updatePetStatus,
+                checkUserPets
             }}>
             {children}
         </AuthContext.Provider>

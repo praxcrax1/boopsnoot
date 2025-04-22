@@ -53,11 +53,7 @@ const PetProfileScreen = ({ route, navigation }) => {
             headerShadowVisible: false,
             headerTransparent: true,
             headerLeft: () => (
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
-                </TouchableOpacity>
+                <></>
             ),
             headerRight: () => (
                 <TouchableOpacity
