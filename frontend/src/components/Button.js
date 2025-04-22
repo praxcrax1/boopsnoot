@@ -91,7 +91,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
-        marginBottom: theme.spacing.lg,
     },
     primaryButton: {
         backgroundColor: theme.colors.buttonPrimary,

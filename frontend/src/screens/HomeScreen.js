@@ -561,6 +561,7 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.fontSize.sm,
         fontWeight: theme.typography.fontWeight.medium,
         color: theme.colors.primary,
+        marginBottom: theme.spacing.lg,
     },
     quickActionsContainer: {
         flexDirection: "row",

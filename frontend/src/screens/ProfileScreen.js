@@ -306,7 +306,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: theme.spacing.md,
         paddingVertical: 0,
         borderRadius: theme.borderRadius.lg,
-        ...theme.shadows.small,
     },
     addPetButtonText: {
         fontSize: theme.typography.fontSize.sm,
