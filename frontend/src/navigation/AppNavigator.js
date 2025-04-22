@@ -1,9 +1,11 @@
-import React, { useContext } from "react";
+import React, { useContext } from "react"; // Removed useEffect, useRef
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthContext } from "../contexts/AuthContext";
+import { navigationRef } from '../../App';
+import useNotifications from "../hooks/useNotifications"; // Import the custom hook
 
 // Auth screens
 import SplashScreen from "../screens/auth/SplashScreen";
@@ -103,6 +105,10 @@ const MainStack = () => (
 // Root navigator that handles auth state
 const AppNavigator = () => {
     const { isAuthenticated, isLoading, hasPets, checkingPetStatus } = useContext(AuthContext);
+    
+    // Call the custom hook unconditionally, passing the auth state
+    // The hook itself will handle the logic based on isAuthenticated
+    useNotifications(isAuthenticated); 
 
     // If still checking auth state or pet status, show loading screen
     if (isLoading || (isAuthenticated && checkingPetStatus)) {
@@ -110,7 +116,7 @@ const AppNavigator = () => {
     }
 
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             {isAuthenticated ? (
                 hasPets ? (
                     <MainStack />

@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
+const Chat = require('./models/Chat'); // Import Chat model
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -85,51 +86,68 @@ io.on('connection', (socket) => {
   });
   
   // Send message
-  socket.on('send_message', (data) => {
+  socket.on('send_message', async (data) => { // Make handler async
     console.log('Message received from client:', data);
-    
-    // Get the sender's user ID
+
     const senderId = data.senderId || socket.userId || (data.sender && data.sender._id);
-    
-    // Make sure we have the sender's user ID stored in the message data
-    const messageData = {
-      ...data,
-      senderSocketId: socket.id,
-      senderUserId: senderId,
-      // When sending to others, explicitly mark as NOT from the current user (receiver's perspective)
-      sender: {
-        ...data.sender,
-        isCurrentUser: false  // This is critical - when someone else receives a message, it's not from them
-      }
-    };
-    
-    console.log('Broadcasting message to room:', messageData.chatId, 'Message data:', messageData);
-    
-    // Broadcast to all clients in the chat room including the sender ID
     const chatId = data.chatId;
-    socket.to(chatId).emit('receive_message', messageData);
-  });
-  
-  // Support alternate event name format
-  socket.on('message', (data) => {
-    console.log('Message received (alt format):', data);
-    
-    // Get the sender's user ID
-    const senderId = data.senderId || socket.userId || (data.sender && data.sender._id);
-    
-    const messageData = {
-      ...data,
-      senderSocketId: socket.id,
-      senderUserId: senderId,
-      // When sending to others, explicitly mark as NOT from the current user (receiver's perspective)
-      sender: {
-        ...data.sender,
-        isCurrentUser: false  // When receiving a message, it's always from someone else
-      }
-    };
-    
-    const chatId = data.chatId;
-    socket.to(chatId).emit('receive_message', messageData);
+
+    if (!chatId || !senderId) {
+        console.error('Missing chatId or senderId in send_message:', data);
+        // Optionally emit an error back to the sender
+        // socket.emit('message_error', { message: 'Missing chat or sender info' });
+        return;
+    }
+
+    try {
+        // Find the chat to get participants
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+            console.error(`Chat not found for ID: ${chatId}`);
+            // socket.emit('message_error', { message: 'Chat room not found' });
+            return;
+        }
+
+        // Prepare the message data to be sent
+        const messageData = {
+            ...data,
+            senderSocketId: socket.id,
+            senderUserId: senderId,
+            // Ensure sender info is consistent
+            sender: {
+                ...(data.sender || {}),
+                _id: senderId, // Make sure sender ID is present
+                isCurrentUser: false // This will be determined by the receiver
+            }
+        };
+
+        console.log('Attempting to broadcast message to participants of chat:', chatId);
+
+        // Iterate over participants and send to their connected sockets
+        chat.participants.forEach(participantId => {
+            const recipientSocketId = connectedUsers.get(participantId.toString());
+
+            // Don't send back to the original sender's socket immediately
+            // The frontend ChatScreen handles adding the message locally.
+            // However, if the sender has multiple sessions, they *should* receive it.
+            // The frontend listener already filters messages where senderId === currentUserId.
+            // So, we can safely emit to all participants' sockets.
+
+            if (recipientSocketId) {
+                console.log(`Sending message to participant ${participantId} via socket ${recipientSocketId}`);
+                // Emit the message directly to the recipient's socket
+                io.to(recipientSocketId).emit('receive_message', messageData);
+            } else {
+                console.log(`Participant ${participantId} is not currently connected.`);
+                // TODO: Implement offline handling / push notifications here if needed
+                // This is where you'd trigger a push notification if the user is offline
+            }
+        });
+
+    } catch (error) {
+        console.error('Error processing send_message:', error);
+        // socket.emit('message_error', { message: 'Server error processing message' });
+    }
   });
   
   // Disconnect

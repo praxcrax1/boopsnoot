@@ -6,6 +6,7 @@ class SocketService {
     socket = null;
     currentUserId = null;
     isConnecting = false;
+    globalMessageListeners = new Set();
 
     async getCurrentUser() {
         if (!this.currentUserId) {
@@ -24,7 +25,6 @@ class SocketService {
     }
 
     async connect() {
-        // Prevent multiple connection attempts
         if (this.isConnecting) {
             console.log("Connection already in progress, waiting...");
             let attempts = 0;
@@ -35,7 +35,6 @@ class SocketService {
             return this.socket;
         }
 
-        // If socket exists and is connected, return it
         if (this.socket && this.socket.connected) {
             console.log("Socket already connected:", this.socket.id);
             return this.socket;
@@ -49,7 +48,6 @@ class SocketService {
 
             console.log("Connecting to socket at:", SOCKET_URL);
 
-            // Create new socket connection
             this.socket = io(SOCKET_URL, {
                 transports: ["websocket"],
                 reconnection: true,
@@ -67,11 +65,9 @@ class SocketService {
                 },
             });
 
-            // Set up connection event handlers
             this.socket.on("connect", () => {
                 console.log("Socket connected with ID:", this.socket.id);
 
-                // Authenticate the socket with user ID
                 if (this.currentUserId) {
                     this.socket.emit("authenticate", {
                         userId: this.currentUserId,
@@ -84,7 +80,6 @@ class SocketService {
                     console.warn(
                         "No user ID available for socket authentication"
                     );
-                    // Try to get user ID if not available
                     this.getCurrentUser().then((userId) => {
                         if (userId) {
                             this.socket.emit("authenticate", { userId });
@@ -104,7 +99,6 @@ class SocketService {
             this.socket.on("disconnect", (reason) => {
                 console.log("Socket disconnected, reason:", reason);
 
-                // Auto reconnect if disconnected unexpectedly
                 if (
                     reason === "io server disconnect" ||
                     reason === "transport close"
@@ -117,7 +111,8 @@ class SocketService {
                 console.error("Socket error:", error);
             });
 
-            // Wait for connection to establish
+            this.setupGlobalMessageListener();
+
             if (!this.socket.connected) {
                 console.log("Waiting for socket connection...");
                 await new Promise((resolve) => {
@@ -154,15 +149,12 @@ class SocketService {
         try {
             console.log("Attempting to join chat room:", chatId);
 
-            // Make sure socket is connected before joining chat
             if (!this.socket || !this.socket.connected) {
                 console.log("Socket not connected, connecting now...");
                 await this.connect();
-                // Add a small delay to ensure connection is fully established
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
 
-            // Double check the connection
             if (!this.socket) {
                 console.error(
                     "Cannot join chat: socket is null after connection attempt"
@@ -195,13 +187,11 @@ class SocketService {
 
     async sendMessage(messageData) {
         try {
-            // Ensure socket is connected
             if (!this.socket || !this.socket.connected) {
                 console.log(
                     "Socket not connected, connecting before sending message..."
                 );
                 await this.connect();
-                // Add a small delay to ensure connection is fully established
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
 
@@ -211,7 +201,6 @@ class SocketService {
                 );
             }
 
-            // Make sure we have the current user ID
             if (!this.currentUserId) {
                 await this.getCurrentUser();
             }
@@ -223,13 +212,11 @@ class SocketService {
                 this.currentUserId
             );
 
-            // Make sure we include the current user ID with the message
             const messageWithSender = {
                 ...messageData,
                 senderId: this.currentUserId,
             };
 
-            // Use the correct event name that matches the backend
             this.socket.emit("send_message", messageWithSender);
             return true;
         } catch (error) {
@@ -238,64 +225,81 @@ class SocketService {
         }
     }
 
-    async onReceiveMessage(callback) {
-        try {
-            // Ensure socket is connected
-            if (!this.socket) {
-                await this.connect();
-            }
+    addGlobalMessageListener(callback) {
+        this.globalMessageListeners.add(callback);
+        console.log("Added global listener. Count:", this.globalMessageListeners.size);
+    }
 
-            // Make sure we have the current user ID
+    removeGlobalMessageListener(callback) {
+        this.globalMessageListeners.delete(callback);
+        console.log("Removed global listener. Count:", this.globalMessageListeners.size);
+    }
+
+    notifyGlobalListeners(message) {
+        console.log(`[SocketService LOG] Notifying ${this.globalMessageListeners.size} global listeners.`);
+        if (this.globalMessageListeners.size === 0) {
+            console.warn("[SocketService LOG] No global listeners registered to notify!");
+        }
+        this.globalMessageListeners.forEach(listener => {
+            try {
+                console.log("[SocketService LOG] Calling a global listener function.");
+                listener(message);
+            } catch (error) {
+                console.error("[SocketService LOG] Error in global message listener:", error);
+            }
+        });
+    }
+
+    setupGlobalMessageListener() {
+        if (!this.socket) {
+            console.error("Cannot set up global message listener: socket not initialized");
+            return;
+        }
+
+        this.socket.off("receive_message");
+
+        this.socket.on("receive_message", async (data) => {
+            console.log(
+                "[SocketService LOG] Raw message received on 'receive_message':",
+                JSON.stringify(data, null, 2)
+            );
+
             if (!this.currentUserId) {
                 await this.getCurrentUser();
             }
 
-            // Remove any existing listeners to avoid duplicates
-            if (this.socket) {
-                this.socket.off("receive_message");
+            const senderId = data.senderUserId || data.senderId || data.sender?._id;
+            const isCurrentUser = senderId === this.currentUserId;
 
-                // Use the correct event name that matches the backend
-                this.socket.on("receive_message", (data) => {
-                    console.log(
-                        "Received message:",
-                        data,
-                        "Current user:",
-                        this.currentUserId
-                    );
-
-                    // Determine if the sender is the current user
-                    const isCurrentUser =
-                        data.senderId === this.currentUserId ||
-                        data.senderUserId === this.currentUserId ||
-                        (data.sender &&
-                            (data.sender._id === this.currentUserId ||
-                                data.sender.isCurrentUser));
-
-                    // Create a standardized message format to ensure consistency
-                    const standardizedMessage = {
-                        ...data,
-                        sender: {
-                            ...data.sender,
-                            isCurrentUser: isCurrentUser,
-                        },
-                    };
-
-                    callback(standardizedMessage);
-                });
-            } else {
-                console.error(
-                    "Cannot set up message listener: socket not initialized"
-                );
+            if (isCurrentUser) {
+                console.log("[SocketService LOG] Ignoring message from self.");
+                return;
             }
-        } catch (error) {
-            console.error("Error setting up message listener:", error);
-        }
+
+            const standardizedMessage = {
+                ...data,
+                sender: {
+                    ...(data.sender || {}),
+                    _id: senderId,
+                    isCurrentUser: false,
+                },
+            };
+
+            console.log("[SocketService LOG] Preparing to notify global listeners with message:", JSON.stringify(standardizedMessage, null, 2));
+            this.notifyGlobalListeners(standardizedMessage);
+        });
+
+        console.log("[SocketService LOG] Global 'receive_message' listener setup complete.");
     }
 
-    offReceiveMessage() {
-        if (this.socket) {
-            this.socket.off("receive_message");
-        }
+    async onReceiveMessage(callback) {
+       console.warn("SocketService.onReceiveMessage is potentially deprecated. Use addGlobalMessageListener instead.");
+       this.addGlobalMessageListener(callback);
+    }
+
+    offReceiveMessage(callback) {
+       console.warn("SocketService.offReceiveMessage is potentially deprecated. Use removeGlobalMessageListener instead.");
+       this.removeGlobalMessageListener(callback);
     }
 }
 

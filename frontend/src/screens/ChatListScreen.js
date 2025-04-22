@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from 'expo-notifications';
 import theme, { withOpacity } from "../styles/theme";
 
 const ChatListScreen = ({ navigation }) => {
@@ -22,6 +23,8 @@ const ChatListScreen = ({ navigation }) => {
     const [unreadChats, setUnreadChats] = useState({});
     const appState = useRef(AppState.currentState);
     const socketInitialized = useRef(false);
+    const notificationListener = useRef();
+    const responseListener = useRef();
     
     // Fetch all chats from API
     const fetchChats = useCallback(async () => {
@@ -60,69 +63,89 @@ const ChatListScreen = ({ navigation }) => {
         }
     };
     
-    // Handle new message from socket
+    // Handle new message from socket (now received via global listener)
     const handleNewMessage = useCallback((message) => {
-        if (!message || !message.chatId) return;
-        
-        // Get the active screen to check if user is in the chat
-        // Don't mark as unread if user is currently viewing the chat
-        const currentRoute = navigation.getCurrentRoute();
-        const isInChatScreen = currentRoute?.name === 'Chat' && 
-                               currentRoute?.params?.chatId === message.chatId;
-        
-        if (isInChatScreen) return;
-        
-        // Add to unread messages
-        setUnreadChats(prev => {
-            const newState = { 
-                ...prev, 
-                [message.chatId]: true 
-            };
-            saveUnreadState(newState);
-            return newState;
-        });
-        
-        // Update chat list to show the new message
+        // --- Log when the handler is called ---
+        console.log(
+            "[ChatListScreen LOG] handleNewMessage called with message:",
+            JSON.stringify(message, null, 2)
+        );
+        // --- End Log ---
+
+        if (!message || !message.chatId) {
+            console.log("[ChatListScreen LOG] Received invalid message data", message);
+            return;
+        }
+
+        console.log("ChatListScreen: Handling new message for chat:", message.chatId);
+
+        // Check if the user is currently viewing this specific chat
+        const currentRoute = navigation.getState()?.routes.find(route => route.name === 'Chat');
+        const isViewingThisChat = currentRoute?.params?.chatId === message.chatId;
+
+        // Update unread status only if not viewing the chat
+        if (!isViewingThisChat) {
+            setUnreadChats(prev => {
+                const newState = { ...prev, [message.chatId]: true };
+                saveUnreadState(newState);
+                console.log("ChatListScreen: Marked chat as unread:", message.chatId);
+                return newState;
+            });
+        }
+
+        // Update chat list state
         setChats(prevChats => {
-            // Find the chat that received the message
             const chatIndex = prevChats.findIndex(chat => chat._id === message.chatId);
-            if (chatIndex === -1) {
-                // If chat doesn't exist in the list (rare case), fetch all chats again
-                fetchChats();
+            let updatedChats = [...prevChats];
+
+            if (chatIndex !== -1) {
+                // Chat exists, update its last message and move to top
+                const existingChat = updatedChats[chatIndex];
+                const updatedChat = {
+                    ...existingChat,
+                    lastMessage: {
+                        content: message.content,
+                        createdAt: message.createdAt || new Date().toISOString(),
+                        // Mark as unread based on whether user is viewing the chat
+                        unread: !isViewingThisChat
+                    }
+                };
+                // Remove from current position and add to the beginning
+                updatedChats.splice(chatIndex, 1);
+                updatedChats.unshift(updatedChat);
+                console.log("ChatListScreen: Updated existing chat:", message.chatId);
+            } else {
+                // Chat doesn't exist, fetch all chats again to get the new one
+                // This might happen if a new match starts chatting immediately
+                console.log("ChatListScreen: New chat detected, refetching list.");
+                fetchChats(); // Refetch to include the new chat
+                // Return previous state for now until fetch completes
                 return prevChats;
             }
-            
-            const updatedChats = [...prevChats];
-            
-            // Update the chat with new last message
-            updatedChats[chatIndex] = {
-                ...updatedChats[chatIndex],
-                lastMessage: {
-                    content: message.content,
-                    createdAt: message.createdAt || new Date().toISOString(),
-                    unread: true
-                }
-            };
-            
-            // Move the updated chat to the top
-            const updatedChat = updatedChats.splice(chatIndex, 1)[0];
-            updatedChats.unshift(updatedChat);
-            
+
             return updatedChats;
         });
     }, [navigation, fetchChats]);
     
-    // Initialize socket listeners
+    // Initialize socket listeners using the global system
     const initializeSocket = useCallback(async () => {
-        if (socketInitialized.current) return;
-        
+        // --- Log when initialization starts ---
+        console.log("[ChatListScreen LOG] Attempting to initialize socket and add listener.");
+        // --- End Log ---
+        if (socketInitialized.current) {
+            console.log("[ChatListScreen LOG] Socket already initialized.");
+            return;
+        }
+
         try {
-            await SocketService.connect();
+            await SocketService.connect(); // Ensure connection
+            // Use the new global listener registration
+            console.log("[ChatListScreen LOG] Calling SocketService.addGlobalMessageListener.");
             SocketService.addGlobalMessageListener(handleNewMessage);
             socketInitialized.current = true;
-            console.log("Socket initialized for ChatListScreen");
+            console.log("[ChatListScreen LOG] Socket initialized and global listener added successfully.");
         } catch (error) {
-            console.error("Error initializing socket in ChatListScreen:", error);
+            console.error("[ChatListScreen LOG] Error initializing socket:", error);
         }
     }, [handleNewMessage]);
     
@@ -163,9 +186,9 @@ const ChatListScreen = ({ navigation }) => {
         initializeSocket();
         
         // Handle app state changes to reconnect socket when app comes back to foreground
-        const subscription = AppState.addEventListener('change', nextAppState => {
+        const appStateSubscription = AppState.addEventListener('change', nextAppState => {
             if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-                console.log('App has come to the foreground!');
+                console.log('ChatListScreen: App has come to the foreground!');
                 initializeSocket();
                 fetchChats();
             }
@@ -174,16 +197,46 @@ const ChatListScreen = ({ navigation }) => {
         });
         
         // Refresh chats when the screen is focused
-        const unsubscribeFocus = navigation.addListener("focus", () => {
+        const focusSubscription = navigation.addListener("focus", () => {
+            console.log("ChatListScreen: Screen focused, fetching chats.");
             fetchChats();
+            Notifications.setBadgeCountAsync(0);
         });
 
+        // Notification Interaction Handling
+        notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+            console.log('Notification received while app foregrounded:', notification);
+        });
+
+        responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+            console.log('Notification tapped:', response);
+            const { chatId } = response.notification.request.content.data;
+            if (chatId) {
+                console.log('Navigating to chat from notification:', chatId);
+                navigation.navigate('Chat', { chatId });
+            }
+        });
+
+        // Cleanup function
         return () => {
-            // Clean up on unmount
-            subscription.remove();
-            unsubscribeFocus();
+            console.log("[ChatListScreen LOG] Cleaning up listeners.");
+            appStateSubscription.remove();
+            focusSubscription(); // Remove focus listener
+
+            // Remove notification listeners
+            if (notificationListener.current) {
+                Notifications.removeNotificationSubscription(notificationListener.current);
+            }
+            if (responseListener.current) {
+                Notifications.removeNotificationSubscription(responseListener.current);
+            }
+
+            // Use the new global listener removal
             if (socketInitialized.current) {
+                console.log("[ChatListScreen LOG] Removing global message listener.");
                 SocketService.removeGlobalMessageListener(handleNewMessage);
+                socketInitialized.current = false; // Reset flag on cleanup
+                console.log("[ChatListScreen LOG] Removed global message listener.");
             }
         };
     }, [navigation, fetchChats, initializeSocket, handleNewMessage]);

@@ -112,6 +112,12 @@ const ChatScreen = ({ route, navigation }) => {
                 
                 // Mark chat as read when opened
                 markChatAsRead();
+
+                // Scroll to bottom after loading messages
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: false });
+                }, 100); // Small delay to allow layout
+
             } catch (error) {
                 console.error("Error loading chat data:", error);
                 Alert.alert("Error", "Failed to load chat. Please try again.");
