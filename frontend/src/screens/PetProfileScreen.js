@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -8,17 +8,26 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Animated,
+    Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PetService from "../services/PetService";
 import Button from "../components/Button";
 import { DISPLAY_VALUES } from "../constants/petConstants";
+import theme, { withOpacity } from "../styles/theme";
+
+const { width } = Dimensions.get("window");
+const PHOTO_HEIGHT = 350;
 
 const PetProfileScreen = ({ route, navigation }) => {
     const { petId } = route.params;
     const [pet, setPet] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const photoScrollRef = useRef(null);
 
     useEffect(() => {
         const fetchPetData = async () => {
@@ -38,15 +47,16 @@ const PetProfileScreen = ({ route, navigation }) => {
 
         fetchPetData();
 
-        // Set up navigation header
         navigation.setOptions({
             headerShown: true,
             title: "",
+            headerShadowVisible: false,
+            headerTransparent: true,
             headerLeft: () => (
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color="#333" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
                 </TouchableOpacity>
             ),
             headerRight: () => (
@@ -55,28 +65,34 @@ const PetProfileScreen = ({ route, navigation }) => {
                     onPress={() =>
                         navigation.navigate("EditPetProfile", { petId })
                     }>
-                    <Ionicons name="create-outline" size={24} color="#FF6B6B" />
+                    <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
                 </TouchableOpacity>
             ),
         });
     }, [petId, navigation]);
 
-    const handleNextPhoto = () => {
-        if (pet?.photos && currentPhotoIndex < pet.photos.length - 1) {
-            setCurrentPhotoIndex(currentPhotoIndex + 1);
+    const handlePhotoChange = (event) => {
+        const contentOffsetX = event.nativeEvent.contentOffset.x;
+        const newIndex = Math.round(contentOffsetX / width);
+
+        if (pet?.photos && newIndex >= 0 && newIndex < pet.photos.length) {
+            setCurrentPhotoIndex(newIndex);
         }
     };
 
-    const handlePreviousPhoto = () => {
-        if (currentPhotoIndex > 0) {
-            setCurrentPhotoIndex(currentPhotoIndex - 1);
+    const scrollToPhoto = (index) => {
+        if (photoScrollRef.current && pet?.photos?.length > 0) {
+            photoScrollRef.current.scrollTo({
+                x: index * width,
+                animated: true,
+            });
         }
     };
 
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B6B" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
@@ -87,7 +103,7 @@ const PetProfileScreen = ({ route, navigation }) => {
                 <Ionicons
                     name="alert-circle-outline"
                     size={64}
-                    color="#FF6B6B"
+                    color={theme.colors.error}
                 />
                 <Text style={styles.errorText}>Pet not found</Text>
                 <Button
@@ -103,58 +119,52 @@ const PetProfileScreen = ({ route, navigation }) => {
     return (
         <ScrollView
             style={styles.container}
-            showsVerticalScrollIndicator={false}>
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+        >
             <View style={styles.photoContainer}>
                 {pet.photos && pet.photos.length > 0 ? (
                     <>
-                        <Image
-                            source={{ uri: pet.photos[currentPhotoIndex] }}
-                            style={styles.petImage}
-                            resizeMode="cover"
-                        />
+                        <Animated.ScrollView
+                            ref={photoScrollRef}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                                { useNativeDriver: false, listener: handlePhotoChange }
+                            )}
+                            scrollEventThrottle={16}>
+                            {pet.photos.map((photo, index) => (
+                                <Image
+                                    key={index}
+                                    source={{ uri: photo }}
+                                    style={styles.petImage}
+                                    resizeMode="cover"
+                                />
+                            ))}
+                        </Animated.ScrollView>
+                        
                         {pet.photos.length > 1 && (
-                            <View style={styles.photoNavContainer}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.photoNavButton,
-                                        currentPhotoIndex === 0 &&
-                                            styles.photoNavButtonDisabled,
-                                    ]}
-                                    onPress={handlePreviousPhoto}
-                                    disabled={currentPhotoIndex === 0}>
-                                    <Ionicons
-                                        name="chevron-back"
-                                        size={20}
-                                        color="#FFF"
-                                    />
-                                </TouchableOpacity>
-                                <Text style={styles.photoCount}>
-                                    {currentPhotoIndex + 1}/{pet.photos.length}
-                                </Text>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.photoNavButton,
-                                        currentPhotoIndex ===
-                                            pet.photos.length - 1 &&
-                                            styles.photoNavButtonDisabled,
-                                    ]}
-                                    onPress={handleNextPhoto}
-                                    disabled={
-                                        currentPhotoIndex ===
-                                        pet.photos.length - 1
-                                    }>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={20}
-                                        color="#FFF"
-                                    />
-                                </TouchableOpacity>
+                            <View style={styles.paginationDots}>
+                                {pet.photos.map((_, index) => (
+                                    <TouchableOpacity 
+                                        key={index}
+                                        onPress={() => scrollToPhoto(index)}>
+                                        <View
+                                            style={[
+                                                styles.paginationDot,
+                                                currentPhotoIndex === index && styles.paginationDotActive
+                                            ]}
+                                        />
+                                    </TouchableOpacity>
+                                ))}
                             </View>
                         )}
                     </>
                 ) : (
                     <View style={styles.noPhotoContainer}>
-                        <Ionicons name="paw" size={64} color="#DDD" />
+                        <Ionicons name="paw" size={64} color={theme.colors.textDisabled} />
                         <Text style={styles.noPhotoText}>
                             No photos available
                         </Text>
@@ -174,27 +184,27 @@ const PetProfileScreen = ({ route, navigation }) => {
                     </View>
                 </View>
 
-                <View style={styles.infoSection}>
-                    <View style={styles.infoRow}>
-                        <InfoItem
-                            label="Gender"
-                            value={pet.gender}
-                            icon="male-female"
-                        />
-                        <InfoItem label="Size" value={pet.size} icon="resize" />
-                    </View>
-                    <View style={styles.infoRow}>
-                        <InfoItem
-                            label="Vaccinated"
-                            value={pet.vaccinated === "yes" ? "Yes" : "No"}
-                            icon="medkit"
-                        />
-                        <InfoItem
-                            label="Activity"
-                            value={pet.activityLevel}
-                            icon="fitness"
-                        />
-                    </View>
+                <View style={styles.infoCardsContainer}>
+                    <InfoCard
+                        label="Gender"
+                        value={DISPLAY_VALUES.GENDER[pet.gender] || pet.gender}
+                        icon="male-female"
+                    />
+                    <InfoCard 
+                        label="Size" 
+                        value={DISPLAY_VALUES.SIZE[pet.size] || pet.size} 
+                        icon="resize" 
+                    />
+                    <InfoCard
+                        label="Vaccinated"
+                        value={pet.vaccinated === "yes" ? "Yes" : "No"}
+                        icon="medkit"
+                    />
+                    <InfoCard
+                        label="Activity"
+                        value={DISPLAY_VALUES.ACTIVITY[pet.activityLevel] || pet.activityLevel}
+                        icon="fitness"
+                    />
                 </View>
 
                 <View style={styles.section}>
@@ -241,22 +251,18 @@ const PetProfileScreen = ({ route, navigation }) => {
     );
 };
 
-const InfoItem = ({ label, value, icon }) => (
-    <View style={styles.infoItem}>
-        <Ionicons
-            name={icon}
-            size={20}
-            color="#FF6B6B"
-            style={styles.infoIcon}
-        />
-        <View>
+const InfoCard = ({ label, value, icon }) => (
+    <View style={styles.infoCard}>
+        <View style={styles.infoIconContainer}>
+            <Ionicons
+                name={icon}
+                size={18}
+                color={theme.colors.primary}
+            />
+        </View>
+        <View style={styles.infoTextContainer}>
             <Text style={styles.infoLabel}>{label}</Text>
-            <Text style={styles.infoValue}>
-                {label === "Gender" ? DISPLAY_VALUES.GENDER[value] :
-                 label === "Size" ? DISPLAY_VALUES.SIZE[value] :
-                 label === "Activity" ? DISPLAY_VALUES.ACTIVITY[value] :
-                 value}
-            </Text>
+            <Text style={styles.infoValue}>{value}</Text>
         </View>
     </View>
 );
@@ -264,176 +270,200 @@ const InfoItem = ({ label, value, icon }) => (
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFF",
+        backgroundColor: theme.colors.background,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: theme.colors.background,
     },
     errorContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        padding: 20,
+        padding: theme.spacing.xl,
+        backgroundColor: theme.colors.background,
     },
     errorText: {
-        fontSize: 18,
-        color: "#333",
-        marginVertical: 20,
+        fontSize: theme.typography.fontSize.lg,
+        color: theme.colors.textPrimary,
+        marginVertical: theme.spacing.lg,
     },
     goBackButton: {
-        backgroundColor: "#FF6B6B",
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 10,
+        backgroundColor: theme.colors.primary,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.xl,
+        borderRadius: theme.borderRadius.md,
+        marginTop: theme.spacing.lg,
     },
     goBackButtonText: {
-        color: "#FFF",
-        fontWeight: "bold",
+        color: theme.colors.onPrimary,
+        fontWeight: theme.typography.fontWeight.bold,
     },
     backButton: {
-        marginLeft: 10,
+        marginLeft: theme.spacing.md,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: withOpacity("#000000", 0.3),
+        justifyContent: "center",
+        alignItems: "center",
     },
     editButton: {
-        marginRight: 10,
+        marginRight: theme.spacing.md,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: withOpacity("#FFFFFF", 0.8),
+        justifyContent: "center",
+        alignItems: "center",
     },
     photoContainer: {
-        position: "relative",
         width: "100%",
-        height: 300,
+        height: PHOTO_HEIGHT,
     },
     petImage: {
-        width: "100%",
-        height: 300,
+        width,
+        height: PHOTO_HEIGHT,
     },
-    photoNavContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        position: "absolute",
-        bottom: 15,
-        left: 0,
-        right: 0,
-        justifyContent: "center",
+    paginationDots: {
+        flexDirection: 'row',
+        position: 'absolute',
+        bottom: theme.spacing.lg,
+        alignSelf: 'center',
     },
-    photoNavButton: {
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        justifyContent: "center",
-        alignItems: "center",
-        marginHorizontal: 5,
+    paginationDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        marginHorizontal: 4,
     },
-    photoNavButtonDisabled: {
-        opacity: 0.5,
-    },
-    photoCount: {
-        color: "#FFF",
-        fontSize: 14,
-        fontWeight: "bold",
-        marginHorizontal: 10,
+    paginationDotActive: {
+        backgroundColor: '#FFFFFF',
     },
     noPhotoContainer: {
         width: "100%",
-        height: 300,
-        backgroundColor: "#F5F5F5",
+        height: PHOTO_HEIGHT,
+        backgroundColor: theme.colors.backgroundVariant,
         justifyContent: "center",
         alignItems: "center",
     },
     noPhotoText: {
-        fontSize: 16,
-        color: "#999",
-        marginTop: 10,
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textDisabled,
+        marginTop: theme.spacing.md,
     },
     contentContainer: {
-        padding: 20,
+        padding: theme.spacing.xl,
+        marginTop: -theme.spacing.xxl,
+        backgroundColor: theme.colors.background,
+        borderTopLeftRadius: theme.borderRadius.xl,
+        borderTopRightRadius: theme.borderRadius.xl,
     },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
-        marginBottom: 20,
+        marginBottom: theme.spacing.xl,
     },
     petName: {
-        fontSize: 28,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 5,
+        fontSize: theme.typography.fontSize.xxl,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textPrimary,
+        marginBottom: theme.spacing.xs,
     },
     petBreed: {
-        fontSize: 16,
-        color: "#666",
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
     },
     ageContainer: {
-        backgroundColor: "#F9F9F9",
-        borderRadius: 10,
-        padding: 10,
+        backgroundColor: theme.colors.backgroundVariant,
+        borderRadius: theme.borderRadius.md,
+        paddingVertical: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.md,
         alignItems: "center",
+        ...theme.shadows.small,
     },
     ageLabel: {
-        fontSize: 12,
-        color: "#666",
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
     },
     ageValue: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#333",
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
     },
-    infoSection: {
-        marginBottom: 25,
+    infoCardsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: theme.spacing.xl,
     },
-    infoRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 15,
+    infoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '48%',
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+        ...theme.shadows.small,
     },
-    infoItem: {
-        flexDirection: "row",
-        alignItems: "center",
+    infoIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: withOpacity(theme.colors.primary, 0.1),
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: theme.spacing.md,
+    },
+    infoTextContainer: {
         flex: 1,
     },
-    infoIcon: {
-        marginRight: 10,
-    },
     infoLabel: {
-        fontSize: 12,
-        color: "#999",
+        fontSize: theme.typography.fontSize.xs,
+        color: theme.colors.textSecondary,
+        marginBottom: 2,
     },
     infoValue: {
-        fontSize: 16,
-        color: "#333",
-        fontWeight: "500",
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
     },
     section: {
-        marginBottom: 25,
+        marginBottom: theme.spacing.xl,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#333",
-        marginBottom: 10,
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
+        marginBottom: theme.spacing.md,
     },
     descriptionText: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: "#333",
+        fontSize: theme.typography.fontSize.md,
+        lineHeight: theme.typography.lineHeight.normal * theme.typography.fontSize.md,
+        color: theme.colors.textPrimary,
     },
     tagsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
     },
     tag: {
-        backgroundColor: "#F0F0F0",
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-        marginRight: 10,
-        marginBottom: 10,
+        backgroundColor: theme.colors.backgroundVariant,
+        paddingVertical: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.md,
+        borderRadius: theme.borderRadius.xl,
+        marginRight: theme.spacing.sm,
+        marginBottom: theme.spacing.sm,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
     },
     tagText: {
-        fontSize: 14,
-        color: "#666",
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
     },
 });
 

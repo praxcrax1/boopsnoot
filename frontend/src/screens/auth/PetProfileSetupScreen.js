@@ -36,7 +36,7 @@ import {
 import InputField from "../../components/InputField";
 import CustomDropdown from "../../components/CustomDropdown";
 import Button from "../../components/Button";
-import theme from "../../styles/theme";
+import theme, { withOpacity } from "../../styles/theme";
 
 const { width } = Dimensions.get("window");
 const photoSize = (width - 48) / 3;
@@ -624,16 +624,11 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
             >
-                {/* Back Button */}
+                {/* Updated Back Button to match PetProfileScreen */}
                 <TouchableOpacity
                     style={styles.backButton}
-                    onPress={handleBackPress}
-                >
-                    <Ionicons
-                        name="chevron-back"
-                        size={28}
-                        color={theme.colors.textSecondary}
-                    />
+                    onPress={handleBackPress}>
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
                 </TouchableOpacity>
                 
                 <View style={styles.headerContainer}>
@@ -663,12 +658,13 @@ const styles = StyleSheet.create({
     backButton: {
         position: 'absolute',
         top: Platform.OS === 'ios' ? 60 : 45,
-        left: 5,
+        left: 15,
         zIndex: 10,
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: "center",
+        alignItems: "center",
     },
     gradientHeader: {
         paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,

@@ -36,7 +36,7 @@ import {
 import InputField from "../components/InputField";
 import CustomDropdown from "../components/CustomDropdown";
 import Button from "../components/Button";
-import theme from "../styles/theme";
+import theme, { withOpacity } from "../styles/theme";
 
 const { width } = Dimensions.get("window");
 const photoSize = (width - 60) / 3;
@@ -153,28 +153,8 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
     // Setup navigation header separately from data fetching
     useEffect(() => {
-        const headerLeftButton = () => (
-            <TouchableOpacity
-                style={styles.headerButton}
-                onPress={handleBackPress}>
-                <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
-            </TouchableOpacity>
-        );
-        
         navigation.setOptions({
-            title: "Edit Pet Profile",
-            headerLeft: headerLeftButton,
-            headerRight: null,
-            headerTitleStyle: {
-                fontWeight: theme.typography.fontWeight.semiBold,
-                color: theme.colors.textPrimary
-            },
-            headerStyle: {
-                backgroundColor: theme.colors.background,
-                elevation: 0,
-                shadowOpacity: 0,
-                borderBottomWidth: 0,
-            }
+            headerShown: false, // Hide the default header, we'll use our own
         });
     }, [navigation]);
 
@@ -792,16 +772,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Back Button */}
+                {/* Updated Back Button to match PetProfileScreen */}
                 <TouchableOpacity
                     style={styles.backButton}
-                    onPress={handleBackPress}
-                >
-                    <Ionicons
-                        name="chevron-back"
-                        size={28}
-                        color={theme.colors.textPrimary}
-                    />
+                    onPress={handleBackPress}>
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
                 </TouchableOpacity>
                 
                 {/* Pet preview card */}
@@ -862,16 +837,15 @@ const styles = StyleSheet.create({
     },
     backButton: {
         position: 'absolute',
-        top: 10,
-        left: 10,
+        top: 20,
+        left: 15,
         zIndex: 10,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: theme.colors.background + 'CC', // Semi-transparent
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...theme.shadows.small,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: withOpacity("#000000", 0.3),
+        justifyContent: "center",
+        alignItems: "center",
     },
     scrollContent: {
         paddingBottom: 100, // Space for fixed action button
