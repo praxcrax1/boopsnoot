@@ -36,8 +36,6 @@ const HomeScreen = ({ navigation, route }) => {
     const [matches, setMatches] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null);
 
-    console.log(matches)
-
     // Animation value for the matches section
     const matchesOpacity = new Animated.Value(1);
 
@@ -487,7 +485,7 @@ const styles = StyleSheet.create({
     },
     petSelectorContainer: {
         backgroundColor: 'transparent',
-        paddingTop: 25,
+        paddingTop: 20,
         paddingBottom: 8,
         zIndex: 10,
     },

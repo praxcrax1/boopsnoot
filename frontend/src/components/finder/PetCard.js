@@ -31,8 +31,6 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
         return "Nearby";
     }, []);
 
-    console.log(pet)
-
     const handleImageLoad = useCallback((index) => {
         setImagesLoaded(prev => ({
             ...prev,
@@ -91,7 +89,10 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
                         <Text style={styles.distance}>{formatDistance(pet.distance)}</Text>
                     </View>
                 </View>
-                <Text style={styles.breed}>{pet.breed}</Text>
+                <View style={styles.breedAgeContainer}>
+                    <Text style={styles.breed}>{pet.breed}</Text>
+                    {pet.age && <Text style={styles.age}>, {pet.age}</Text>}
+                </View>
             </View>
 
             <View style={styles.detailsRow}>
@@ -117,6 +118,19 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
                         {pet.temperament.map((tag, index) => (
                             <View key={index} style={styles.tag}>
                                 <Text style={styles.tagText}>{tag}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {pet.preferredPlaymates && pet.preferredPlaymates.length > 0 && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Preferred Play Mates</Text>
+                    <View style={styles.tagsContainer}>
+                        {pet.preferredPlaymates.map((playmate, index) => (
+                            <View key={index} style={styles.tag}>
+                                <Text style={styles.tagText}>{playmate}</Text>
                             </View>
                         ))}
                     </View>
@@ -251,7 +265,18 @@ const styles = StyleSheet.create({
         includeFontPadding: false,
         textAlignVertical: 'center',
     },
+    breedAgeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     breed: {
+        fontSize: 18,
+        color: '#666666',
+        fontWeight: '500',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
+    },
+    age: {
         fontSize: 18,
         color: '#666666',
         fontWeight: '500',
