@@ -573,8 +573,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             error={errors.name}
                             touched={touched.name}
                             onBlur={() => handleBlur("name")}
-                            style={styles.input}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <InputField
@@ -586,8 +584,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             error={errors.breed}
                             touched={touched.breed}
                             onBlur={() => handleBlur("breed")}
-                            style={styles.input}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <CustomDropdown
@@ -595,7 +591,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             options={petTypeOptions}
                             selectedValue={petData.type}
                             onValueChange={(value) => handleInputChange("type", value)}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <InputField
@@ -609,8 +604,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             error={errors.age}
                             touched={touched.age}
                             onBlur={() => handleBlur("age")}
-                            style={styles.input}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <CustomDropdown
@@ -618,7 +611,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             options={genderOptions}
                             selectedValue={petData.gender}
                             onValueChange={(value) => handleInputChange("gender", value)}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <CustomDropdown
@@ -626,7 +618,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             options={sizeOptions}
                             selectedValue={petData.size}
                             onValueChange={(value) => handleInputChange("size", value)}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <CustomDropdown
@@ -634,7 +625,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             options={vaccinatedOptions}
                             selectedValue={petData.vaccinated}
                             onValueChange={(value) => handleInputChange("vaccinated", value)}
-                            containerStyle={styles.inputContainer}
                         />
                     </View>
                 );
@@ -711,7 +701,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             options={activityOptions}
                             selectedValue={petData.activityLevel}
                             onValueChange={(value) => handleInputChange("activityLevel", value)}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <InputField
@@ -722,8 +711,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             multiline
                             numberOfLines={4}
                             textAlignVertical="top"
-                            style={styles.textArea}
-                            containerStyle={styles.inputContainer}
                         />
 
                         <Text style={styles.label}>Temperament</Text>
@@ -796,6 +783,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
             <ScrollView 
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -886,7 +878,7 @@ const styles = StyleSheet.create({
         paddingTop: 0,      // No padding at top since we have absolute header
     },
     previewCard: {
-        height: 200,
+        height: 300,
         width: "100%",
         position: "relative",
         marginBottom: 16,
@@ -977,17 +969,6 @@ const styles = StyleSheet.create({
     sectionContent: {
         paddingHorizontal: 20,
     },
-    inputContainer: {
-        marginBottom: 16,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: theme.colors.inputBorder,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        fontSize: theme.typography.fontSize.md,
-    },
     label: {
         fontSize: theme.typography.fontSize.md,
         fontWeight: theme.typography.fontWeight.semiBold,
@@ -1004,15 +985,6 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.fontSize.sm,
         color: theme.colors.textSecondary,
         marginBottom: 16,
-    },
-    textArea: {
-        height: 120,
-        textAlignVertical: "top",
-        borderWidth: 1,
-        borderColor: theme.colors.inputBorder,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
     },
     optionsContainer: {
         flexDirection: "row",

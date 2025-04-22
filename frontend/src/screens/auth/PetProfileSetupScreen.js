@@ -609,7 +609,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <SafeAreaView 
+            style={styles.container} 
+            edges={["left", "right"]} // Removed "top" to handle it manually
+        >
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
+            />
             <LinearGradient
                 colors={[theme.colors.primaryLight, theme.colors.background]}
                 style={styles.gradientHeader}
@@ -624,7 +632,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                     <Ionicons
                         name="chevron-back"
                         size={28}
-                        color={theme.colors.onPrimary}
+                        color={theme.colors.textSecondary}
                     />
                 </TouchableOpacity>
                 
@@ -651,11 +659,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,
-        paddingTop: StatusBar.currentHeight || 0,
     },
     backButton: {
         position: 'absolute',
-        top: 15,
+        top: Platform.OS === 'ios' ? 60 : 45,
         left: 5,
         zIndex: 10,
         width: 40,
@@ -664,7 +671,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     gradientHeader: {
-        paddingTop: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
         paddingBottom: 40,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
@@ -674,6 +681,7 @@ const styles = StyleSheet.create({
     headerContainer: {
         alignItems: "center",
         paddingHorizontal: 20,
+        marginTop: Platform.OS === 'ios' ? 15 : 5,
     },
     headerText: {
         fontSize: theme.typography.fontSize.xxl,
