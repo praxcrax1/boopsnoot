@@ -76,7 +76,7 @@ const FinderScreen = ({ navigation }) => {
     // Navigate to chat when there's a match
     const navigateToMatchChat = async (matchId) => {
         try {
-            const chatResponse = await ChatService.getChatByMatch(matchId);
+            const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
             if (chatResponse && chatResponse.chat) {
                 navigation.navigate("ChatScreen", {
                     chatId: chatResponse.chat._id,

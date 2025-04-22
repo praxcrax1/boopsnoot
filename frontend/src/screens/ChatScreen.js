@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import theme, { withOpacity } from "../styles/theme";
 
 const ChatScreen = ({ route, navigation }) => {
     const { chatId } = route.params;
@@ -31,7 +32,6 @@ const ChatScreen = ({ route, navigation }) => {
     const socketConnected = useRef(false);
 
     useEffect(() => {
-        // Get the current user ID
         const getUserId = async () => {
             try {
                 const userData = await AsyncStorage.getItem("user");
@@ -48,25 +48,22 @@ const ChatScreen = ({ route, navigation }) => {
             return null;
         };
 
-        // Set up navigation header
         navigation.setOptions({
             headerShown: true,
             headerLeft: () => (
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color="#333" />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
             ),
         });
 
         const loadChatData = async () => {
             try {
-                // Fetch chat info
                 const chatResponse = await ChatService.getChatById(chatId);
                 setChatInfo(chatResponse.chat);
 
-                // Set the title to the other pet's name
                 if (chatResponse.chat && chatResponse.chat.participants) {
                     const otherPet = chatResponse.chat.participants.find(
                         (p) => !p.isCurrentUser
@@ -103,7 +100,7 @@ const ChatScreen = ({ route, navigation }) => {
                                     <Ionicons
                                         name="information-circle-outline"
                                         size={24}
-                                        color="#333"
+                                        color={theme.colors.textPrimary}
                                     />
                                 </TouchableOpacity>
                             ),
@@ -111,7 +108,6 @@ const ChatScreen = ({ route, navigation }) => {
                     }
                 }
 
-                // Fetch messages and set state
                 setMessages(chatResponse.messages || []);
             } catch (error) {
                 console.error("Error loading chat data:", error);
@@ -121,16 +117,11 @@ const ChatScreen = ({ route, navigation }) => {
             }
         };
 
-        // Initialize socket and load chat data
         const initializeChat = async () => {
             const userId = await getUserId();
-
-            // Load chat data first
             await loadChatData();
 
-            // Then set up socket connection
             try {
-                // Make sure socket is connected and joined to the chat room
                 console.log("Setting up socket for chat:", chatId);
                 await SocketService.connect();
 
@@ -141,7 +132,6 @@ const ChatScreen = ({ route, navigation }) => {
                     console.warn(
                         "Failed to join chat room, will retry in background"
                     );
-                    // Try again after a delay
                     setTimeout(async () => {
                         const retryJoin = await SocketService.joinChat(chatId);
                         socketConnected.current = retryJoin;
@@ -149,7 +139,6 @@ const ChatScreen = ({ route, navigation }) => {
                     }, 2000);
                 }
 
-                // Set up message listener
                 SocketService.onReceiveMessage(handleNewMessage);
             } catch (error) {
                 console.error("Error setting up socket:", error);
@@ -159,7 +148,6 @@ const ChatScreen = ({ route, navigation }) => {
         initializeChat();
 
         return () => {
-            // Clean up socket listeners but don't disconnect
             SocketService.offReceiveMessage();
         };
     }, [chatId, navigation]);
@@ -168,19 +156,16 @@ const ChatScreen = ({ route, navigation }) => {
         console.log("Received message in ChatScreen:", newMessage);
 
         if (newMessage && newMessage.chatId === chatId) {
-            // Format the message to match our UI expectations
             const formattedMessage = {
                 _id: newMessage._id || `temp-${Date.now()}`,
                 content: newMessage.content,
                 sender: {
-                    // In socket messages from other users, isCurrentUser will be false
                     isCurrentUser: false,
                 },
                 createdAt: newMessage.createdAt || new Date().toISOString(),
             };
 
             setMessages((prevMessages) => {
-                // Check if message already exists (avoid duplicates)
                 const messageExists = prevMessages.some(
                     (msg) =>
                         msg._id === formattedMessage._id ||
@@ -195,7 +180,6 @@ const ChatScreen = ({ route, navigation }) => {
 
                 const newMessages = [...prevMessages, formattedMessage];
 
-                // Scroll to bottom on next render
                 setTimeout(() => {
                     flatListRef.current?.scrollToEnd({ animated: true });
                 }, 100);
@@ -213,18 +197,16 @@ const ChatScreen = ({ route, navigation }) => {
             setInputText("");
             setIsSending(true);
 
-            // Optimistically add the message to the UI
             const tempMessage = {
                 _id: `temp-${Date.now()}`,
                 content: trimmedMessage,
-                sender: { isCurrentUser: true }, // This message is from the current user
+                sender: { isCurrentUser: true },
                 createdAt: new Date().toISOString(),
                 pending: true,
             };
 
             setMessages((prevMessages) => [...prevMessages, tempMessage]);
 
-            // Send message to server
             const response = await ChatService.sendMessage(
                 chatId,
                 trimmedMessage
@@ -234,12 +216,11 @@ const ChatScreen = ({ route, navigation }) => {
                 throw new Error("Failed to send message");
             }
 
-            // Replace the temporary message with the confirmed one from the server
             const confirmedMessage = {
                 ...response.message,
                 sender: {
                     ...response.message.sender,
-                    isCurrentUser: true, // Make sure this message is marked as from the current user
+                    isCurrentUser: true,
                 },
                 pending: false,
             };
@@ -250,10 +231,8 @@ const ChatScreen = ({ route, navigation }) => {
                 )
             );
 
-            // Emit the message through socket for real-time delivery
             console.log("Sending message via socket:", confirmedMessage);
 
-            // If socket isn't connected yet, try to connect again
             if (!socketConnected.current) {
                 console.log(
                     "Socket not connected, attempting to connect and join chat"
@@ -262,25 +241,22 @@ const ChatScreen = ({ route, navigation }) => {
                 socketConnected.current = await SocketService.joinChat(chatId);
             }
 
-            // Make sure to include current user ID and chat ID in the message
             await SocketService.sendMessage({
                 ...response.message,
                 chatId,
                 senderId: currentUserId,
                 sender: {
                     ...response.message.sender,
-                    isCurrentUser: true, // This is important for the sender
+                    isCurrentUser: true,
                 },
             });
 
-            // Scroll to bottom on next render
             setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
         } catch (error) {
             console.error("Error sending message:", error);
 
-            // Mark the message as failed
             setMessages((prevMessages) =>
                 prevMessages.map((msg) =>
                     msg.pending ? { ...msg, failed: true } : msg
@@ -297,15 +273,12 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const renderMessage = ({ item, index }) => {
-        // Get the message alignment based on who sent it
         const isCurrentUser = item.sender && item.sender.isCurrentUser;
 
-        // Check if this message is from the same sender as the previous one
         const isConsecutive =
             index > 0 &&
             messages[index - 1].sender?.isCurrentUser === isCurrentUser;
 
-        // Format timestamp
         const messageTime = new Date(item.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -346,8 +319,8 @@ const ChatScreen = ({ route, navigation }) => {
                                 size={12}
                                 color={
                                     isCurrentUser
-                                        ? "rgba(255,255,255,0.7)"
-                                        : "#999"
+                                        ? withOpacity(theme.colors.onPrimary, 0.7)
+                                        : theme.colors.textSecondary
                                 }
                             />
                         )}
@@ -355,7 +328,7 @@ const ChatScreen = ({ route, navigation }) => {
                             <Ionicons
                                 name="alert-circle-outline"
                                 size={12}
-                                color="#FF4444"
+                                color={theme.colors.error}
                             />
                         )}
                         <Text
@@ -374,20 +347,19 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const renderDateSeparator = () => {
-        // This would be implemented to group messages by date
-        return null; // Placeholder for future implementation
+        return null;
     };
 
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B6B" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["bottom"]}>
             <StatusBar barStyle="dark-content" />
 
             {messages.length === 0 ? (
@@ -395,7 +367,7 @@ const ChatScreen = ({ route, navigation }) => {
                     <Ionicons
                         name="chatbubble-ellipses-outline"
                         size={64}
-                        color="#DDDDDD"
+                        color={theme.colors.divider}
                     />
                     <Text style={styles.emptyText}>No messages yet</Text>
                     <Text style={styles.emptySubtext}>
@@ -431,7 +403,7 @@ const ChatScreen = ({ route, navigation }) => {
                         value={inputText}
                         onChangeText={setInputText}
                         placeholder="Type a message..."
-                        placeholderTextColor="#999"
+                        placeholderTextColor={theme.colors.placeholder}
                         multiline
                         maxHeight={80}
                     />
@@ -445,9 +417,9 @@ const ChatScreen = ({ route, navigation }) => {
                         onPress={sendMessage}
                         disabled={!inputText.trim() || isSending}>
                         {isSending ? (
-                            <ActivityIndicator size="small" color="#FFF" />
+                            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
                         ) : (
-                            <Ionicons name="send" size={20} color="#FFF" />
+                            <Ionicons name="send" size={20} color={theme.colors.onPrimary} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -459,7 +431,7 @@ const ChatScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#F9F9F9",
+        backgroundColor: theme.colors.background,
     },
     loadingContainer: {
         flex: 1,
@@ -467,12 +439,12 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     backButton: {
-        marginLeft: 10,
-        padding: 5,
+        marginLeft: theme.spacing.sm,
+        padding: theme.spacing.xs,
     },
     headerButton: {
-        marginRight: 10,
-        padding: 5,
+        marginRight: theme.spacing.sm,
+        padding: theme.spacing.xs,
     },
     headerTitleContainer: {
         flexDirection: "row",
@@ -482,14 +454,14 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        marginRight: 10,
+        marginRight: theme.spacing.sm,
         borderWidth: 1,
-        borderColor: "#EEEEEE",
+        borderColor: theme.colors.divider,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#333",
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textPrimary,
     },
     emptyContainer: {
         flex: 1,
@@ -498,23 +470,23 @@ const styles = StyleSheet.create({
         paddingBottom: 80,
     },
     emptyText: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#999",
-        marginTop: 16,
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textSecondary,
+        marginTop: theme.spacing.lg,
     },
     emptySubtext: {
-        fontSize: 14,
-        color: "#AAAAAA",
-        marginTop: 8,
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textDisabled,
+        marginTop: theme.spacing.sm,
     },
     messagesContainer: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        paddingBottom: 20,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        paddingBottom: theme.spacing.xxl,
     },
     messageContainer: {
-        marginVertical: 4,
+        marginVertical: theme.spacing.xs,
         maxWidth: "80%",
     },
     consecutiveMessage: {
@@ -527,89 +499,85 @@ const styles = StyleSheet.create({
         alignSelf: "flex-start",
     },
     messageBubble: {
-        padding: 12,
-        borderRadius: 18,
+        padding: theme.spacing.md,
+        borderRadius: theme.borderRadius.lg,
         minWidth: 80,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 1,
-        elevation: 1,
+        ...theme.shadows.small,
     },
     currentUserBubble: {
-        backgroundColor: "#FF6B6B",
-        borderBottomRightRadius: 4,
+        backgroundColor: theme.colors.primary,
+        borderBottomRightRadius: theme.borderRadius.xs,
     },
     otherUserBubble: {
-        backgroundColor: "#FFFFFF",
+        backgroundColor: theme.colors.surface,
         borderWidth: 1,
-        borderColor: "#EEEEEE",
-        borderBottomLeftRadius: 4,
+        borderColor: theme.colors.divider,
+        borderBottomLeftRadius: theme.borderRadius.xs,
     },
     messageText: {
-        fontSize: 16,
-        lineHeight: 22,
+        fontSize: theme.typography.fontSize.md,
+        lineHeight: theme.typography.lineHeight.normal * theme.typography.fontSize.md,
     },
     currentUserText: {
-        color: "#FFFFFF",
+        color: theme.colors.onPrimary,
     },
     otherUserText: {
-        color: "#333333",
+        color: theme.colors.textPrimary,
     },
     pendingMessage: {
         opacity: 0.7,
     },
     failedMessage: {
-        backgroundColor: "#FFDDDD",
-        borderColor: "#FFAAAA",
+        backgroundColor: withOpacity(theme.colors.error, 0.1),
+        borderColor: withOpacity(theme.colors.error, 0.3),
     },
     messageFooter: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "flex-end",
-        marginTop: 4,
+        marginTop: theme.spacing.xs,
         gap: 4,
     },
     messageTime: {
-        fontSize: 11,
+        fontSize: theme.typography.fontSize.xs,
         alignSelf: "flex-end",
     },
     currentUserTime: {
-        color: "rgba(255,255,255,0.7)",
+        color: withOpacity(theme.colors.onPrimary, 0.7),
     },
     otherUserTime: {
-        color: "#999999",
+        color: theme.colors.textSecondary,
     },
     inputContainer: {
         flexDirection: "row",
-        backgroundColor: "#FFF",
-        padding: 12,
+        backgroundColor: theme.colors.surface,
+        padding: theme.spacing.md,
         borderTopWidth: 1,
-        borderTopColor: "#EEEEEE",
+        borderTopColor: theme.colors.divider,
         alignItems: "flex-end",
     },
     input: {
         flex: 1,
-        backgroundColor: "#F5F5F5",
-        borderRadius: 24,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        paddingTop: 12,
-        fontSize: 16,
+        backgroundColor: theme.colors.backgroundVariant,
+        borderRadius: theme.borderRadius.xl,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        paddingTop: theme.spacing.md,
+        fontSize: theme.typography.fontSize.md,
         maxHeight: 80,
-        marginRight: 10,
-        color: "#333",
+        marginRight: theme.spacing.md,
+        color: theme.colors.textPrimary,
     },
     sendButton: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: "#FF6B6B",
+        backgroundColor: theme.colors.primary,
         justifyContent: "center",
         alignItems: "center",
     },
     disabledButton: {
-        backgroundColor: "#CCCCCC",
+        backgroundColor: theme.colors.buttonDisabled,
     },
 });
 

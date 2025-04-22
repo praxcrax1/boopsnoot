@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
+import theme, { withOpacity } from "../styles/theme";
 
 const ChatListScreen = ({ navigation }) => {
     const [chats, setChats] = useState([]);
@@ -74,7 +75,8 @@ const ChatListScreen = ({ navigation }) => {
                 style={styles.chatItem}
                 onPress={() =>
                     navigation.navigate("Chat", { chatId: item._id })
-                }>
+                }
+                activeOpacity={0.7}>
                 <Image
                     style={styles.avatar}
                     source={
@@ -117,7 +119,7 @@ const ChatListScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FF6B6B" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
             </View>
         );
     }
@@ -134,13 +136,14 @@ const ChatListScreen = ({ navigation }) => {
                     renderItem={renderChatItem}
                     keyExtractor={(item) => item._id}
                     contentContainerStyle={styles.listContainer}
+                    showsVerticalScrollIndicator={false}
                 />
             ) : (
                 <View style={styles.emptyContainer}>
                     <Ionicons
                         name="chatbubble-ellipses"
                         size={64}
-                        color="#DDD"
+                        color={withOpacity(theme.colors.textSecondary, 0.3)}
                     />
                     <Text style={styles.emptyTitle}>No Messages Yet</Text>
                     <Text style={styles.emptyDescription}>
@@ -149,7 +152,8 @@ const ChatListScreen = ({ navigation }) => {
                     </Text>
                     <TouchableOpacity
                         style={styles.finderButton}
-                        onPress={() => navigation.navigate("Finder")}>
+                        onPress={() => navigation.navigate("Finder")}
+                        activeOpacity={0.8}>
                         <Text style={styles.finderButtonText}>
                             Find Matches
                         </Text>
@@ -163,104 +167,110 @@ const ChatListScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFF",
+        backgroundColor: theme.colors.background,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: theme.colors.background,
     },
     header: {
-        paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.lg,
         borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        borderBottomColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#333",
+        fontSize: theme.typography.fontSize.xl,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
     },
     listContainer: {
-        padding: 10,
+        paddingVertical: theme.spacing.sm,
     },
     chatItem: {
         flexDirection: "row",
         alignItems: "center",
-        padding: 12,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        borderBottomColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
     },
     avatar: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        marginRight: 15,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        marginRight: theme.spacing.lg,
+        backgroundColor: theme.colors.backgroundVariant,
     },
     chatInfo: {
         flex: 1,
+        justifyContent: "center",
     },
     chatHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 5,
+        marginBottom: theme.spacing.xs,
     },
     petName: {
-        fontSize: 18,
-        fontWeight: "600",
-        color: "#333",
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
     },
     timestamp: {
-        fontSize: 12,
-        color: "#999",
+        fontSize: theme.typography.fontSize.xs,
+        color: theme.colors.textSecondary,
     },
     messagePreview: {
-        fontSize: 14,
-        color: "#666",
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
     },
     unreadMessage: {
-        fontWeight: "500",
-        color: "#333",
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
     },
     unreadIndicator: {
         width: 10,
         height: 10,
-        borderRadius: 5,
-        backgroundColor: "#FF6B6B",
-        position: "absolute",
-        right: 15,
-        top: "50%",
+        borderRadius: theme.borderRadius.circle,
+        backgroundColor: theme.colors.primary,
+        marginLeft: theme.spacing.sm,
     },
     emptyContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        padding: 30,
+        padding: theme.spacing.xxxl,
     },
     emptyTitle: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#333",
-        marginTop: 20,
-        marginBottom: 10,
+        fontSize: theme.typography.fontSize.xxl,
+        fontWeight: theme.typography.fontWeight.bold,
+        color: theme.colors.textPrimary,
+        marginTop: theme.spacing.lg,
+        marginBottom: theme.spacing.sm,
     },
     emptyDescription: {
-        fontSize: 16,
-        color: "#666",
+        fontSize: theme.typography.fontSize.md,
+        color: theme.colors.textSecondary,
         textAlign: "center",
-        marginBottom: 30,
+        marginBottom: theme.spacing.xl,
+        lineHeight: theme.typography.lineHeight.normal,
     },
     finderButton: {
-        backgroundColor: "#FF6B6B",
-        paddingVertical: 12,
-        paddingHorizontal: 25,
-        borderRadius: 10,
+        backgroundColor: theme.colors.primary,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.xl,
+        borderRadius: theme.borderRadius.md,
+        ...theme.shadows.small,
     },
     finderButtonText: {
-        color: "#FFF",
-        fontSize: 16,
-        fontWeight: "bold",
+        color: theme.colors.onPrimary,
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.semiBold,
     },
 });
 
