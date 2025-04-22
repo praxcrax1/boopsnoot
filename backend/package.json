@@ -17,6 +17,7 @@
   "license": "ISC",
   "description": "Backend API for BoopSnoot pet matchmaking app",
   "dependencies": {
+    "aws-sdk": "^2.1692.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",

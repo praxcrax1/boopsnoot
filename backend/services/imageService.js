@@ -6,7 +6,9 @@
  * without changing the application code.
  */
 const cloudinary = require("cloudinary").v2;
+const AWS = require('aws-sdk');
 const fs = require("fs");
+const path = require("path");
 const dotenv = require("dotenv");
 
 dotenv.config();
@@ -23,10 +25,30 @@ if (UPLOAD_PROVIDER === 'cloudinary') {
     });
 }
 
+// Configure AWS S3
+if (UPLOAD_PROVIDER === 'aws') {
+    AWS.config.update({
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        region: process.env.AWS_REGION || 'us-east-1'
+    });
+}
+
 class ImageService {
     constructor() {
         // Select the provider based on configuration
         this.provider = UPLOAD_PROVIDER;
+        
+        // Initialize S3 client if using AWS
+        if (this.provider === 'aws') {
+            this.s3 = new AWS.S3();
+            this.bucketName = process.env.AWS_S3_BUCKET_NAME;
+            
+            if (!this.bucketName) {
+                console.warn('AWS S3 bucket name not provided. Using default: "pet-uploads"');
+                this.bucketName = 'pet-uploads';
+            }
+        }
     }
 
     /**
@@ -51,10 +73,9 @@ class ImageService {
                 case 'cloudinary':
                     result = await this._uploadWithCloudinary(filePath, uploadOptions);
                     break;
-                // Add other providers here in the future
-                // case 'aws':
-                //    result = await this._uploadWithAWS(filePath, uploadOptions);
-                //    break;
+                case 'aws':
+                    result = await this._uploadWithAWS(filePath, uploadOptions);
+                    break;
                 default:
                     throw new Error(`Unsupported upload provider: ${this.provider}`);
             }
@@ -85,7 +106,9 @@ class ImageService {
                 case 'cloudinary':
                     result = await cloudinary.uploader.destroy(publicId);
                     break;
-                // Add other providers here in the future
+                case 'aws':
+                    result = await this._deleteFromAWS(publicId);
+                    break;
                 default:
                     throw new Error(`Unsupported upload provider: ${this.provider}`);
             }
@@ -122,16 +145,109 @@ class ImageService {
     }
 
     /**
+     * Implementation for AWS S3 upload
+     * @private
+     */
+    async _uploadWithAWS(filePath, options) {
+        // Read file content
+        const fileContent = fs.readFileSync(filePath);
+        
+        // Generate a unique key for S3 object
+        const fileName = path.basename(filePath);
+        let key;
+        
+        if (options.uniqueFilename) {
+            const timestamp = new Date().getTime();
+            const randomStr = Math.random().toString(36).substring(2, 10);
+            key = `${options.folder}/${timestamp}-${randomStr}-${fileName}`;
+        } else {
+            key = `${options.folder}/${fileName}`;
+        }
+        
+        // Set up the S3 upload parameters
+        const params = {
+            Bucket: this.bucketName,
+            Key: key,
+            Body: fileContent,
+            ContentType: this._getContentType(fileName)
+        };
+        
+        // Upload to S3
+        const uploadResult = await this.s3.upload(params).promise();
+        
+        // Return a standardized result object (similar to Cloudinary)
+        return {
+            success: true,
+            url: uploadResult.Location,
+            publicId: key,
+            originalResponse: uploadResult
+        };
+    }
+    
+    /**
+     * Implementation for AWS S3 deletion
+     * @private
+     */
+    async _deleteFromAWS(key) {
+        const params = {
+            Bucket: this.bucketName,
+            Key: key
+        };
+        
+        const deleteResult = await this.s3.deleteObject(params).promise();
+        
+        return deleteResult;
+    }
+    
+    /**
+     * Helper method to determine content type based on file extension
+     * @private
+     */
+    _getContentType(fileName) {
+        const ext = path.extname(fileName).toLowerCase();
+        
+        switch (ext) {
+            case '.jpg':
+            case '.jpeg':
+                return 'image/jpeg';
+            case '.png':
+                return 'image/png';
+            case '.gif':
+                return 'image/gif';
+            case '.webp':
+                return 'image/webp';
+            default:
+                return 'application/octet-stream';
+        }
+    }
+
+    /**
      * Get provider-specific information
      * @returns {Object} - Provider info
      */
     getProviderInfo() {
+        if (this.provider === 'cloudinary') {
+            return {
+                name: this.provider,
+                isConfigured: 
+                    process.env.CLOUDINARY_CLOUD_NAME && 
+                    process.env.CLOUDINARY_API_KEY && 
+                    process.env.CLOUDINARY_API_SECRET,
+            };
+        } else if (this.provider === 'aws') {
+            return {
+                name: this.provider,
+                isConfigured: 
+                    process.env.AWS_ACCESS_KEY_ID && 
+                    process.env.AWS_SECRET_ACCESS_KEY && 
+                    process.env.AWS_REGION && 
+                    process.env.AWS_S3_BUCKET_NAME,
+            };
+        }
+        
         return {
             name: this.provider,
-            isConfigured: this.provider === 'cloudinary' && 
-                process.env.CLOUDINARY_CLOUD_NAME && 
-                process.env.CLOUDINARY_API_KEY && 
-                process.env.CLOUDINARY_API_SECRET,
+            isConfigured: false
         };
     }
 }
