@@ -9,7 +9,8 @@ const errorResponse = (res, status, message, error) => {
     return res.status(status).json({
         success: false,
         message,
-        error: process.env.NODE_ENV === "development" ? error?.message : undefined,
+        error:
+            process.env.NODE_ENV === "development" ? error?.message : undefined,
     });
 };
 
@@ -23,10 +24,10 @@ const validateUserPet = async (petId, userId) => {
 
 const calculateDistance = (coords1, coords2) => {
     if (!coords1 || !coords2) return 0.1;
-    
+
     const [long1, lat1] = coords1;
     const [long2, lat2] = coords2;
-    
+
     // Simple distance calculation (approximation)
     const R = 6371; // Radius of earth in km
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -34,10 +35,11 @@ const calculateDistance = (coords1, coords2) => {
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
+
     return R * c; // Distance in km
 };
 
@@ -80,7 +82,11 @@ exports.getPotentialMatches = async (req, res) => {
         // Verify the pet exists and belongs to the user
         const pet = await validateUserPet(petId, req.user.id);
         if (!pet) {
-            return errorResponse(res, 404, "Pet not found or does not belong to you");
+            return errorResponse(
+                res,
+                404,
+                "Pet not found or does not belong to you"
+            );
         }
 
         // Find matches that this pet has already interacted with
@@ -107,8 +113,12 @@ exports.getPotentialMatches = async (req, res) => {
             }
             // If the other pet likes this pet but this pet hasn't acted yet, prioritize showing it
             else if (
-                (isPet1 && match.pet2LikedPet1 === true && match.pet1LikedPet2 === null) ||
-                (!isPet1 && match.pet1LikedPet2 === true && match.pet2LikedPet1 === null)
+                (isPet1 &&
+                    match.pet2LikedPet1 === true &&
+                    match.pet1LikedPet2 === null) ||
+                (!isPet1 &&
+                    match.pet1LikedPet2 === true &&
+                    match.pet2LikedPet1 === null)
             ) {
                 likedByPetIds.push(otherPetId);
             }
@@ -161,11 +171,15 @@ exports.getPotentialMatches = async (req, res) => {
                         },
                     }).select("_id");
 
-                    const nearbyOwnerIds = nearbyOwners.map((user) => user._id.toString());
+                    const nearbyOwnerIds = nearbyOwners.map((user) =>
+                        user._id.toString()
+                    );
 
                     // Filter to pets whose owners are nearby
                     const nearbyLikedPetIds = petsWhoLikedMeData
-                        .filter((pet) => nearbyOwnerIds.includes(pet.owner.toString()))
+                        .filter((pet) =>
+                            nearbyOwnerIds.includes(pet.owner.toString())
+                        )
                         .map((pet) => pet._id);
 
                     // Finally get the full pet details
@@ -181,7 +195,10 @@ exports.getPotentialMatches = async (req, res) => {
                         );
                     }
                 } catch (error) {
-                    console.error("Error finding nearby pets who liked me:", error);
+                    console.error(
+                        "Error finding nearby pets who liked me:",
+                        error
+                    );
                     // Fallback to non-location query
                     petsWhoLikedMe = await Pet.find({
                         _id: { $in: likedByPetIds },
@@ -266,7 +283,8 @@ exports.getPotentialMatches = async (req, res) => {
         // Ensure no duplicates
         potentialMatches = potentialMatches.filter(
             (pet, index, self) =>
-                index === self.findIndex((p) => p._id.toString() === pet._id.toString())
+                index ===
+                self.findIndex((p) => p._id.toString() === pet._id.toString())
         );
 
         res.json({
@@ -290,7 +308,11 @@ exports.likePet = async (req, res) => {
         // Verify the pet exists and belongs to the user
         const pet = await validateUserPet(petId, req.user.id);
         if (!pet) {
-            return errorResponse(res, 404, "Pet not found or does not belong to you");
+            return errorResponse(
+                res,
+                404,
+                "Pet not found or does not belong to you"
+            );
         }
 
         // Check if the liked pet exists
@@ -339,8 +361,12 @@ exports.likePet = async (req, res) => {
         if (!previousIsMatch && savedMatch.isMatch) {
             // Create a chat for the matched pets
             const [pet1Owner, pet2Owner] = await Promise.all([
-                Pet.findById(petWithLowerId).select("owner").populate("owner", "id"),
-                Pet.findById(petWithHigherId).select("owner").populate("owner", "id")
+                Pet.findById(petWithLowerId)
+                    .select("owner")
+                    .populate("owner", "id"),
+                Pet.findById(petWithHigherId)
+                    .select("owner")
+                    .populate("owner", "id"),
             ]);
 
             await Chat.create({
@@ -374,7 +400,11 @@ exports.getPetMatches = async (req, res) => {
         // Verify the pet exists and belongs to the user
         const pet = await validateUserPet(petId, req.user.id);
         if (!pet) {
-            return errorResponse(res, 404, "Pet not found or does not belong to you");
+            return errorResponse(
+                res,
+                404,
+                "Pet not found or does not belong to you"
+            );
         }
 
         // Find matches ensuring both pets exist
@@ -383,19 +413,21 @@ exports.getPetMatches = async (req, res) => {
             isMatch: true,
         })
             .populate({
-                path: 'pet1',
-                select: 'name breed photos',
-                match: { _id: { $exists: true } }  // Only populate if pet exists
+                path: "pet1",
+                select: "name breed photos",
+                match: { _id: { $exists: true } }, // Only populate if pet exists
             })
             .populate({
-                path: 'pet2',
-                select: 'name breed photos',
-                match: { _id: { $exists: true } }  // Only populate if pet exists
+                path: "pet2",
+                select: "name breed photos",
+                match: { _id: { $exists: true } }, // Only populate if pet exists
             })
             .sort({ matchDate: -1 });
 
         // Filter out matches where either pet no longer exists
-        const validMatches = matches.filter(match => match.pet1 && match.pet2);
+        const validMatches = matches.filter(
+            (match) => match.pet1 && match.pet2
+        );
 
         res.json({
             success: true,

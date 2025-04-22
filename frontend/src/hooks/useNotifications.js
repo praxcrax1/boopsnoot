@@ -2,10 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { AppState, Platform } from 'react-native';
 import { navigationRef } from '../../App';
-import ApiClient from '../services/ApiClient';
-
-// Create API client instance
-const apiClient = new ApiClient();
+import AuthService from '../services/AuthService'; // Changed: import AuthService instead of apiClient
 
 // --- Notification Handler Setup (runs once when the module is loaded) ---
 Notifications.setNotificationHandler({
@@ -68,9 +65,9 @@ async function registerForPushNotificationsAsync() {
         
         console.log("[useNotifications] Expo Push Token:", token);
         
-        // Send the token to your backend server
+        // Send the token to the backend server using AuthService
         try {
-            await apiClient.post('/users/push-token', { token });
+            await AuthService.storePushToken(token);
             console.log("[useNotifications] Token sent to backend successfully");
         } catch (apiError) {
             console.error("[useNotifications] Failed to send token to backend:", apiError);

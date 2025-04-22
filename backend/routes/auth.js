@@ -28,4 +28,9 @@ router.put("/update-location", protect, authController.updateLocation);
 // @access  Private
 router.get("/me", protect, authController.getMe);
 
+// @route   POST /api/auth/push-token
+// @desc    Store push notification token
+// @access  Private
+router.post("/push-token", protect, authController.storePushToken);
+
 module.exports = router;

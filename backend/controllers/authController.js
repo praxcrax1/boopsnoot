@@ -226,3 +226,38 @@ exports.getMe = async (req, res) => {
         });
     }
 };
+
+// @desc    Store push notification token
+// @route   POST /api/auth/push-token
+// @access  Private
+exports.storePushToken = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: "Push notification token is required",
+            });
+        }
+
+        // Update user with new push token
+        const user = await User.findByIdAndUpdate(
+            req.user.id,
+            { $set: { pushToken: token } },
+            { new: true }
+        ).select("-password");
+
+        res.status(200).json({
+            success: true,
+            message: "Push notification token stored successfully",
+        });
+    } catch (error) {
+        console.error("Store push token error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        });
+    }
+};

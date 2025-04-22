@@ -73,6 +73,16 @@ class AuthService {
         }
     }
 
+    async storePushToken(token) {
+        try {
+            const response = await apiClient.post("/auth/push-token", { token });
+            return response.data;
+        } catch (error) {
+            console.error("Push token storage error:", error);
+            throw handleApiError(error);
+        }
+    }
+
     async loginWithGoogle(accessToken) {
         try {
             const response = await apiClient.post("/auth/google", {
