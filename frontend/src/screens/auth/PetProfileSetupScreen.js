@@ -362,8 +362,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 error={errors.name}
                 touched={touched.name}
                 onBlur={() => handleBlur("name")}
-                style={styles.input}
-                containerStyle={styles.inputContainer}
             />
 
             <InputField
@@ -375,8 +373,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 error={errors.breed}
                 touched={touched.breed}
                 onBlur={() => handleBlur("breed")}
-                style={styles.input}
-                containerStyle={styles.inputContainer}
             />
 
             <CustomDropdown
@@ -384,7 +380,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 options={petTypeOptions}
                 selectedValue={petData.type}
                 onValueChange={(value) => handleInputChange("type", value)}
-                containerStyle={styles.inputContainer}
             />
 
             <InputField
@@ -398,8 +393,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 error={errors.age}
                 touched={touched.age}
                 onBlur={() => handleBlur("age")}
-                style={styles.input}
-                containerStyle={styles.inputContainer}
             />
 
             <CustomDropdown
@@ -407,7 +400,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 options={genderOptions}
                 selectedValue={petData.gender}
                 onValueChange={(value) => handleInputChange("gender", value)}
-                containerStyle={styles.inputContainer}
             />
 
             <CustomDropdown
@@ -415,7 +407,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 options={sizeOptions}
                 selectedValue={petData.size}
                 onValueChange={(value) => handleInputChange("size", value)}
-                containerStyle={styles.inputContainer}
             />
 
             <View style={styles.navigationButtonsContainer}>
@@ -520,8 +511,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
-                style={styles.textArea}
-                containerStyle={styles.inputContainer}
             />
 
             <Text style={styles.label}>Temperament</Text>
