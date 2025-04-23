@@ -362,14 +362,14 @@ exports.likePet = async (req, res) => {
             // Create a chat for the matched pets
             const [pet1Owner, pet2Owner] = await Promise.all([
                 Pet.findById(petWithLowerId)
-                    .select("owner")
+                    .select("owner name photos")
                     .populate("owner", "id"),
                 Pet.findById(petWithHigherId)
-                    .select("owner")
+                    .select("owner name photos")
                     .populate("owner", "id"),
             ]);
 
-            await Chat.create({
+            const chat = await Chat.create({
                 match: savedMatch._id,
                 participants: [pet1Owner.owner._id, pet2Owner.owner._id],
             });
@@ -377,6 +377,46 @@ exports.likePet = async (req, res) => {
             // Mark the match date and save again if this is a new match
             savedMatch.matchDate = new Date();
             await savedMatch.save();
+            
+            // Get the other pet and owner to send notification to
+            const currentPet = petId === pet1Owner._id.toString() ? pet1Owner : pet2Owner;
+            const otherPet = petId === pet1Owner._id.toString() ? pet2Owner : pet1Owner;
+            const otherUserId = otherPet.owner._id;
+            
+            // Send match notification via socket ONLY to the other user 
+            // (the one who was liked and doesn't know about the match yet)
+            if (global.io && otherUserId) {
+                try {
+                    // Import the function to emit match notification
+                    const { emitMatchNotification } = require('../services/socketService');
+                    
+                    // Prepare match notification data
+                    const matchNotificationData = {
+                        matchId: savedMatch._id,
+                        chatId: chat._id,
+                        pet: {
+                            _id: currentPet._id,
+                            name: currentPet.name,
+                            photos: currentPet.photos
+                        },
+                        matchedPet: {
+                            _id: otherPet._id,
+                            name: otherPet.name,
+                            photos: otherPet.photos
+                        },
+                        timestamp: new Date()
+                    };
+                    
+                    // Only emit to the other user (who was liked and doesn't know about the match yet)
+                    // NOT to the current user (who just swiped and knows they have a match)
+                    emitMatchNotification(otherUserId, matchNotificationData);
+                    
+                    console.log(`Match notification emitted to user ${otherUserId} who was liked by ${req.user.id}`);
+                } catch (notificationError) {
+                    console.error('Error sending match notification:', notificationError);
+                    // Non-critical error, continue execution
+                }
+            }
         }
 
         res.json({

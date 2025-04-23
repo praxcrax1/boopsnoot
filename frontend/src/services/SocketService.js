@@ -10,6 +10,7 @@ class SocketService {
     currentUserId = null;
     isConnecting = false;
     globalMessageListeners = new Set();
+    matchNotificationListeners = new Set(); // New set for match notification listeners
 
     async getCurrentUser() {
         if (!this.currentUserId) {
@@ -115,6 +116,7 @@ class SocketService {
             });
 
             this.setupGlobalMessageListener();
+            this.setupMatchNotificationListener(); // Add new listener setup
 
             if (!this.socket.connected) {
                 console.log("Waiting for socket connection...");
@@ -344,6 +346,90 @@ class SocketService {
     offReceiveMessage(callback) {
        console.warn("SocketService.offReceiveMessage is potentially deprecated. Use removeGlobalMessageListener instead.");
        this.removeGlobalMessageListener(callback);
+    }
+
+    // Match notification listeners
+    addMatchNotificationListener(callback) {
+        this.matchNotificationListeners.add(callback);
+        console.log("Added match notification listener. Count:", this.matchNotificationListeners.size);
+    }
+
+    removeMatchNotificationListener(callback) {
+        this.matchNotificationListeners.delete(callback);
+        console.log("Removed match notification listener. Count:", this.matchNotificationListeners.size);
+    }
+
+    notifyMatchListeners(matchData) {
+        console.log(`[SocketService LOG] Notifying ${this.matchNotificationListeners.size} match listeners.`);
+        this.matchNotificationListeners.forEach(listener => {
+            try {
+                console.log("[SocketService LOG] Calling a match listener function.");
+                listener(matchData);
+            } catch (error) {
+                console.error("[SocketService LOG] Error in match notification listener:", error);
+            }
+        });
+    }
+
+    setupMatchNotificationListener() {
+        if (!this.socket) {
+            console.error("Cannot set up match notification listener: socket not initialized");
+            return;
+        }
+
+        this.socket.off("match_created");
+
+        this.socket.on("match_created", async (data) => {
+            console.log(
+                "[SocketService LOG] Match notification received:",
+                JSON.stringify(data, null, 2)
+            );
+
+            if (!this.currentUserId) {
+                await this.getCurrentUser();
+            }
+
+            // Notify any listeners (components) that are waiting for match notifications
+            this.notifyMatchListeners(data);
+            
+            // Create a local notification for the match
+            this.createMatchNotification(data);
+        });
+
+        console.log("[SocketService LOG] Match notification listener setup complete.");
+    }
+
+    async createMatchNotification(matchData) {
+        try {
+            // Check if app is in foreground
+            const appState = AppState.currentState;
+            
+            // The pet object contains information about the pet that liked the current user's pet
+            // matchedPet contains information about the current user's pet
+            // For notifications, we want to show the name of the pet that liked the user's pet
+            const petName = matchData.pet?.name || "Someone";
+            const notificationTitle = "You got a match!";
+            const notificationBody = `${petName} has matched with your pet!`;
+            
+            // Create notification content
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: notificationTitle,
+                    body: notificationBody,
+                    data: { 
+                        type: 'match',
+                        matchId: matchData.matchId, 
+                        chatId: matchData.chatId 
+                    },
+                    sound: true,
+                },
+                trigger: null, // Show immediately
+            });
+            
+            console.log("[SocketService LOG] Match notification created");
+        } catch (error) {
+            console.error("[SocketService LOG] Error creating match notification:", error);
+        }
     }
 }
 

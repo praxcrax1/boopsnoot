@@ -2,28 +2,40 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { AppState, Platform } from 'react-native';
 import { navigationRef } from '../../App';
-import AuthService from '../services/AuthService'; // Changed: import AuthService instead of apiClient
+import AuthService from '../services/AuthService';
 
 // --- Notification Handler Setup (runs once when the module is loaded) ---
 Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
         const appState = AppState.currentState;
         const currentRoute = navigationRef.current?.getCurrentRoute?.();
-        const notificationChatId = notification.request.content.data?.chatId;
+        const notificationData = notification.request.content.data;
+        const notificationType = notificationData?.type || 'chat';
+        const notificationChatId = notificationData?.chatId;
 
-        // Check if app is active AND user is on the specific chat screen for the notification
-        const isOnRelevantChatScreen = 
-            appState === 'active' && 
-            currentRoute?.name === 'Chat' && 
-            currentRoute.params?.chatId === notificationChatId;
+        // Different handling based on notification type
+        if (notificationType === 'match') {
+            // For match notifications, always show alerts
+            return {
+                shouldShowAlert: true,
+                shouldPlaySound: true,
+                shouldSetBadge: true,
+            };
+        } else {
+            // For chat notifications, only show if not already in that specific chat
+            const isOnRelevantChatScreen = 
+                appState === 'active' && 
+                currentRoute?.name === 'Chat' && 
+                currentRoute.params?.chatId === notificationChatId;
 
-        console.log(`[NotificationHandler] AppState: ${appState}, CurrentRoute: ${currentRoute?.name}, NotificationChatId: ${notificationChatId}, IsOnRelevantChat: ${isOnRelevantChatScreen}`);
+            console.log(`[NotificationHandler] AppState: ${appState}, CurrentRoute: ${currentRoute?.name}, NotificationChatId: ${notificationChatId}, IsOnRelevantChat: ${isOnRelevantChatScreen}`);
 
-        return {
-            shouldShowAlert: !isOnRelevantChatScreen, // Show alert unless on the specific chat screen
-            shouldPlaySound: !isOnRelevantChatScreen, // Play sound unless on the specific chat screen
-            shouldSetBadge: true, // Always allow badge update
-        };
+            return {
+                shouldShowAlert: !isOnRelevantChatScreen, 
+                shouldPlaySound: !isOnRelevantChatScreen,
+                shouldSetBadge: true,
+            };
+        }
     },
 });
 
@@ -100,9 +112,19 @@ const useNotifications = (isAuthenticated) => {
                 console.log('[useNotifications] Notification tapped:', response);
                 const data = response.notification.request.content.data;
                 
-                if (data.chatId && navigationRef.current && navigationRef.current.isReady()) {
-                    console.log('[useNotifications] Navigating to chat from notification:', data.chatId);
-                    navigationRef.current.navigate('Chat', { chatId: data.chatId });
+                if (data.type === 'match') {
+                    // Handle match notification tap
+                    console.log('[useNotifications] Match notification tapped:', data);
+                    if (navigationRef.current && navigationRef.current.isReady()) {
+                        // Navigate to the chat screen with the matched pet
+                        navigationRef.current.navigate('Chat', { chatId: data.chatId, isNewMatch: true });
+                    }
+                } else if (data.chatId) {
+                    // Handle regular chat notification tap
+                    console.log('[useNotifications] Chat notification tapped:', data.chatId);
+                    if (navigationRef.current && navigationRef.current.isReady()) {
+                        navigationRef.current.navigate('Chat', { chatId: data.chatId });
+                    }
                 }
             });
 

@@ -4,7 +4,23 @@ const Chat = require("../models/Chat");
 const connectedUsers = new Map();
 const userSockets = new Map();
 
+// Helper function to emit match notifications
+const emitMatchNotification = (userId, matchData) => {
+    const socketId = connectedUsers.get(userId.toString());
+    
+    if (socketId) {
+        console.log(`Emitting match notification to user ${userId} via socket ${socketId}`);
+        global.io.to(socketId).emit('match_created', matchData);
+    } else {
+        console.log(`User ${userId} is not connected to receive match notification`);
+        // Could implement offline notifications here
+    }
+};
+
 const setupSocketIO = (io) => {
+    // Store io instance globally to use in other functions
+    global.io = io;
+
     io.on("connection", (socket) => {
         console.log("A user connected:", socket.id);
 
@@ -137,4 +153,7 @@ const setupSocketIO = (io) => {
     });
 };
 
-module.exports = setupSocketIO;
+module.exports = {
+    setupSocketIO,
+    emitMatchNotification
+};
