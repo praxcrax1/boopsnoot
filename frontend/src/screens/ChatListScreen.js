@@ -10,6 +10,7 @@ import {
     AppState,
     StatusBar,
     Platform,
+    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +21,10 @@ import * as Notifications from 'expo-notifications';
 // Services
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
+import PetService from "../services/PetService";
+
+// Components
+import PetSelectorModal from "../components/finder/PetSelectorModal";
 
 // Styles and Context
 import theme, { withOpacity } from "../styles/theme";
@@ -35,6 +40,9 @@ const ChatListScreen = ({ navigation }) => {
     const [chats, setChats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadChats, setUnreadChats] = useState({});
+    const [userPets, setUserPets] = useState([]);
+    const [selectedPetId, setSelectedPetId] = useState(null); // null means "All Pets"
+    const [petSelectorVisible, setPetSelectorVisible] = useState(false);
     
     // ====== REFS ======
     const appState = useRef(AppState.currentState);
@@ -166,6 +174,18 @@ const ChatListScreen = ({ navigation }) => {
             setLoading(false);
         }
     }, [updateUnreadStatus, sortChats]);
+
+    /**
+     * Fetch user pets from API
+     */
+    const fetchUserPets = useCallback(async () => {
+        try {
+            const response = await PetService.getUserPets();
+            setUserPets(response.pets || []);
+        } catch (error) {
+            console.error("Error fetching user pets:", error);
+        }
+    }, []);
 
     // ====== EVENT HANDLERS ======
     
@@ -306,6 +326,7 @@ const ChatListScreen = ({ navigation }) => {
     useEffect(() => {
         // Initial fetch
         fetchChats();
+        fetchUserPets();
         
         // Set up socket listener
         initializeSocket();
@@ -445,21 +466,71 @@ const ChatListScreen = ({ navigation }) => {
     /**
      * Renders the header component with gradient background
      */
-    const renderHeader = () => (
-        <LinearGradient
-            colors={[theme.colors.primaryLight, theme.colors.background]}
-            style={styles.gradientHeader}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-        >
-            <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Messages</Text>
-                <Text style={styles.subHeaderText}>
-                    Connect with your pet's playmates
+    const renderHeader = () => {
+        return (
+            <LinearGradient
+                colors={[theme.colors.primaryLight, theme.colors.background]}
+                style={styles.gradientHeader}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+            >
+                <View style={styles.headerContainer}>
+                    <View style={styles.headerTextContainer}>
+                        <Text style={styles.headerText}>Messages</Text>
+                        <Text style={styles.subHeaderText}>
+                            Connect with your pet's playmates
+                        </Text>
+                    </View>
+                </View>
+            </LinearGradient>
+        );
+    };
+
+    /**
+     * Renders the pet selector component
+     */
+    const renderPetSelector = () => {
+        // Only render if user has multiple pets
+        if (userPets.length <= 1) return null;
+
+        // Get the selected pet object
+        const selectedPet = selectedPetId 
+            ? userPets.find(pet => pet._id === selectedPetId)
+            : null;
+
+        return (
+            <View style={styles.petSelectorContainer}>
+                <Text style={styles.petSelectorLabel}>
+                    Select a pet to filter messages
                 </Text>
+                <TouchableOpacity
+                    style={styles.petSelectorButton}
+                    onPress={() => setPetSelectorVisible(true)}
+                >
+                    <View style={styles.petSelectorContent}>
+                        {selectedPet ? (
+                            <>
+                                <Image
+                                    source={
+                                        selectedPet.photos && selectedPet.photos.length > 0
+                                            ? { uri: selectedPet.photos[0] }
+                                            : require("../assets/default-pet.png")
+                                    }
+                                    style={styles.selectedPetImage}
+                                />
+                                <Text style={styles.selectedPetName}>
+                                    {selectedPet.name}
+                                </Text>
+                            </>
+                        ) : (
+                            <Text style={styles.selectedPetName}>All Pets</Text>
+                        )}
+                        <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
+                    </View>
+                </TouchableOpacity>
             </View>
-        </LinearGradient>
-    );
+        );
+    };
 
     // ====== MAIN RENDER ======
     if (loading) {
@@ -470,6 +541,14 @@ const ChatListScreen = ({ navigation }) => {
         );
     }
 
+    const filteredChats = selectedPetId
+        ? chats.filter((chat) =>
+            chat.participants.some(
+                (participant) => participant.pet?._id === selectedPetId
+            )
+        )
+        : chats;
+
     return (
         <SafeAreaView style={styles.container} edges={["left", "right"]}>
             <StatusBar
@@ -479,16 +558,29 @@ const ChatListScreen = ({ navigation }) => {
             />
             
             {renderHeader()}
+            {renderPetSelector()}
 
-            {chats.length > 0 ? (
+            {filteredChats.length > 0 ? (
                 <FlatList
-                    data={chats}
+                    data={filteredChats}
                     renderItem={renderChatItem}
                     keyExtractor={(item) => item._id}
                     contentContainerStyle={styles.listContainer}
                     showsVerticalScrollIndicator={false}
                 />
             ) : renderEmptyState()}
+
+            {/* Pet Selector Modal */}
+            <PetSelectorModal
+                visible={petSelectorVisible}
+                pets={userPets}
+                selectedPetId={selectedPetId}
+                onClose={() => setPetSelectorVisible(false)}
+                onSelectPet={(petId) => {
+                    setSelectedPetId(petId === selectedPetId ? null : petId); // Toggle off if the same pet is selected
+                    setPetSelectorVisible(false);
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -507,16 +599,18 @@ const styles = StyleSheet.create({
     },
     gradientHeader: {
         paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
-        paddingBottom: 40,
+        paddingBottom: 25,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
-        marginBottom: -20,
-        zIndex: 10,
+        zIndex: 1,
         paddingHorizontal: theme.spacing.xl,
     },
     headerContainer: {
         alignItems: "center",
         marginTop: Platform.OS === 'ios' ? 15 : 5,
+    },
+    headerTextContainer: {
+        alignItems: "center",
     },
     headerText: {
         fontSize: theme.typography.fontSize.xxl,
@@ -528,8 +622,41 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.fontSize.md,
         color: theme.colors.textSecondary,
     },
+    petSelectorContainer: {
+        paddingHorizontal: theme.spacing.xl,
+        paddingVertical: theme.spacing.md,
+        backgroundColor: theme.colors.background,
+        marginTop: 10,
+    },
+    petSelectorLabel: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.xs,
+    },
+    petSelectorButton: {
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surface,
+    },
+    petSelectorContent: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    selectedPetImage: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        marginRight: theme.spacing.sm,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    selectedPetName: {
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        color: theme.colors.textPrimary,
+        marginRight: theme.spacing.xs,
+    },
     listContainer: {
-        paddingTop: 30,
         paddingVertical: theme.spacing.sm,
     },
     chatItem: {
