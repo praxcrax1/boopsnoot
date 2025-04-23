@@ -577,7 +577,7 @@ const ChatListScreen = ({ navigation }) => {
                 selectedPetId={selectedPetId}
                 onClose={() => setPetSelectorVisible(false)}
                 onSelectPet={(petId) => {
-                    setSelectedPetId(petId === selectedPetId ? null : petId); // Toggle off if the same pet is selected
+                    setSelectedPetId(petId); // Toggle off if the same pet is selected
                     setPetSelectorVisible(false);
                 }}
             />
