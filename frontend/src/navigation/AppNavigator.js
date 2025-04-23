@@ -3,9 +3,12 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import { View } from "react-native";
 import { AuthContext } from "../contexts/AuthContext";
+import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 import { navigationRef } from '../../App';
 import useNotifications from "../hooks/useNotifications"; // Import the custom hook
+import theme from "../styles/theme";
 
 // Auth screens
 import SplashScreen from "../screens/auth/SplashScreen";
@@ -41,34 +44,68 @@ const AuthStack = () => (
 );
 
 // Main tab navigator for the app
-const MainTabs = () => (
-    <Tab.Navigator
-        screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color, size }) => {
-                let iconName;
+const MainTabs = () => {
+    // Get unread chat status from context
+    const { hasUnreadChats } = useContext(ChatNotificationContext);
+    
+    return (
+        <Tab.Navigator
+            screenOptions={({ route }) => ({
+                tabBarIcon: ({ focused, color, size }) => {
+                    let iconName;
 
-                if (route.name === "Home") {
-                    iconName = focused ? "home" : "home-outline";
-                } else if (route.name === "Finder") {
-                    iconName = focused ? "search" : "search-outline";
-                } else if (route.name === "Chats") {
-                    iconName = focused ? "chatbubbles" : "chatbubbles-outline";
-                } else if (route.name === "Profile") {
-                    iconName = focused ? "person" : "person-outline";
-                }
+                    if (route.name === "Home") {
+                        iconName = focused ? "home" : "home-outline";
+                    } else if (route.name === "Finder") {
+                        iconName = focused ? "search" : "search-outline";
+                    } else if (route.name === "Chats") {
+                        iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+                    } else if (route.name === "Profile") {
+                        iconName = focused ? "person" : "person-outline";
+                    }
 
-                return <Ionicons name={iconName} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: "#FF6B6B",
-            tabBarInactiveTintColor: "gray",
-            headerShown: false,
-        })}>
-        <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Finder" component={FinderScreen} />
-        <Tab.Screen name="Chats" component={ChatListScreen} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
-);
+                    return <Ionicons name={iconName} size={size} color={color} />;
+                },
+                tabBarActiveTintColor: "#FF6B6B",
+                tabBarInactiveTintColor: "gray",
+                headerShown: false,
+            })}>
+            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Finder" component={FinderScreen} />
+            <Tab.Screen 
+                name="Chats" 
+                component={ChatListScreen} 
+                options={{
+                    tabBarIcon: ({ focused, color, size }) => {
+                        return (
+                            <View style={{ width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                                <Ionicons 
+                                    name={focused ? "chatbubbles" : "chatbubbles-outline"} 
+                                    size={size} 
+                                    color={color} 
+                                />
+                                {hasUnreadChats && (
+                                    <View 
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            right: -6,
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: 4,
+                                            backgroundColor: theme.colors.primary,
+                                        }}
+                                    />
+                                )}
+                            </View>
+                        );
+                    },
+                }}
+            />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
+        </Tab.Navigator>
+    );
+};
 
 // Main stack navigator including the tab navigator
 const MainStack = () => (

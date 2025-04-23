@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useContext } from "react";
 import {
     View,
     Text,
@@ -14,39 +14,111 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import ChatService from "../services/ChatService";
-import SocketService from "../services/SocketService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from 'expo-notifications';
-import theme, { withOpacity } from "../styles/theme";
 
+// Services
+import ChatService from "../services/ChatService";
+import SocketService from "../services/SocketService";
+
+// Styles and Context
+import theme, { withOpacity } from "../styles/theme";
+import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
+
+/**
+ * ChatListScreen component displaying all user chats
+ * Shows unread chats at the top, followed by recent messages
+ * and then latest matches at the top (even without messages)
+ */
 const ChatListScreen = ({ navigation }) => {
+    // ====== STATE MANAGEMENT ======
     const [chats, setChats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadChats, setUnreadChats] = useState({});
+    
+    // ====== REFS ======
     const appState = useRef(AppState.currentState);
     const socketInitialized = useRef(false);
     const notificationListener = useRef();
     const responseListener = useRef();
     
-    // Fetch all chats from API
-    const fetchChats = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await ChatService.getChats();
-            setChats(response.chats || []);
+    // ====== CONTEXT ======
+    const { updateUnreadStatus } = useContext(ChatNotificationContext);
+
+    // ====== HELPER FUNCTIONS ======
+    
+    /**
+     * Sorts chats by priority:
+     * 1. Unread chats
+     * 2. Chats with recent messages
+     * 3. Latest matches without messages
+     */
+    const sortChats = useCallback((chatList, unreadState) => {
+        return [...chatList].sort((a, b) => {
+            // Priority 1: Unread chats at the top
+            const aUnread = unreadState[a._id] || (a.lastMessage && a.lastMessage.unread);
+            const bUnread = unreadState[b._id] || (b.lastMessage && b.lastMessage.unread);
             
-            // Load saved unread state
-            const unreadState = await loadUnreadState();
-            setUnreadChats(unreadState || {});
-        } catch (error) {
-            console.error("Error fetching chats:", error);
-        } finally {
-            setLoading(false);
-        }
+            if (aUnread && !bUnread) return -1;
+            if (!aUnread && bUnread) return 1;
+            
+            // Priority 2: Chats with messages, sorted by most recent message
+            const aHasMessages = a.lastMessage && a.lastMessage.createdAt;
+            const bHasMessages = b.lastMessage && b.lastMessage.createdAt;
+            
+            if (aHasMessages && bHasMessages) {
+                return new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt);
+            }
+            
+            // Priority 3: If one has messages and the other doesn't
+            if (aHasMessages && !bHasMessages) return -1;
+            if (!aHasMessages && bHasMessages) return 1;
+            
+            // Priority 4: No messages on either - sort by match date (newest matches first)
+            const aMatchDate = a.match && a.match.matchDate ? new Date(a.match.matchDate) : new Date(a.createdAt);
+            const bMatchDate = b.match && b.match.matchDate ? new Date(b.match.matchDate) : new Date(b.createdAt);
+            
+            return bMatchDate - aMatchDate;
+        });
     }, []);
     
-    // Load unread state from storage
+    /**
+     * Formats timestamp relative to current time
+     * Today: shows time (12:30 PM)
+     * This week: shows day (Mon, Tue)
+     * Older: shows date (Jan 12)
+     */
+    const formatTimestamp = (timestamp) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+
+        // If the message was sent today, show time only
+        if (
+            date.getDate() === now.getDate() &&
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear()
+        ) {
+            return date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+
+        // If the message was sent this week, show day of week
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        if (diffDays < 7) {
+            return date.toLocaleDateString([], { weekday: "short" });
+        }
+
+        // Otherwise, show the date
+        return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    };
+
+    // ====== DATA MANAGEMENT ======
+    
+    /**
+     * Load unread state from AsyncStorage
+     */
     const loadUnreadState = async () => {
         try {
             const unreadData = await AsyncStorage.getItem('unreadChats');
@@ -57,23 +129,86 @@ const ChatListScreen = ({ navigation }) => {
         }
     };
     
-    // Save unread state to storage
+    /**
+     * Save unread state to AsyncStorage and update global context
+     */
     const saveUnreadState = async (unreadState) => {
         try {
             await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadState));
+            // Update the global unread status
+            updateUnreadStatus(Object.keys(unreadState || {}).length > 0);
         } catch (error) {
             console.error("Error saving unread state:", error);
         }
     };
     
-    // Handle new message from socket (now received via global listener)
+    /**
+     * Fetch all chats from API and sort them appropriately
+     */
+    const fetchChats = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await ChatService.getChats();
+            
+            // Load saved unread state
+            const unreadState = await loadUnreadState();
+            setUnreadChats(unreadState || {});
+            
+            // Sort chats before setting state
+            const sortedChats = sortChats(response.chats || [], unreadState || {});
+            setChats(sortedChats);
+            
+            // Update the global unread status
+            updateUnreadStatus(Object.keys(unreadState || {}).length > 0);
+        } catch (error) {
+            console.error("Error fetching chats:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [updateUnreadStatus, sortChats]);
+
+    // ====== EVENT HANDLERS ======
+    
+    /**
+     * Handle navigating to a specific chat and mark as read
+     */
+    const handleChatPress = useCallback((chatId) => {
+        navigation.navigate("Chat", { chatId });
+        
+        // Mark as read
+        setUnreadChats(prev => {
+            const newState = { ...prev };
+            delete newState[chatId];
+            saveUnreadState(newState);
+            return newState;
+        });
+        
+        // Update the local chat state to remove unread indicator
+        setChats(prevChats => {
+            return prevChats.map(chat => {
+                if (chat._id === chatId && chat.lastMessage) {
+                    return {
+                        ...chat,
+                        lastMessage: {
+                            ...chat.lastMessage,
+                            unread: false
+                        }
+                    };
+                }
+                return chat;
+            });
+        });
+    }, [navigation]);
+    
+    /**
+     * Handle new incoming messages from socket
+     */
     const handleNewMessage = useCallback((message) => {
-        // --- Log when the handler is called ---
+        // Log when the handler is called
         console.log(
             "[ChatListScreen LOG] handleNewMessage called with message:",
             JSON.stringify(message, null, 2)
         );
-        // --- End Log ---
 
         if (!message || !message.chatId) {
             console.log("[ChatListScreen LOG] Received invalid message data", message);
@@ -109,7 +244,6 @@ const ChatListScreen = ({ navigation }) => {
                     lastMessage: {
                         content: message.content,
                         createdAt: message.createdAt || new Date().toISOString(),
-                        // Mark as unread based on whether user is viewing the chat
                         unread: !isViewingThisChat
                     }
                 };
@@ -119,30 +253,30 @@ const ChatListScreen = ({ navigation }) => {
                 console.log("ChatListScreen: Updated existing chat:", message.chatId);
             } else {
                 // Chat doesn't exist, fetch all chats again to get the new one
-                // This might happen if a new match starts chatting immediately
                 console.log("ChatListScreen: New chat detected, refetching list.");
-                fetchChats(); // Refetch to include the new chat
-                // Return previous state for now until fetch completes
+                fetchChats();
                 return prevChats;
             }
 
             return updatedChats;
         });
     }, [navigation, fetchChats]);
+
+    // ====== SOCKET CONNECTION ======
     
-    // Initialize socket listeners using the global system
+    /**
+     * Initialize socket connection and message listeners
+     */
     const initializeSocket = useCallback(async () => {
-        // --- Log when initialization starts ---
         console.log("[ChatListScreen LOG] Attempting to initialize socket and add listener.");
-        // --- End Log ---
+        
         if (socketInitialized.current) {
             console.log("[ChatListScreen LOG] Socket already initialized.");
             return;
         }
 
         try {
-            await SocketService.connect(); // Ensure connection
-            // Use the new global listener registration
+            await SocketService.connect();
             console.log("[ChatListScreen LOG] Calling SocketService.addGlobalMessageListener.");
             SocketService.addGlobalMessageListener(handleNewMessage);
             socketInitialized.current = true;
@@ -151,36 +285,24 @@ const ChatListScreen = ({ navigation }) => {
             console.error("[ChatListScreen LOG] Error initializing socket:", error);
         }
     }, [handleNewMessage]);
+
+    // ====== EFFECTS AND LIFECYCLE ======
     
-    // Mark chat as read when entering it
-    const handleChatPress = useCallback((chatId) => {
-        navigation.navigate("Chat", { chatId });
-        
-        // Mark as read
-        setUnreadChats(prev => {
-            const newState = { ...prev };
-            delete newState[chatId];
-            saveUnreadState(newState);
-            return newState;
+    // Listen for new match notifications to refresh the chat list
+    useEffect(() => {
+        const matchSubscription = SocketService.addMatchNotificationListener(() => {
+            console.log("Match notification received, refreshing chats");
+            fetchChats();
         });
         
-        // Update the local chat state to remove unread indicator
-        setChats(prevChats => {
-            return prevChats.map(chat => {
-                if (chat._id === chatId && chat.lastMessage) {
-                    return {
-                        ...chat,
-                        lastMessage: {
-                            ...chat.lastMessage,
-                            unread: false
-                        }
-                    };
-                }
-                return chat;
-            });
-        });
-    }, [navigation]);
+        return () => {
+            if (matchSubscription) {
+                SocketService.removeMatchNotificationListener(matchSubscription);
+            }
+        };
+    }, [fetchChats]);
     
+    // Main effect for initializing sockets, handling app state changes, and cleanup
     useEffect(() => {
         // Initial fetch
         fetchChats();
@@ -224,9 +346,8 @@ const ChatListScreen = ({ navigation }) => {
         return () => {
             console.log("[ChatListScreen LOG] Cleaning up listeners.");
             appStateSubscription.remove();
-            focusSubscription(); // Remove focus listener
+            focusSubscription();
 
-            // Remove notification listeners
             if (notificationListener.current) {
                 Notifications.removeNotificationSubscription(notificationListener.current);
             }
@@ -234,46 +355,28 @@ const ChatListScreen = ({ navigation }) => {
                 Notifications.removeNotificationSubscription(responseListener.current);
             }
 
-            // Use the new global listener removal
             if (socketInitialized.current) {
                 console.log("[ChatListScreen LOG] Removing global message listener.");
                 SocketService.removeGlobalMessageListener(handleNewMessage);
-                socketInitialized.current = false; // Reset flag on cleanup
+                socketInitialized.current = false;
                 console.log("[ChatListScreen LOG] Removed global message listener.");
             }
         };
     }, [navigation, fetchChats, initializeSocket, handleNewMessage]);
 
-    const formatTimestamp = (timestamp) => {
-        const date = new Date(timestamp);
-        const now = new Date();
-
-        // If the message was sent today, show time only
-        if (
-            date.getDate() === now.getDate() &&
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear()
-        ) {
-            return date.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        }
-
-        // If the message was sent this week, show day of week
-        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-        if (diffDays < 7) {
-            return date.toLocaleDateString([], { weekday: "short" });
-        }
-
-        // Otherwise, show the date
-        return date.toLocaleDateString([], { month: "short", day: "numeric" });
-    };
-
+    // ====== RENDER FUNCTIONS ======
+    
+    /**
+     * Renders a single chat item in the list
+     */
     const renderChatItem = ({ item }) => {
         const otherPet = item.participants.find((p) => !p.isCurrentUser);
         const lastMessage = item.lastMessage || {};
         const isUnread = unreadChats[item._id] || lastMessage.unread;
+        const petName = otherPet?.pet?.name || "Unknown Pet";
+        const petPhoto = otherPet?.pet?.photos?.length > 0 
+            ? { uri: otherPet.pet.photos[0] } 
+            : require("../assets/default-pet.png");
 
         return (
             <TouchableOpacity
@@ -282,14 +385,7 @@ const ChatListScreen = ({ navigation }) => {
                 activeOpacity={0.7}>
                 <Image
                     style={styles.avatar}
-                    source={
-                        otherPet &&
-                        otherPet.pet &&
-                        otherPet.pet.photos &&
-                        otherPet.pet.photos.length > 0
-                            ? { uri: otherPet.pet.photos[0] }
-                            : require("../assets/default-pet.png")
-                    }
+                    source={petPhoto}
                 />
                 <View style={styles.chatInfo}>
                     <View style={styles.chatHeader}>
@@ -297,9 +393,7 @@ const ChatListScreen = ({ navigation }) => {
                             styles.petName,
                             isUnread && styles.boldText
                         ]}>
-                            {otherPet && otherPet.pet
-                                ? otherPet.pet.name
-                                : "Unknown Pet"}
+                            {petName}
                         </Text>
                         <Text style={styles.timestamp}>
                             {lastMessage.createdAt
@@ -322,6 +416,52 @@ const ChatListScreen = ({ navigation }) => {
         );
     };
 
+    /**
+     * Renders the empty state when no chats exist
+     */
+    const renderEmptyState = () => (
+        <View style={styles.emptyContainer}>
+            <Ionicons
+                name="chatbubble-ellipses"
+                size={64}
+                color={withOpacity(theme.colors.textSecondary, 0.3)}
+            />
+            <Text style={styles.emptyTitle}>No Messages Yet</Text>
+            <Text style={styles.emptyDescription}>
+                Match with pets nearby to start chatting with their
+                owners
+            </Text>
+            <TouchableOpacity
+                style={styles.finderButton}
+                onPress={() => navigation.navigate("Finder")}
+                activeOpacity={0.8}>
+                <Text style={styles.finderButtonText}>
+                    Find Matches
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    /**
+     * Renders the header component with gradient background
+     */
+    const renderHeader = () => (
+        <LinearGradient
+            colors={[theme.colors.primaryLight, theme.colors.background]}
+            style={styles.gradientHeader}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+        >
+            <View style={styles.headerContainer}>
+                <Text style={styles.headerText}>Messages</Text>
+                <Text style={styles.subHeaderText}>
+                    Connect with your pet's playmates
+                </Text>
+            </View>
+        </LinearGradient>
+    );
+
+    // ====== MAIN RENDER ======
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -338,19 +478,7 @@ const ChatListScreen = ({ navigation }) => {
                 translucent={true}
             />
             
-            <LinearGradient
-                colors={[theme.colors.primaryLight, theme.colors.background]}
-                style={styles.gradientHeader}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-            >
-                <View style={styles.headerContainer}>
-                    <Text style={styles.headerText}>Messages</Text>
-                    <Text style={styles.subHeaderText}>
-                        Connect with your pet's playmates
-                    </Text>
-                </View>
-            </LinearGradient>
+            {renderHeader()}
 
             {chats.length > 0 ? (
                 <FlatList
@@ -360,32 +488,12 @@ const ChatListScreen = ({ navigation }) => {
                     contentContainerStyle={styles.listContainer}
                     showsVerticalScrollIndicator={false}
                 />
-            ) : (
-                <View style={styles.emptyContainer}>
-                    <Ionicons
-                        name="chatbubble-ellipses"
-                        size={64}
-                        color={withOpacity(theme.colors.textSecondary, 0.3)}
-                    />
-                    <Text style={styles.emptyTitle}>No Messages Yet</Text>
-                    <Text style={styles.emptyDescription}>
-                        Match with pets nearby to start chatting with their
-                        owners
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.finderButton}
-                        onPress={() => navigation.navigate("Finder")}
-                        activeOpacity={0.8}>
-                        <Text style={styles.finderButtonText}>
-                            Find Matches
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            )}
+            ) : renderEmptyState()}
         </SafeAreaView>
     );
 };
 
+// ====== STYLES ======
 const styles = StyleSheet.create({
     container: {
         flex: 1,

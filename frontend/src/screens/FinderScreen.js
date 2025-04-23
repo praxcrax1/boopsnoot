@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from 'expo-location';
 import MatchService from "../services/MatchService";
 import PetService from "../services/PetService";
 import theme from "../styles/theme";
@@ -27,6 +28,7 @@ import PetCard from "../components/finder/PetCard";
 import SkeletonLoader from "../components/finder/SkeletonLoader";
 import PawLoader from "../components/finder/PawLoader";
 import ActionAnimation from "../components/finder/ActionAnimation";
+import LocationPermissionRequest from "../components/finder/LocationPermissionRequest";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -73,14 +75,17 @@ const FinderScreen = ({ navigation }) => {
     const [prefetchingInProgress, setPrefetchingInProgress] = useState(false);
     const prefetchThreshold = 3; // Start prefetching when we have this many pets left
 
+    // Location permission state
+    const [locationPermission, setLocationPermission] = useState(null);
+    const [isLocationAvailable, setIsLocationAvailable] = useState(false);
+
     // Navigate to chat when there's a match
     const navigateToMatchChat = async (matchId) => {
         try {
             const chatResponse = await ChatService.getOrCreateChatForMatch(matchId);
             if (chatResponse && chatResponse.chat) {
-                navigation.navigate("ChatScreen", {
+                navigation.navigate("Chat", {
                     chatId: chatResponse.chat._id,
-                    matchId,
                 });
             }
         } catch (error) {
@@ -91,6 +96,7 @@ const FinderScreen = ({ navigation }) => {
     useEffect(() => {
         StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
         fetchUserPets();
+        checkLocationPermission();
 
         Animated.timing(fadeAnim, {
             toValue: 1,
@@ -187,6 +193,34 @@ const FinderScreen = ({ navigation }) => {
         }
     }, [petQueue, prefetchingInProgress]);
 
+    const checkLocationPermission = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            setLocationPermission(status);
+            
+            if (status === 'granted') {
+                // Check if location services are enabled
+                const locationServicesEnabled = await Location.hasServicesEnabledAsync();
+                setIsLocationAvailable(locationServicesEnabled);
+                
+                // Try to get current location as a further test
+                if (locationServicesEnabled) {
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                        timeout: 5000 // 5 seconds timeout
+                    });
+                    
+                    setIsLocationAvailable(location !== null);
+                }
+            } else {
+                setIsLocationAvailable(false);
+            }
+        } catch (error) {
+            console.error("Error checking location permission:", error);
+            setIsLocationAvailable(false);
+        }
+    };
+
     const fetchUserPets = async () => {
         setLoading(true);
         try {
@@ -225,6 +259,7 @@ const FinderScreen = ({ navigation }) => {
 
     const fetchPotentialMatches = async (reset = false) => {
         if (!selectedPetId) return;
+        if (!isLocationAvailable) return;
 
         setLoading(true);
         try {
@@ -457,6 +492,11 @@ const FinderScreen = ({ navigation }) => {
             return <PawLoader />;
         }
         
+        // Check for location permission first
+        if (!isLocationAvailable) {
+            return <LocationPermissionRequest />;
+        }
+        
         if (potentialMatches.length === 0 || currentIndex >= potentialMatches.length) {
             return <EmptyState onRefresh={() => fetchPotentialMatches(true)} />;
         }
@@ -538,7 +578,8 @@ const FinderScreen = ({ navigation }) => {
                 {potentialMatches.length > 0 &&
                     currentIndex < potentialMatches.length &&
                     !loading &&
-                    !isTransitioning && (
+                    !isTransitioning && 
+                    isLocationAvailable && (
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.passButton]}
