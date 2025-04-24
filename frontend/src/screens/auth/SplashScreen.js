@@ -8,7 +8,7 @@ const SplashScreen = ({ navigation }) => {
         <SafeAreaView style={styles.container}>
             <View style={styles.logoContainer}>
                 <Image
-                    source={require("../../assets/splash-icon.png")}
+                    source={require("../../assets/boopsnoot.png")}
                     style={styles.logo}
                     resizeMode="contain"
                 />
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     appName: {
         fontSize: theme.typography.fontSize.display,
         fontWeight: theme.typography.fontWeight.bold,
-        color: theme.colors.primary,
+        color: theme.colors.textPrimary,
         marginBottom: theme.spacing.md,
     },
     tagline: {

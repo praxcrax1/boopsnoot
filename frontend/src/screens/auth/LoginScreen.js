@@ -131,7 +131,7 @@ const LoginScreen = ({ navigation }) => {
                 behavior={Platform.OS === "ios" ? "padding" : "height"}>
                 <View style={styles.headerContainer}>
                     <Image
-                        source={require("../../assets/splash-icon.png")}
+                        source={require("../../assets/boopsnoot.png")}
                         style={styles.logo}
                         resizeMode="contain"
                     />
