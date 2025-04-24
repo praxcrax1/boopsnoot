@@ -29,6 +29,7 @@ import SkeletonLoader from "../components/finder/SkeletonLoader";
 import PawLoader from "../components/finder/PawLoader";
 import ActionAnimation from "../components/finder/ActionAnimation";
 import LocationPermissionRequest from "../components/finder/LocationPermissionRequest";
+import AddYourPetRequest from "../components/finder/AddYourPetRequest";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -50,6 +51,7 @@ const FinderScreen = ({ navigation }) => {
     const [petSelectorVisible, setPetSelectorVisible] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMorePets, setHasMorePets] = useState(true);
+    const [hasPets, setHasPets] = useState(true); // New state to track if user has pets
     
     // Current visible pet state - to handle clean transitions
     const [currentVisiblePet, setCurrentVisiblePet] = useState(null);
@@ -228,32 +230,21 @@ const FinderScreen = ({ navigation }) => {
             if (response.pets && response.pets.length > 0) {
                 setUserPets(response.pets);
                 setSelectedPetId(response.pets[0]._id);
+                setHasPets(true);
             } else {
-                Alert.alert(
-                    "No Pets Found",
-                    "You need to add a pet before you can find matches.",
-                    [
-                        {
-                            text: "Add Pet",
-                            onPress: () =>
-                                navigation.navigate("PetProfileSetup"),
-                        },
-                        {
-                            text: "Cancel",
-                            onPress: () => navigation.goBack(),
-                            style: "cancel",
-                        },
-                    ]
-                );
+                // Update hasPets state instead of showing alert
+                setHasPets(false);
             }
         } catch (error) {
             console.error("Error fetching user pets:", error);
+            setHasPets(false); // Assume no pets on error for better UX
             Alert.alert(
                 "Error",
                 "Failed to fetch your pets. Please try again."
             );
         } finally {
             setLoading(false);
+            setInitialLoading(false); // Always set initialLoading to false here
         }
     };
 
@@ -277,6 +268,7 @@ const FinderScreen = ({ navigation }) => {
 
             if (reset) {
                 Animated.sequence([
+
                     Animated.timing(contentOpacity, {
                         toValue: 0,
                         duration: 200,
@@ -492,7 +484,12 @@ const FinderScreen = ({ navigation }) => {
             return <PawLoader />;
         }
         
-        // Check for location permission first
+        // Check if user has no pets first
+        if (!hasPets) {
+            return <AddYourPetRequest />;
+        }
+        
+        // Check for location permission
         if (!isLocationAvailable) {
             return <LocationPermissionRequest />;
         }
@@ -506,6 +503,7 @@ const FinderScreen = ({ navigation }) => {
             <>
                 {isCardVisible && currentIndex < potentialMatches.length - 1 && (
                     <Animated.View style={[
+
                         styles.nextCardContainer,
                         { opacity: nextCardOpacity }
                     ]}>
@@ -517,6 +515,7 @@ const FinderScreen = ({ navigation }) => {
                 )}
                 {isCardVisible && currentVisiblePet && (
                     <Animated.View style={[
+
                         styles.currentCardContainer,
                         {
                             transform: [
@@ -549,6 +548,7 @@ const FinderScreen = ({ navigation }) => {
                     selectedPet={selectedPet}
                     onFilterPress={() => {}}
                     onPetSelectorPress={() => {}}
+                    showFilter={true} // Default to showing filter during loading
                 />
                 <SkeletonLoader />
             </SafeAreaView>
@@ -568,6 +568,7 @@ const FinderScreen = ({ navigation }) => {
                     selectedPet={selectedPet}
                     onFilterPress={() => setFilterVisible(true)}
                     onPetSelectorPress={() => setPetSelectorVisible(true)}
+                    showFilter={hasPets && isLocationAvailable} // Only show filter if user has pets and location is available
                 />
 
                 <View style={styles.contentContainer}>
@@ -579,7 +580,8 @@ const FinderScreen = ({ navigation }) => {
                     currentIndex < potentialMatches.length &&
                     !loading &&
                     !isTransitioning && 
-                    isLocationAvailable && (
+                    isLocationAvailable &&
+                    hasPets && (
                         <View style={styles.actionsContainer}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.passButton]}

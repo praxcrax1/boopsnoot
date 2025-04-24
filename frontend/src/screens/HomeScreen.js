@@ -391,7 +391,7 @@ const HomeScreen = ({ navigation, route }) => {
                         ) : (
                             !matchesLoading && (
                                 <View style={styles.emptyStateContainer}>
-                                    <Ionicons name="paw-outline" size={48} color={withOpacity(theme.colors.primary, 0.6)} />
+                                    <Ionicons name="paw" size={48} color={withOpacity(theme.colors.primary, 0.6)} />
                                     <Text style={styles.emptyStateText}>
                                         No matches yet
                                     </Text>

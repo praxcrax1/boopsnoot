@@ -730,7 +730,6 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
         textAlign: "center",
         marginBottom: theme.spacing.xl,
-        lineHeight: theme.typography.lineHeight.normal,
     },
     finderButton: {
         backgroundColor: theme.colors.primary,

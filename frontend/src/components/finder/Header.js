@@ -3,10 +3,10 @@ import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../styles/theme";
 
-const Header = ({ title, selectedPet, onFilterPress, onPetSelectorPress }) => (
+const Header = ({ title, selectedPet, onFilterPress, onPetSelectorPress, showFilter }) => (
     <View style={styles.header}>
         <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.headerButtons}>
+        {showFilter && <View style={styles.headerButtons}>
             <TouchableOpacity
                 style={styles.petSwitchButton}
                 onPress={onPetSelectorPress}>
@@ -33,7 +33,7 @@ const Header = ({ title, selectedPet, onFilterPress, onPetSelectorPress }) => (
                 onPress={onFilterPress}>
                 <Ionicons name="options-outline" size={20} color="#333" />
             </TouchableOpacity>
-        </View>
+        </View>}
     </View>
 );
 
