@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
     },
     previewContainer: {
         position: 'relative',
-        height: 300,
+        height: 250,
         width: '100%',
     },
     previewImage: {
