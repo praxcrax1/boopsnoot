@@ -19,6 +19,7 @@ import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import theme, { withOpacity } from "../styles/theme";
+import MenuBottomSheet from "../components/MenuBottomSheet";
 
 const ChatScreen = ({ route, navigation }) => {
     const { chatId } = route.params;
@@ -28,6 +29,8 @@ const ChatScreen = ({ route, navigation }) => {
     const [chatInfo, setChatInfo] = useState(null);
     const [isSending, setIsSending] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [otherPet, setOtherPet] = useState(null);
     const flatListRef = useRef();
     const socketConnected = useRef(false);
 
@@ -65,19 +68,20 @@ const ChatScreen = ({ route, navigation }) => {
                 setChatInfo(chatResponse.chat);
 
                 if (chatResponse.chat && chatResponse.chat.participants) {
-                    const otherPet = chatResponse.chat.participants.find(
+                    const foundOtherPet = chatResponse.chat.participants.find(
                         (p) => !p.isCurrentUser
                     );
-                    if (otherPet && otherPet.pet) {
+                    if (foundOtherPet && foundOtherPet.pet) {
+                        setOtherPet(foundOtherPet.pet);
                         navigation.setOptions({
                             headerTitle: () => (
                                 <View style={styles.headerTitleContainer}>
                                     <Image
                                         source={
-                                            otherPet.pet.photos &&
-                                            otherPet.pet.photos.length > 0
+                                            foundOtherPet.pet.photos &&
+                                            foundOtherPet.pet.photos.length > 0
                                                 ? {
-                                                      uri: otherPet.pet
+                                                      uri: foundOtherPet.pet
                                                           .photos[0],
                                                   }
                                                 : require("../assets/default-pet.png")
@@ -85,20 +89,16 @@ const ChatScreen = ({ route, navigation }) => {
                                         style={styles.headerAvatar}
                                     />
                                     <Text style={styles.headerTitle}>
-                                        {otherPet.pet.name}
+                                        {foundOtherPet.pet.name}
                                     </Text>
                                 </View>
                             ),
                             headerRight: () => (
                                 <TouchableOpacity
                                     style={styles.headerButton}
-                                    onPress={() =>
-                                        navigation.navigate("PetProfile", {
-                                            petId: otherPet.pet._id,
-                                        })
-                                    }>
+                                    onPress={() => setMenuVisible(true)}>
                                     <Ionicons
-                                        name="information-circle-outline"
+                                        name="ellipsis-horizontal"
                                         size={24}
                                         color={theme.colors.textPrimary}
                                     />
@@ -375,6 +375,20 @@ const ChatScreen = ({ route, navigation }) => {
         return null;
     };
 
+    const menuOptions = [
+        {
+            label: "View Profile",
+            icon: "person-outline",
+            onPress: () => {
+                if (otherPet && otherPet._id) {
+                    navigation.navigate("PetProfile", {
+                        petId: otherPet._id,
+                    });
+                }
+            },
+        },
+    ];
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -449,6 +463,13 @@ const ChatScreen = ({ route, navigation }) => {
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
+
+            <MenuBottomSheet
+                visible={menuVisible}
+                onClose={() => setMenuVisible(false)}
+                options={menuOptions}
+                title="Chat Options"
+            />
         </SafeAreaView>
     );
 };
