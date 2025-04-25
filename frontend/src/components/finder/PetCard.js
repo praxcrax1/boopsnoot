@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, memo } from "react";
+import React, { useState, useRef, useMemo, useCallback, memo, useEffect } from "react";
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
 import { DISPLAY_VALUES } from "../../constants/petConstants";
+import LocationService from "../../services/LocationService";
 
 // Using icon.png as a placeholder image
 const PLACEHOLDER_IMAGE = "https://blocks.astratic.com/img/general-img-landscape.png"
@@ -19,17 +20,40 @@ const PLACEHOLDER_IMAGE = "https://blocks.astratic.com/img/general-img-landscape
 const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [imagesLoaded, setImagesLoaded] = useState({});
+    const [locality, setLocality] = useState(null);
+    const [isLoadingLocality, setIsLoadingLocality] = useState(false);
     const flatListRef = useRef(null);
 
-    const formatDistance = useCallback((distance) => {
-        if (!distance && distance !== 0) return "Nearby";
-        if (typeof distance === "number") {
-            if (distance < 1) return `${(distance * 1000).toFixed(0)}m`;
-            if (distance < 10) return `${distance.toFixed(1)}km`;
-            return `${Math.round(distance)}km`;
+    // Fetch locality name when pet changes
+    useEffect(() => {
+        // Only proceed if pet has location data (owner.location.coordinates)
+        if (pet && pet.ownerLocation && pet.ownerLocation.coordinates) {
+            const fetchLocality = async () => {
+                setIsLoadingLocality(true);
+                try {
+                    // Extract coordinates from pet
+                    const [longitude, latitude] = pet.ownerLocation.coordinates;
+                    
+                    // Get locality name from coordinates
+                    const localityName = await LocationService.getLocalityFromCoordinates(
+                        latitude, 
+                        longitude
+                    );
+                    setLocality(localityName);
+                } catch (error) {
+                    console.error("Error fetching locality:", error);
+                    setLocality("Unknown area");
+                } finally {
+                    setIsLoadingLocality(false);
+                }
+            };
+            
+            fetchLocality();
+        } else {
+            setLocality("Unknown area");
         }
-        return "Nearby";
-    }, []);
+    }, [pet]);
+    
 
     const handleImageLoad = useCallback((index) => {
         setImagesLoaded(prev => ({
@@ -84,10 +108,14 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
             <View style={styles.headerSection}>
                 <View style={styles.nameContainer}>
                     <Text style={styles.name}>{pet.name}</Text>
-                    <View style={styles.distanceBadge}>
-                        <Ionicons name="location" size={14} color="#666666" />
-                        <Text style={styles.distance}>{formatDistance(pet.distance)}</Text>
-                    </View>
+                </View>
+                <View style={styles.locationContainer}>
+                    <Ionicons name="location" size={14} color="#666666" />
+                    <Text style={styles.locationText} ellipsizeMode="tail">
+                        {isLoadingLocality 
+                            ? "Loading location..." 
+                            : (locality || "Unknown area") + (pet.distance ? `, ${LocationService.formatDistance(pet.distance)}` : "")}
+                    </Text>
                 </View>
                 <View style={styles.breedAgeContainer}>
                     <Text style={styles.breed}>{pet.breed}</Text>
@@ -144,7 +172,7 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
                 </View>
             )}
         </>
-    ), [pet, formatDistance]);
+    ), [pet, locality, isLoadingLocality]);
 
     // Memoize the images carousel to prevent rendering issues
     const imageCarousel = useMemo(() => (
@@ -237,9 +265,6 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     nameContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         marginBottom: 8,
     },
     name: {
@@ -249,21 +274,25 @@ const styles = StyleSheet.create({
         includeFontPadding: false,
         textAlignVertical: 'center',
     },
-    distanceBadge: {
+    locationContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F5F5F5',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 16,
+        marginBottom: 8,
+        alignSelf: 'flex-start', // Make container wrap content width
+        maxWidth: '95%', // Allow some space but prevent overflow
     },
-    distance: {
+    locationText: {
         fontSize: 14,
         color: '#666666',
         marginLeft: 4,
         fontWeight: '500',
         includeFontPadding: false,
         textAlignVertical: 'center',
+        flex: 0, // Don't expand to fill container
     },
     breedAgeContainer: {
         flexDirection: 'row',

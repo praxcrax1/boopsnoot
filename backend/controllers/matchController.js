@@ -52,7 +52,14 @@ const addDistanceInfo = async (pets, ownerCoordinates) => {
                     ownerCoordinates,
                     petOwnerInfo.location.coordinates
                 );
-                return { ...pet, distance };
+                // Include owner location coordinates for reverse geocoding on frontend
+                return { 
+                    ...pet, 
+                    distance,
+                    ownerLocation: {
+                        coordinates: petOwnerInfo.location.coordinates
+                    }
+                };
             }
             return { ...pet, distance: 0.1 };
         })
