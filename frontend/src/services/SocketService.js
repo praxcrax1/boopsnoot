@@ -10,7 +10,8 @@ class SocketService {
     currentUserId = null;
     isConnecting = false;
     globalMessageListeners = new Set();
-    matchNotificationListeners = new Set(); // New set for match notification listeners
+    matchNotificationListeners = new Set();
+    chatRemovalListeners = new Set(); // New set for chat removal notification listeners
 
     async getCurrentUser() {
         if (!this.currentUserId) {
@@ -116,7 +117,8 @@ class SocketService {
             });
 
             this.setupGlobalMessageListener();
-            this.setupMatchNotificationListener(); // Add new listener setup
+            this.setupMatchNotificationListener();
+            this.setupChatRemovalListener(); // Set up the chat removal listener
 
             if (!this.socket.connected) {
                 console.log("Waiting for socket connection...");
@@ -430,6 +432,70 @@ class SocketService {
         } catch (error) {
             console.error("[SocketService LOG] Error creating match notification:", error);
         }
+    }
+
+    // Chat removal notification listeners
+    addChatRemovalListener(callback) {
+        this.chatRemovalListeners.add(callback);
+        console.log("Added chat removal listener. Count:", this.chatRemovalListeners.size);
+    }
+
+    removeChatRemovalListener(callback) {
+        this.chatRemovalListeners.delete(callback);
+        console.log("Removed chat removal listener. Count:", this.chatRemovalListeners.size);
+    }
+
+    notifyChatRemovalListeners(chatId) {
+        console.log(`[SocketService LOG] Notifying ${this.chatRemovalListeners.size} chat removal listeners.`);
+        this.chatRemovalListeners.forEach(listener => {
+            try {
+                console.log("[SocketService LOG] Calling a chat removal listener function.");
+                listener(chatId);
+            } catch (error) {
+                console.error("[SocketService LOG] Error in chat removal listener:", error);
+            }
+        });
+    }
+
+    setupChatRemovalListener() {
+        if (!this.socket) {
+            console.error("Cannot set up chat removal listener: socket not initialized");
+            return;
+        }
+
+        this.socket.off("chat_removed");
+
+        this.socket.on("chat_removed", async (data) => {
+            console.log(
+                "[SocketService LOG] Chat removal notification received:",
+                JSON.stringify(data, null, 2)
+            );
+
+            if (!data || !data.chatId) {
+                console.log("[SocketService LOG] Received invalid chat removal data");
+                return;
+            }
+
+            // Clean up the unread state for this chat
+            try {
+                const unreadData = await AsyncStorage.getItem('unreadChats');
+                if (unreadData) {
+                    const unreadChats = JSON.parse(unreadData);
+                    if (unreadChats[data.chatId]) {
+                        delete unreadChats[data.chatId];
+                        await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                        console.log(`[SocketService LOG] Removed chat ${data.chatId} from unread chats state`);
+                    }
+                }
+            } catch (error) {
+                console.error("[SocketService LOG] Error updating unread chats:", error);
+            }
+
+            // Notify any listeners (components) that are waiting for chat removal notifications
+            this.notifyChatRemovalListeners(data.chatId);
+        });
+
+        console.log("[SocketService LOG] Chat removal listener setup complete.");
     }
 }
 

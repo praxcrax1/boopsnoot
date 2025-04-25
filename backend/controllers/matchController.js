@@ -552,7 +552,33 @@ exports.unmatchPet = async (req, res) => {
         // Find and delete any related chat
         const chat = await Chat.findOne({ match: match._id });
         if (chat) {
+            // Get the other user's ID (the owner of the unmatched pet)
+            const otherPet = await Pet.findById(unmatchedPetId).populate('owner', '_id');
+            const otherUserId = otherPet?.owner?._id;
+            
+            const chatId = chat._id;
             await chat.deleteOne();
+
+            // Send chat removal notification via socket to both users
+            if (global.io) {
+                try {
+                    // Import the function to emit chat removal notification
+                    const { emitChatRemovalNotification } = require('../services/socketService');
+                    
+                    // Notify current user
+                    emitChatRemovalNotification(req.user.id, chatId);
+                    
+                    // Notify other user
+                    if (otherUserId) {
+                        emitChatRemovalNotification(otherUserId, chatId);
+                    }
+                    
+                    console.log(`Chat removal notification emitted for chat ${chatId}`);
+                } catch (notificationError) {
+                    console.error('Error sending chat removal notification:', notificationError);
+                    // Non-critical error, continue execution
+                }
+            }
         }
 
         // Add unmatched pet to disliked pets for current pet

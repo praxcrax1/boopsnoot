@@ -306,6 +306,25 @@ const ChatListScreen = ({ navigation }) => {
         }
     }, [handleNewMessage]);
 
+    // Handle chat removal (when another user unmatches or deletes their pet)
+    const handleChatRemoval = useCallback((chatId) => {
+        console.log("[ChatListScreen LOG] Chat removal notification received for chat:", chatId);
+
+        // Remove the chat from the chats state
+        setChats(prevChats => prevChats.filter(chat => chat._id !== chatId));
+
+        // Remove from unread state
+        setUnreadChats(prev => {
+            const newState = { ...prev };
+            if (newState[chatId]) {
+                delete newState[chatId];
+                saveUnreadState(newState);
+                console.log("[ChatListScreen LOG] Removed unread status for chat:", chatId);
+            }
+            return newState;
+        });
+    }, []);
+
     // ====== EFFECTS AND LIFECYCLE ======
     
     // Listen for new match notifications to refresh the chat list
@@ -315,12 +334,19 @@ const ChatListScreen = ({ navigation }) => {
             fetchChats();
         });
         
+        // Listen for chat removal notifications
+        const chatRemovalSubscription = SocketService.addChatRemovalListener(handleChatRemoval);
+        
         return () => {
             if (matchSubscription) {
                 SocketService.removeMatchNotificationListener(matchSubscription);
             }
+            
+            if (chatRemovalSubscription) {
+                SocketService.removeChatRemovalListener(chatRemovalSubscription);
+            }
         };
-    }, [fetchChats]);
+    }, [fetchChats, handleChatRemoval]);
     
     // Main effect for initializing sockets, handling app state changes, and cleanup
     useEffect(() => {

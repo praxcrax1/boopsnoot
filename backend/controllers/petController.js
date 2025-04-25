@@ -1,4 +1,6 @@
 const Pet = require("../models/Pet");
+const Match = require("../models/Match");
+const Chat = require("../models/Chat");
 const imageService = require("../services/imageService");
 const fs = require("fs");
 const path = require("path");
@@ -24,12 +26,12 @@ exports.createPet = async (req, res) => {
         } = req.body;
 
         // Validation - require at least 2 photos
-        if (!photos || !Array.isArray(photos) || photos.length < 2) {
-            return res.status(400).json({
-                success: false,
-                message: "Please add at least 2 photos of your pet",
-            });
-        }
+        // if (!photos || !Array.isArray(photos) || photos.length < 2) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Please add at least 2 photos of your pet",
+        //     });
+        // }
 
         // Create pet with owner ID from authenticated user
         const pet = new Pet({
@@ -281,43 +283,93 @@ exports.updatePet = async (req, res) => {
     }
 };
 
-// @desc    Delete a pet profile
+// @desc    Delete a pet
 // @route   DELETE /api/pets/:id
 // @access  Private
 exports.deletePet = async (req, res) => {
     try {
-        const pet = await Pet.findById(req.params.id);
+        const pet = await Pet.findOne({
+            _id: req.params.id,
+            owner: req.user.id,
+        });
 
         if (!pet) {
-            return res.status(404).json({
+            return res.status(404).json({ 
                 success: false,
-                message: "Pet not found",
+                message: "Pet not found or you are not the owner" 
             });
         }
 
-        // Check ownership
-        if (pet.owner.toString() !== req.user.id) {
-            return res.status(403).json({
-                success: false,
-                message: "Not authorized to delete this pet",
-            });
+        // Find all matches involving this pet
+        const matchesLowerIdQuery = await Match.find({ pet1: pet._id });
+        const matchesHigherIdQuery = await Match.find({ pet2: pet._id });
+        
+        const allMatches = [...matchesLowerIdQuery, ...matchesHigherIdQuery];
+
+        // Collect all related chat IDs and affected user IDs for notifications
+        const chatNotifications = [];
+
+        // Find all chats associated with these matches
+        for (const match of allMatches) {
+            const chat = await Chat.findOne({ match: match._id });
+            
+            if (chat) {
+                // Get the other pet in this match
+                const otherPetId = match.pet1.toString() === pet._id.toString() ? match.pet2 : match.pet1;
+                const otherPet = await Pet.findById(otherPetId).populate('owner', '_id');
+                const otherUserId = otherPet?.owner?._id;
+
+                if (otherUserId) {
+                    chatNotifications.push({
+                        chatId: chat._id,
+                        userId: otherUserId
+                    });
+                }
+                
+                // Delete the chat
+                await chat.deleteOne();
+            }
+            
+            // Delete the match
+            await match.deleteOne();
         }
 
+        // Delete the pet
         await pet.deleteOne();
+        
+        // Send chat removal notifications to affected users
+        if (global.io && chatNotifications.length > 0) {
+            try {
+                // Import the function to emit chat removal notification
+                const { emitChatRemovalNotification } = require('../services/socketService');
+                
+                // Send notifications to all affected users
+                for (const notification of chatNotifications) {
+                    emitChatRemovalNotification(notification.userId, notification.chatId);
+                    console.log(`Chat removal notification emitted to user ${notification.userId} for chat ${notification.chatId}`);
+                }
+                
+                // Also notify the current user about all removed chats
+                chatNotifications.forEach(notification => {
+                    emitChatRemovalNotification(req.user.id, notification.chatId);
+                });
+                
+            } catch (notificationError) {
+                console.error('Error sending chat removal notifications:', notificationError);
+                // Non-critical error, continue execution
+            }
+        }
 
-        res.json({
+        res.json({ 
             success: true,
-            message: "Pet removed",
+            message: "Pet deleted successfully" 
         });
     } catch (error) {
         console.error("Delete pet error:", error);
         res.status(500).json({
             success: false,
             message: "Server error",
-            error:
-                process.env.NODE_ENV === "development"
-                    ? error.message
-                    : undefined,
+            error: process.env.NODE_ENV === "development" ? error.message : undefined,
         });
     }
 };

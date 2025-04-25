@@ -17,6 +17,18 @@ const emitMatchNotification = (userId, matchData) => {
     }
 };
 
+// Helper function to emit chat removal notifications
+const emitChatRemovalNotification = (userId, chatId) => {
+    const socketId = connectedUsers.get(userId.toString());
+    
+    if (socketId) {
+        console.log(`Emitting chat removal notification to user ${userId} via socket ${socketId}`);
+        global.io.to(socketId).emit('chat_removed', { chatId });
+    } else {
+        console.log(`User ${userId} is not connected to receive chat removal notification`);
+    }
+};
+
 const setupSocketIO = (io) => {
     // Store io instance globally to use in other functions
     global.io = io;
@@ -155,5 +167,6 @@ const setupSocketIO = (io) => {
 
 module.exports = {
     setupSocketIO,
-    emitMatchNotification
+    emitMatchNotification,
+    emitChatRemovalNotification
 };
