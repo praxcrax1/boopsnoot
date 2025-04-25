@@ -18,4 +18,9 @@ router.post("/like", protect, matchController.likePet);
 // @access  Private
 router.get("/:petId", protect, matchController.getPetMatches);
 
-module.exports = router;
+// @route   POST /api/matches/unmatch
+// @desc    Unmatch a pet from another pet
+// @access  Private
+router.post('/unmatch', protect, matchController.unmatchPet);
+
+module.exports = router;``

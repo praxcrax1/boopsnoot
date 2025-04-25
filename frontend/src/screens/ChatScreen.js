@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
+import MatchService from "../services/MatchService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import theme, { withOpacity } from "../styles/theme";
 import MenuBottomSheet from "../components/MenuBottomSheet";
@@ -31,6 +32,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [menuVisible, setMenuVisible] = useState(false);
     const [otherPet, setOtherPet] = useState(null);
+    const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
     const socketConnected = useRef(false);
 
@@ -68,9 +70,17 @@ const ChatScreen = ({ route, navigation }) => {
                 setChatInfo(chatResponse.chat);
 
                 if (chatResponse.chat && chatResponse.chat.participants) {
-                    const foundOtherPet = chatResponse.chat.participants.find(
-                        (p) => !p.isCurrentUser
+                    const foundCurrentPet = chatResponse.chat.participants.find(
+                        p => p.isCurrentUser
                     );
+                    const foundOtherPet = chatResponse.chat.participants.find(
+                        p => !p.isCurrentUser
+                    );
+                    
+                    if (foundCurrentPet && foundCurrentPet.pet) {
+                        setCurrentPet(foundCurrentPet.pet);
+                    }
+                    
                     if (foundOtherPet && foundOtherPet.pet) {
                         setOtherPet(foundOtherPet.pet);
                         navigation.setOptions({
@@ -212,6 +222,44 @@ const ChatScreen = ({ route, navigation }) => {
                 return newMessages;
             });
         }
+    };
+
+    const handleUnmatch = () => {
+        if (!currentPet || !otherPet) {
+            Alert.alert("Error", "Unable to unmatch. Missing pet information.");
+            return;
+        }
+
+        Alert.alert(
+            "Unmatch",
+            `Are you sure you want to unmatch ${otherPet.name}? This action cannot be undone.`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Unmatch",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await MatchService.unmatchPet(currentPet._id, otherPet._id);
+                            
+                            // Navigate back to chat list
+                            setMenuVisible(false);
+                            navigation.goBack();
+                            Alert.alert("Success", `You've unmatched with ${otherPet.name}.`);
+                        } catch (error) {
+                            console.error("Error unmatching:", error);
+                            Alert.alert("Error", "Failed to unmatch. Please try again.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const sendMessage = async () => {
@@ -386,6 +434,11 @@ const ChatScreen = ({ route, navigation }) => {
                     });
                 }
             },
+        },
+        {
+            label: "Unmatch",
+            icon: "close-circle-outline",
+            onPress: handleUnmatch,
         },
     ];
 

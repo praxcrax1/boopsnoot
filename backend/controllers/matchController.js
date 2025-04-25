@@ -490,3 +490,75 @@ exports.getPetMatches = async (req, res) => {
         return errorResponse(res, 500, "Server error", error);
     }
 };
+
+// @desc    Unmatch with a pet
+// @route   POST /api/matches/unmatch
+// @access  Private
+exports.unmatchPet = async (req, res) => {
+    try {
+        const { petId, unmatchedPetId } = req.body;
+
+        // Verify the pet exists and belongs to the user
+        const pet = await validateUserPet(petId, req.user.id);
+        if (!pet) {
+            return errorResponse(
+                res,
+                404,
+                "Pet not found or does not belong to you"
+            );
+        }
+
+        // Check if the unmatched pet exists
+        const unmatchedPet = await Pet.findById(unmatchedPetId);
+        if (!unmatchedPet) {
+            return errorResponse(res, 404, "Unmatched pet not found");
+        }
+
+        // Find the match record - always stored with pet1 having the lower ObjectId
+        const [petWithLowerId, petWithHigherId] =
+            petId.toString() < unmatchedPetId.toString()
+                ? [petId, unmatchedPetId]
+                : [unmatchedPetId, petId];
+
+        let match = await Match.findOne({
+            pet1: petWithLowerId,
+            pet2: petWithHigherId,
+        });
+
+        if (!match) {
+            return errorResponse(res, 404, "Match not found");
+        }
+
+        // Update match record to remove the match and set as disliked for both
+        match.isMatch = false;
+        match.matchDate = null;
+        
+        // Set dislike flags based on which pet is which
+        if (petId.toString() === petWithLowerId.toString()) {
+            match.pet1LikedPet2 = false;
+        } else {
+            match.pet2LikedPet1 = false;
+        }
+        
+        await match.save();
+
+        // Find and delete any related chat
+        const chat = await Chat.findOne({ match: match._id });
+        if (chat) {
+            await chat.deleteOne();
+        }
+
+        // Add unmatched pet to disliked pets for current pet
+        await Pet.findByIdAndUpdate(petId, {
+            $addToSet: { dislikedPets: unmatchedPetId }
+        });
+
+        res.json({
+            success: true,
+            message: "Successfully unmatched with pet"
+        });
+    } catch (error) {
+        console.error("Unmatch pet error:", error);
+        return errorResponse(res, 500, "Server error", error);
+    }
+};

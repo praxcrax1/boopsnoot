@@ -59,6 +59,22 @@ class MatchService {
         }
     }
 
+    async unmatchPet(petId, unmatchedPetId) {
+        try {
+            const response = await apiClient.post("/matches/unmatch", {
+                petId,
+                unmatchedPetId
+            });
+            
+            // Clear cache after unmatching to ensure fresh data
+            this.clearCache(petId);
+            
+            return response.data;
+        } catch (error) {
+            throw handleApiError(error);
+        }
+    }
+
     async getUserMatches(petId) {
         try {
             // Check if we have a valid cached response
