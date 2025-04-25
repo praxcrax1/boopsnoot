@@ -16,6 +16,7 @@ import PetService from "../services/PetService";
 import Button from "../components/Button";
 import { DISPLAY_VALUES } from "../constants/petConstants";
 import theme, { withOpacity } from "../styles/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 const PHOTO_HEIGHT = 350;
@@ -25,6 +26,7 @@ const PetProfileScreen = ({ route, navigation }) => {
     const [pet, setPet] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+    const [isCurrentUserPet, setIsCurrentUserPet] = useState(false);
 
     const scrollX = useRef(new Animated.Value(0)).current;
     const photoScrollRef = useRef(null);
@@ -34,6 +36,14 @@ const PetProfileScreen = ({ route, navigation }) => {
             try {
                 const response = await PetService.getPetById(petId);
                 setPet(response.pet);
+                
+                // Check if this pet belongs to the current user
+                const userData = await AsyncStorage.getItem("user");
+                if (userData && response.pet) {
+                    const user = JSON.parse(userData);
+                    const userId = user.id || user._id;
+                    setIsCurrentUserPet(response.pet.owner === userId);
+                }
             } catch (error) {
                 console.error("Error fetching pet data:", error);
                 Alert.alert(
@@ -56,16 +66,18 @@ const PetProfileScreen = ({ route, navigation }) => {
                 <></>
             ),
             headerRight: () => (
-                <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() =>
-                        navigation.navigate("EditPetProfile", { petId })
-                    }>
-                    <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
-                </TouchableOpacity>
+                isCurrentUserPet ? (
+                    <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() =>
+                            navigation.navigate("EditPetProfile", { petId })
+                        }>
+                        <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                ) : null
             ),
         });
-    }, [petId, navigation]);
+    }, [petId, navigation, isCurrentUserPet]);
 
     const handlePhotoChange = (event) => {
         const contentOffsetX = event.nativeEvent.contentOffset.x;
