@@ -10,6 +10,8 @@ import {
     Alert,
     Dimensions,
     StatusBar,
+    Platform,
+    Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,7 +41,7 @@ import Button from "../components/Button";
 import theme, { withOpacity } from "../styles/theme";
 
 const { width } = Dimensions.get("window");
-const photoSize = (width - 60) / 3;
+const photoSize = Math.floor((width - 56) / 3); // 3 photos per row with 20px padding and 8px gaps
 
 const EditPetProfileScreen = ({ route, navigation }) => {
     const { petId } = route.params;
@@ -53,6 +55,11 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     const [hasChanges, setHasChanges] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
     const [currentSection, setCurrentSection] = useState('basic');
+    
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
     
     // Form state
     const [petData, setPetData] = useState({
@@ -140,6 +147,20 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             } finally {
                 if (isMounted) {
                     setLoading(false);
+                    
+                    // Trigger entrance animations
+                    Animated.parallel([
+                        Animated.timing(fadeAnim, {
+                            toValue: 1,
+                            duration: 400,
+                            useNativeDriver: true
+                        }),
+                        Animated.timing(slideAnim, {
+                            toValue: 0,
+                            duration: 400,
+                            useNativeDriver: true
+                        })
+                    ]).start();
                 }
             }
         };
@@ -149,7 +170,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         return () => {
             isMounted = false;
         };
-    }, [petId]);
+    }, [petId, fadeAnim, slideAnim]);
 
     // Setup navigation header separately from data fetching
     useEffect(() => {
@@ -165,6 +186,30 @@ const EditPetProfileScreen = ({ route, navigation }) => {
             setHasChanges(hasFormChanges);
         }
     }, [petData, loading]);
+
+    // Animate tab indicator when changing sections
+    useEffect(() => {
+        let newPosition;
+        switch (currentSection) {
+            case 'basic':
+                newPosition = 0;
+                break;
+            case 'photos':
+                newPosition = width / 3;
+                break;
+            case 'personality':
+                newPosition = (width / 3) * 2;
+                break;
+            default:
+                newPosition = 0;
+        }
+        
+        Animated.timing(tabIndicatorPosition, {
+            toValue: newPosition,
+            duration: 200,
+            useNativeDriver: false
+        }).start();
+    }, [currentSection, tabIndicatorPosition, width]);
 
     // Handle back button press
     const handleBackPress = () => {
@@ -468,6 +513,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Loading pet profile...</Text>
             </View>
         );
     }
@@ -477,73 +523,17 @@ const EditPetProfileScreen = ({ route, navigation }) => {
         return uri && (uri.startsWith('file:') || uri.startsWith('content:') || pendingUploads.includes(uri));
     };
 
-    // Section navigation
-    const renderSectionTabs = () => (
-        <View style={styles.sectionTabsContainer}>
-            <TouchableOpacity 
-                style={[styles.sectionTab, currentSection === 'basic' && styles.activeSectionTab]}
-                onPress={() => setCurrentSection('basic')}
-            >
-                <Ionicons 
-                    name="information-circle-outline" 
-                    size={20} 
-                    color={currentSection === 'basic' ? theme.colors.primary : theme.colors.textSecondary} 
-                />
-                <Text style={[
-                    styles.sectionTabText, 
-                    currentSection === 'basic' && styles.activeSectionTabText
-                ]}>
-                    Basic
-                </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={[styles.sectionTab, currentSection === 'photos' && styles.activeSectionTab]}
-                onPress={() => setCurrentSection('photos')}
-            >
-                <Ionicons 
-                    name="images-outline" 
-                    size={20} 
-                    color={currentSection === 'photos' ? theme.colors.primary : theme.colors.textSecondary} 
-                />
-                <Text style={[
-                    styles.sectionTabText, 
-                    currentSection === 'photos' && styles.activeSectionTabText
-                ]}>
-                    Photos
-                </Text>
-                {errors.photos && (
-                    <View style={styles.errorBadge}>
-                        <Text style={styles.errorBadgeText}>!</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={[styles.sectionTab, currentSection === 'personality' && styles.activeSectionTab]}
-                onPress={() => setCurrentSection('personality')}
-            >
-                <Ionicons 
-                    name="happy-outline" 
-                    size={20} 
-                    color={currentSection === 'personality' ? theme.colors.primary : theme.colors.textSecondary} 
-                />
-                <Text style={[
-                    styles.sectionTabText, 
-                    currentSection === 'personality' && styles.activeSectionTabText
-                ]}>
-                    Personality
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
-
     // Render the appropriate section content
     const renderSectionContent = () => {
         switch (currentSection) {
             case 'basic':
                 return (
-                    <View style={styles.sectionContent}>
+                    <Animated.View 
+                        style={[
+                            styles.sectionContent,
+                            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                        ]}
+                    >
                         <InputField
                             label="Pet Name"
                             required
@@ -580,25 +570,30 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             isNumeric={true}
                             value={petData.age}
                             onChangeText={(value) => handleInputChange("age", value)}
-                            keyboardType="default"
+                            keyboardType="numeric"
                             error={errors.age}
                             touched={touched.age}
                             onBlur={() => handleBlur("age")}
                         />
 
-                        <CustomDropdown
-                            label="Gender"
-                            options={genderOptions}
-                            selectedValue={petData.gender}
-                            onValueChange={(value) => handleInputChange("gender", value)}
-                        />
-
-                        <CustomDropdown
-                            label="Size"
-                            options={sizeOptions}
-                            selectedValue={petData.size}
-                            onValueChange={(value) => handleInputChange("size", value)}
-                        />
+                        <View style={styles.formRow}>
+                            <View style={styles.formHalfColumn}>
+                                <CustomDropdown
+                                    label="Gender"
+                                    options={genderOptions}
+                                    selectedValue={petData.gender}
+                                    onValueChange={(value) => handleInputChange("gender", value)}
+                                />
+                            </View>
+                            <View style={styles.formHalfColumn}>
+                                <CustomDropdown
+                                    label="Size"
+                                    options={sizeOptions}
+                                    selectedValue={petData.size}
+                                    onValueChange={(value) => handleInputChange("size", value)}
+                                />
+                            </View>
+                        </View>
 
                         <CustomDropdown
                             label="Vaccinated"
@@ -606,15 +601,18 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             selectedValue={petData.vaccinated}
                             onValueChange={(value) => handleInputChange("vaccinated", value)}
                         />
-                    </View>
+                    </Animated.View>
                 );
                 
             case 'photos':
                 return (
-                    <View style={styles.sectionContent}>
-                        <Text style={styles.label}>
-                            Pet Photos <Text style={styles.requiredMark}>*</Text>
-                        </Text>
+                    <Animated.View 
+                        style={[
+                            styles.sectionContent,
+                            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                        ]}
+                    >
+                        <Text style={styles.sectionHeader}>Pet Photos</Text>
                         <Text style={styles.photoHelperText}>
                             Add at least 2 photos of your pet to help potential playmates get to know them better
                         </Text>
@@ -656,11 +654,18 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                                         style={styles.removePhotoButton}
                                         onPress={() => removeImage(index)}
                                         disabled={imageUploading}>
-                                        <Ionicons 
-                                            name="close-circle" 
-                                            size={22} 
-                                            color="white" 
-                                        />
+                                        <LinearGradient
+                                            colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)']}
+                                            style={styles.removePhotoGradient}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        >
+                                            <Ionicons 
+                                                name="close-circle" 
+                                                size={22} 
+                                                color="white" 
+                                            />
+                                        </LinearGradient>
                                     </TouchableOpacity>
                                     {isLocalUri(photo) && (
                                         <View style={styles.uploadingOverlay}>
@@ -670,12 +675,19 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                                 </View>
                             ))}
                         </View>
-                    </View>
+                    </Animated.View>
                 );
                 
             case 'personality':
                 return (
-                    <View style={styles.sectionContent}>
+                    <Animated.View 
+                        style={[
+                            styles.sectionContent,
+                            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                        ]}
+                    >
+                        <Text style={styles.sectionHeader}>Personality Details</Text>
+
                         <CustomDropdown
                             label="Activity Level"
                             options={activityOptions}
@@ -753,7 +765,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             iconPosition="left"
                             style={styles.deleteButton}
                         />
-                    </View>
+                    </Animated.View>
                 );
                 
             default:
@@ -762,172 +774,287 @@ const EditPetProfileScreen = ({ route, navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
             <StatusBar
-                barStyle="dark-content"
+                translucent
                 backgroundColor="transparent"
-                translucent={true}
+                barStyle="dark-content"
             />
-            <ScrollView 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Updated Back Button to match PetProfileScreen */}
+            
+            {/* Custom header */}
+            <View style={styles.header}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={handleBackPress}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.onPrimary} />
+                    <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
-                
-                {/* Pet preview card */}
-                <View style={styles.previewCard}>
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.4)', 'transparent']}
-                        style={styles.gradientOverlay}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                    />
-                    
-                    {petData.photos && petData.photos.length > 0 && (
-                        <Image 
-                            source={{ uri: petData.photos[0] }} 
-                            style={styles.previewImage} 
-                            resizeMode="cover"
-                        />
+                <Text style={styles.headerTitle}>Edit Profile</Text>
+                <View style={styles.headerRight}>
+                    {hasChanges && !submitting && !imageUploading && (
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={handleSubmit}>
+                            <Text style={styles.saveButtonText}>Save</Text>
+                        </TouchableOpacity>
                     )}
-                    
-                    <View style={styles.previewInfo}>
+                </View>
+            </View>
+            
+            {/* Pet profile preview */}
+            <View style={styles.previewContainer}>
+                <Image 
+                    source={{ uri: petData.photos?.[0] || 'https://res.cloudinary.com/boopsnoot/image/upload/v1650120000/default-pet.png' }}
+                    style={styles.previewImage}
+                />
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.5)', 'transparent']}
+                    style={styles.previewGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                />
+                <View style={styles.previewInfo}>
+                    <View>
                         <Text style={styles.previewName}>{petData.name}</Text>
                         <Text style={styles.previewBreed}>{petData.breed}</Text>
                     </View>
                 </View>
-                
-                {renderSectionTabs()}
-                
-                {renderSectionContent()}
-            </ScrollView>
+            </View>
             
-            {/* Fixed action button */}
-            <View style={styles.fixedActionContainer}>
-                <Button
-                    title={submitting ? "Saving..." : "Save Changes"}
-                    onPress={handleSubmit}
-                    disabled={submitting || !hasChanges || imageUploading}
-                    loading={submitting}
-                    style={styles.submitButton}
+            {/* Section tabs */}
+            <View style={styles.tabsContainer}>
+                <TouchableOpacity 
+                    style={styles.tab} 
+                    onPress={() => setCurrentSection('basic')}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons 
+                        name="information-circle-outline" 
+                        size={20} 
+                        color={currentSection === 'basic' ? theme.colors.primary : theme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                        styles.tabText,
+                        currentSection === 'basic' && styles.activeTabText
+                    ]}>
+                        Basic
+                    </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                    style={styles.tab} 
+                    onPress={() => setCurrentSection('photos')}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons 
+                        name="images-outline" 
+                        size={20} 
+                        color={currentSection === 'photos' ? theme.colors.primary : theme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                        styles.tabText,
+                        currentSection === 'photos' && styles.activeTabText
+                    ]}>
+                        Photos
+                    </Text>
+                    {touched.photos && errors.photos && (
+                        <View style={styles.errorBadge}>
+                            <Text style={styles.errorBadgeText}>!</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                    style={styles.tab} 
+                    onPress={() => setCurrentSection('personality')}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons 
+                        name="happy-outline" 
+                        size={20} 
+                        color={currentSection === 'personality' ? theme.colors.primary : theme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                        styles.tabText,
+                        currentSection === 'personality' && styles.activeTabText
+                    ]}>
+                        Personality
+                    </Text>
+                </TouchableOpacity>
+                
+                <Animated.View 
+                    style={[
+                        styles.activeTabIndicator,
+                        { left: tabIndicatorPosition, width: width / 3 }
+                    ]}
                 />
             </View>
+            
+            {/* Main content area */}
+            <ScrollView 
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                {renderSectionContent()}
+                <View style={styles.bottomPadding} />
+            </ScrollView>
+            
+            {/* Fixed action button at bottom */}
+            {hasChanges && (
+                <View style={styles.fixedActionContainer}>
+                    <Button
+                        title={submitting ? "Saving..." : "Save Changes"}
+                        onPress={handleSubmit}
+                        disabled={submitting || imageUploading}
+                        loading={submitting}
+                        style={styles.submitButton}
+                    />
+                </View>
+            )}
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
         backgroundColor: theme.colors.background,
-        paddingTop: StatusBar.currentHeight || 0,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: theme.colors.background,
     },
-    headerButton: {
-        padding: 8,
+    loadingText: {
+        marginTop: theme.spacing.md,
+        color: theme.colors.textSecondary,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        backgroundColor: theme.colors.background,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.divider,
+        ...Platform.select({
+            ios: {
+                shadowColor: theme.colors.textPrimary,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
+        zIndex: 10,
+    },
+    headerTitle: {
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
     },
     backButton: {
-        position: 'absolute',
-        top: 20,
-        left: 15,
-        zIndex: 10,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: withOpacity("#000000", 0.3),
-        justifyContent: "center",
-        alignItems: "center",
+        padding: 8,
     },
-    scrollContent: {
-        paddingBottom: 100, // Space for fixed action button
-        paddingTop: 0,      // No padding at top since we have absolute header
+    headerRight: {
+        width: 60,
+        alignItems: 'flex-end',
     },
-    previewCard: {
+    saveButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.primary + '10',
+    },
+    saveButtonText: {
+        color: theme.colors.primary,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        fontSize: theme.typography.fontSize.sm,
+    },
+    container: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    contentContainer: {
+        paddingBottom: 100, // Extra space for fixed button
+    },
+    previewContainer: {
+        position: 'relative',
         height: 300,
-        width: "100%",
-        position: "relative",
-        marginBottom: 16,
+        width: '100%',
     },
     previewImage: {
-        width: '100%',
         height: '100%',
+        width: '100%',
+        resizeMode: 'cover',
     },
-    gradientOverlay: {
+    previewGradient: {
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         height: '100%',
-        zIndex: 1,
     },
     previewInfo: {
         position: 'absolute',
-        bottom: 20,
-        left: 20,
-        zIndex: 2,
+        bottom: 16,
+        left: 16,
+        right: 16,
     },
     previewName: {
-        color: '#fff',
-        fontSize: theme.typography.fontSize.xxl,
+        fontSize: theme.typography.fontSize.xl,
         fontWeight: theme.typography.fontWeight.bold,
+        color: '#fff',
         textShadowColor: 'rgba(0, 0, 0, 0.5)',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
     },
     previewBreed: {
-        color: '#fff',
         fontSize: theme.typography.fontSize.md,
-        fontWeight: theme.typography.fontWeight.medium,
+        color: '#fff',
         opacity: 0.9,
         textShadowColor: 'rgba(0, 0, 0, 0.5)',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
     },
-    sectionTabsContainer: {
+    tabsContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        height: 48,
         backgroundColor: theme.colors.background,
-        borderRadius: theme.borderRadius.lg,
-        marginHorizontal: 20,
-        marginBottom: 20,
-        ...theme.shadows.medium,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.divider,
+        position: 'relative',
     },
-    sectionTab: {
+    tab: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 10,
-        position: 'relative',
+        height: '100%',
     },
-    activeSectionTab: {
-        backgroundColor: theme.colors.primaryLight + '20', // 20% opacity
-        borderRadius: theme.borderRadius.md,
-    },
-    sectionTabText: {
+    tabText: {
         marginLeft: 6,
         fontSize: theme.typography.fontSize.sm,
-        fontWeight: theme.typography.fontWeight.medium,
         color: theme.colors.textSecondary,
     },
-    activeSectionTabText: {
+    activeTabText: {
         color: theme.colors.primary,
         fontWeight: theme.typography.fontWeight.semiBold,
     },
+    activeTabIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        height: 2,
+        backgroundColor: theme.colors.primary,
+    },
     errorBadge: {
         position: 'absolute',
-        top: 0,
-        right: 20,
+        top: 10,
+        right: 'auto',
+        marginLeft: 20,
         backgroundColor: theme.colors.error,
         width: 16,
         height: 16,
@@ -942,12 +1069,27 @@ const styles = StyleSheet.create({
     },
     sectionContent: {
         paddingHorizontal: 20,
+        paddingTop: 20,
+    },
+    formRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    formHalfColumn: {
+        width: '48%',
+    },
+    sectionHeader: {
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: theme.typography.fontWeight.semiBold,
+        color: theme.colors.textPrimary,
+        marginBottom: 12,
     },
     label: {
         fontSize: theme.typography.fontSize.md,
         fontWeight: theme.typography.fontWeight.semiBold,
         color: theme.colors.textPrimary,
         marginBottom: 8,
+        marginTop: 16,
     },
     sublabel: {
         fontSize: theme.typography.fontSize.sm,
@@ -959,6 +1101,70 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.fontSize.sm,
         color: theme.colors.textSecondary,
         marginBottom: 16,
+        lineHeight: 18,
+    },
+    photoUploadButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.background,
+        padding: 16,
+        borderRadius: theme.borderRadius.md,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        borderStyle: "dashed",
+    },
+    photoUploadButtonText: {
+        color: theme.colors.primary,
+        fontSize: theme.typography.fontSize.md,
+        fontWeight: theme.typography.fontWeight.medium,
+        marginLeft: 10,
+    },
+    errorText: {
+        color: theme.colors.error,
+        fontSize: theme.typography.fontSize.sm,
+        marginBottom: 12,
+        marginTop: -8,
+    },
+    photoGridContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        marginHorizontal: -4,
+    },
+    photoItem: {
+        position: "relative",
+        margin: 4,
+        borderRadius: theme.borderRadius.md,
+        overflow: 'hidden',
+        ...theme.shadows.small,
+    },
+    photo: {
+        width: photoSize,
+        height: photoSize,
+    },
+    removePhotoButton: {
+        position: "absolute",
+        top: 6,
+        right: 6,
+        zIndex: 10,
+    },
+    removePhotoGradient: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     optionsContainer: {
         flexDirection: "row",
@@ -971,10 +1177,19 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.xl,
         paddingVertical: 8,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         margin: 4,
-        marginBottom: 8,
-        ...theme.shadows.small,
+        ...Platform.select({
+            ios: {
+                shadowColor: theme.colors.textPrimary,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 1,
+            },
+        }),
     },
     selectedOption: {
         backgroundColor: theme.colors.primary,
@@ -988,81 +1203,33 @@ const styles = StyleSheet.create({
         color: theme.colors.onPrimary,
         fontWeight: theme.typography.fontWeight.medium,
     },
-    photoUploadButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.colors.surface,
-        padding: 16,
-        borderRadius: theme.borderRadius.md,
-        marginBottom: 16,
-        borderWidth: 1.5,
-        borderColor: theme.colors.primary,
-        borderStyle: "dashed",
-    },
-    photoUploadButtonText: {
-        color: theme.colors.primary,
-        fontSize: theme.typography.fontSize.md,
-        fontWeight: theme.typography.fontWeight.medium,
-        marginLeft: 10,
-    },
-    photoGridContainer: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        marginHorizontal: -4,
-        marginBottom: 24,
-    },
-    photoItem: {
-        position: "relative",
-        margin: 4,
-    },
-    photo: {
-        width: photoSize,
-        height: photoSize,
-        borderRadius: theme.borderRadius.md,
-    },
-    removePhotoButton: {
-        position: "absolute",
-        top: 6,
-        right: 6,
-        zIndex: 10,
-    },
-    uploadingOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    requiredMark: {
-        color: theme.colors.error,
-    },
-    errorText: {
-        color: theme.colors.error,
-        fontSize: theme.typography.fontSize.sm,
-        marginTop: -8,
-        marginBottom: 12,
-        marginLeft: 4,
-    },
     deleteButton: {
         marginTop: 24,
-        marginBottom: 40,
+    },
+    bottomPadding: {
+        height: 60,
     },
     fixedActionContainer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        paddingVertical: 12,
         paddingHorizontal: 20,
+        paddingVertical: 12,
         backgroundColor: theme.colors.background,
         borderTopWidth: 1,
         borderTopColor: theme.colors.divider,
-        ...theme.shadows.medium,
+        ...Platform.select({
+            ios: {
+                shadowColor: theme.colors.textPrimary,
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+            },
+            android: {
+                elevation: 8,
+            },
+        }),
     },
     submitButton: {
         borderRadius: theme.borderRadius.md,
