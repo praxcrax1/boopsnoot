@@ -898,19 +898,6 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                 {renderSectionContent()}
                 <View style={styles.bottomPadding} />
             </ScrollView>
-            
-            {/* Fixed action button at bottom */}
-            {hasChanges && (
-                <View style={styles.fixedActionContainer}>
-                    <Button
-                        title={submitting ? "Saving..." : "Save Changes"}
-                        onPress={handleSubmit}
-                        disabled={submitting || imageUploading}
-                        loading={submitting}
-                        style={styles.submitButton}
-                    />
-                </View>
-            )}
         </SafeAreaView>
     );
 };
@@ -1209,30 +1196,15 @@ const styles = StyleSheet.create({
     bottomPadding: {
         height: 60,
     },
-    fixedActionContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: theme.colors.background,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.divider,
-        ...Platform.select({
-            ios: {
-                shadowColor: theme.colors.textPrimary,
-                shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 8,
-            },
-        }),
-    },
     submitButton: {
         borderRadius: theme.borderRadius.md,
+        overflow: 'hidden',
+        ...theme.shadows.medium,
+    },
+    submitButtonText: {
+        color: theme.colors.onPrimary,
+        fontWeight: theme.typography.fontWeight.bold,
+        fontSize: theme.typography.fontSize.md,
     },
 });
 
