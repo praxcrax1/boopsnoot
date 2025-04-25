@@ -460,10 +460,14 @@ const styles = StyleSheet.create({
     },
     paginationDots: {
         flexDirection: 'row',
-        position: 'absolute',
-        bottom: theme.spacing.sm,
         alignSelf: 'center',
+        position: 'absolute',
+        bottom: 50,
         zIndex: 50,
+        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
     },
     paginationDot: {
         width: 8,
@@ -473,7 +477,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
     },
     paginationDotActive: {
-        width: 20,
+        width: 24,
         backgroundColor: '#FFFFFF',
     },
     noPhotoContainer: {
