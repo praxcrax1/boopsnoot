@@ -229,6 +229,7 @@ const FinderScreen = ({ navigation }) => {
             const response = await PetService.getUserPets();
             if (response.pets && response.pets.length > 0) {
                 setUserPets(response.pets);
+                // Always select the first pet by default
                 setSelectedPetId(response.pets[0]._id);
                 setHasPets(true);
             } else {

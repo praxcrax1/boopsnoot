@@ -179,11 +179,17 @@ const ChatListScreen = ({ navigation }) => {
     const fetchUserPets = useCallback(async () => {
         try {
             const response = await PetService.getUserPets();
-            setUserPets(response.pets || []);
+            const pets = response.pets || [];
+            setUserPets(pets);
+            
+            // If we have pets and no pet is currently selected, select the first one
+            if (pets.length > 0 && !selectedPetId) {
+                setSelectedPetId(pets[0]._id);
+            }
         } catch (error) {
             console.error("Error fetching user pets:", error);
         }
-    }, []);
+    }, [selectedPetId]);
 
     // ====== EVENT HANDLERS ======
     
