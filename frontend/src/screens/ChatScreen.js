@@ -12,6 +12,7 @@ import {
     Image,
     StatusBar,
     Alert,
+    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,6 +35,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [otherPet, setOtherPet] = useState(null);
     const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
+    const scrollViewRef = useRef(); // New ref for the entire view
     const socketConnected = useRef(false);
 
     useEffect(() => {
@@ -217,13 +219,8 @@ const ChatScreen = ({ route, navigation }) => {
 
                 if (messageExists) return prevMessages;
 
-                const newMessages = [...prevMessages, formattedMessage];
-
-                setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-
-                return newMessages;
+                // Add new message without scrolling
+                return [...prevMessages, formattedMessage];
             });
         }
     };
@@ -328,9 +325,16 @@ const ChatScreen = ({ route, navigation }) => {
                 },
             });
 
+            // Scroll to bottom of the chat after sending a message
             setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
+                if (scrollViewRef.current) {
+                    // Scroll the entire view to the bottom
+                    scrollViewRef.current.scrollToEnd && scrollViewRef.current.scrollToEnd();
+                    
+                    // Also scroll the FlatList to ensure the latest message is visible
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }
+            }, 200);
         } catch (error) {
             console.error("Error sending message:", error);
 
@@ -423,10 +427,6 @@ const ChatScreen = ({ route, navigation }) => {
         );
     };
 
-    const renderDateSeparator = () => {
-        return null;
-    };
-
     const menuOptions = [
         {
             label: "View Profile",
@@ -457,38 +457,39 @@ const ChatScreen = ({ route, navigation }) => {
     return (
         <SafeAreaView style={styles.container} edges={["bottom"]}>
             <StatusBar barStyle="dark-content" />
-
-            {messages.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Ionicons
-                        name="chatbubble-ellipses-outline"
-                        size={64}
-                        color={theme.colors.divider}
+            
+            {/* Use ScrollView instead of View to enable scrolling */}
+            <ScrollView 
+                style={styles.chatContainer} 
+                ref={scrollViewRef}
+                contentContainerStyle={styles.scrollViewContent}
+                showsVerticalScrollIndicator={false}>
+                {messages.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Ionicons
+                            name="chatbubble-ellipses-outline"
+                            size={64}
+                            color={theme.colors.divider}
+                        />
+                        <Text style={styles.emptyText}>No messages yet</Text>
+                        <Text style={styles.emptySubtext}>
+                            Start the conversation!
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        renderItem={renderMessage}
+                        keyExtractor={(item) => item._id}
+                        contentContainerStyle={styles.messagesContainer}
+                        showsVerticalScrollIndicator={false}
+                        initialNumToRender={15}
+                        maxToRenderPerBatch={10}
+                        windowSize={10}
                     />
-                    <Text style={styles.emptyText}>No messages yet</Text>
-                    <Text style={styles.emptySubtext}>
-                        Start the conversation!
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    renderItem={renderMessage}
-                    keyExtractor={(item) => item._id}
-                    contentContainerStyle={styles.messagesContainer}
-                    onContentSizeChange={() =>
-                        flatListRef.current?.scrollToEnd({ animated: false })
-                    }
-                    onLayout={() =>
-                        flatListRef.current?.scrollToEnd({ animated: false })
-                    }
-                    showsVerticalScrollIndicator={false}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={10}
-                    windowSize={10}
-                />
-            )}
+                )}
+            </ScrollView>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -535,6 +536,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,
+    },
+    chatContainer: {
+        flex: 1,
+        width: '100%',
+    },
+    scrollViewContent: {
+        flexGrow: 1,
     },
     loadingContainer: {
         flex: 1,
