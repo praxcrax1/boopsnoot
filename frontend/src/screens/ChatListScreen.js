@@ -6,11 +6,9 @@ import {
     FlatList,
     TouchableOpacity,
     Image,
-    ActivityIndicator,
     AppState,
     StatusBar,
     Platform,
-    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -559,14 +557,6 @@ const ChatListScreen = ({ navigation }) => {
     };
 
     // ====== MAIN RENDER ======
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-        );
-    }
-
     const filteredChats = selectedPetId
         ? chats.filter((chat) =>
             chat.participants.some(
