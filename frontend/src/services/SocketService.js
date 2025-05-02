@@ -12,6 +12,7 @@ class SocketService {
     globalMessageListeners = new Set();
     matchNotificationListeners = new Set();
     chatRemovalListeners = new Set(); // New set for chat removal notification listeners
+    activeChatId = null; // Track which chat the user is currently viewing
 
     async getCurrentUser() {
         if (!this.currentUserId) {
@@ -496,6 +497,21 @@ class SocketService {
         });
 
         console.log("[SocketService LOG] Chat removal listener setup complete.");
+    }
+
+    // Methods to track which chat is currently being viewed
+    setActiveChatId(chatId) {
+        console.log("[SocketService LOG] Setting active chat ID:", chatId);
+        this.activeChatId = chatId;
+    }
+
+    getActiveChatId() {
+        return this.activeChatId;
+    }
+
+    clearActiveChatId() {
+        console.log("[SocketService LOG] Clearing active chat ID");
+        this.activeChatId = null;
     }
 }
 

@@ -53,6 +53,9 @@ const ChatScreen = ({ route, navigation }) => {
             return null;
         };
 
+        // Set this chat as active in SocketService
+        SocketService.setActiveChatId(chatId);
+
         navigation.setOptions({
             headerShown: true,
             headerLeft: () => (
@@ -184,6 +187,7 @@ const ChatScreen = ({ route, navigation }) => {
 
         return () => {
             SocketService.offReceiveMessage();
+            SocketService.setActiveChatId(null);
         };
     }, [chatId, navigation]);
 

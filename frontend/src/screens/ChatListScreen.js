@@ -236,8 +236,15 @@ const ChatListScreen = ({ navigation }) => {
         console.log("ChatListScreen: Handling new message for chat:", message.chatId);
 
         // Check if the user is currently viewing this specific chat
+        // 1. First check the navigation state
         const currentRoute = navigation.getState()?.routes.find(route => route.name === 'Chat');
-        const isViewingThisChat = currentRoute?.params?.chatId === message.chatId;
+        // 2. Then also check the active chat ID stored in SocketService
+        const activeChatId = SocketService.getActiveChatId();
+        const isViewingThisChat = 
+            (currentRoute?.params?.chatId === message.chatId) || 
+            (activeChatId === message.chatId);
+
+        console.log(`[ChatListScreen LOG] Is viewing this chat? ${isViewingThisChat} (activeChatId: ${activeChatId})`);
 
         // Update unread status only if not viewing the chat
         if (!isViewingThisChat) {
@@ -247,6 +254,8 @@ const ChatListScreen = ({ navigation }) => {
                 console.log("ChatListScreen: Marked chat as unread:", message.chatId);
                 return newState;
             });
+        } else {
+            console.log("ChatListScreen: User is viewing this chat, not marking as unread");
         }
 
         // Update chat list state
