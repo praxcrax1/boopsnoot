@@ -36,7 +36,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
     const socketConnected = useRef(false);
-    
+
     // Add reference to the ChatNotificationContext
     const { checkUnreadStatus } = useContext(ChatNotificationContext);
 
@@ -66,7 +66,11 @@ const ChatScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
+                    <Ionicons
+                        name="arrow-back"
+                        size={24}
+                        color={theme.colors.textPrimary}
+                    />
                 </TouchableOpacity>
             ),
         });
@@ -78,37 +82,45 @@ const ChatScreen = ({ route, navigation }) => {
 
                 if (chatResponse.chat && chatResponse.chat.participants) {
                     const foundCurrentPet = chatResponse.chat.participants.find(
-                        p => p.isCurrentUser
+                        (p) => p.isCurrentUser
                     );
                     const foundOtherPet = chatResponse.chat.participants.find(
-                        p => !p.isCurrentUser
+                        (p) => !p.isCurrentUser
                     );
-                    
+
                     if (foundCurrentPet && foundCurrentPet.pet) {
                         setCurrentPet(foundCurrentPet.pet);
                     }
-                    
+
                     if (foundOtherPet && foundOtherPet.pet) {
                         setOtherPet(foundOtherPet.pet);
                         navigation.setOptions({
                             headerTitle: () => (
-                                <View style={styles.headerTitleContainer}>
-                                    <Image
-                                        source={
-                                            foundOtherPet.pet.photos &&
-                                            foundOtherPet.pet.photos.length > 0
-                                                ? {
-                                                      uri: foundOtherPet.pet
-                                                          .photos[0],
-                                                  }
-                                                : require("../assets/default-pet.png")
-                                        }
-                                        style={styles.headerAvatar}
-                                    />
-                                    <Text style={styles.headerTitle}>
-                                        {foundOtherPet.pet.name}
-                                    </Text>
-                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        navigation.navigate("PetProfile", {
+                                            petId: foundOtherPet.pet._id,
+                                        });
+                                    }}>
+                                    <View style={styles.headerTitleContainer}>
+                                        <Image
+                                            source={
+                                                foundOtherPet.pet.photos &&
+                                                foundOtherPet.pet.photos
+                                                    .length > 0
+                                                    ? {
+                                                          uri: foundOtherPet.pet
+                                                              .photos[0],
+                                                      }
+                                                    : require("../assets/default-pet.png")
+                                            }
+                                            style={styles.headerAvatar}
+                                        />
+                                        <Text style={styles.headerTitle}>
+                                            {foundOtherPet.pet.name}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
                             ),
                             headerRight: () => (
                                 <TouchableOpacity
@@ -126,7 +138,7 @@ const ChatScreen = ({ route, navigation }) => {
                 }
 
                 setMessages(chatResponse.messages || []);
-                
+
                 // Mark chat as read when opened
                 markChatAsRead();
 
@@ -135,7 +147,6 @@ const ChatScreen = ({ route, navigation }) => {
                 setTimeout(() => {
                     scrollToBottom(false);
                 }, 300);
-
             } catch (error) {
                 console.error("Error loading chat data:", error);
                 Alert.alert("Error", "Failed to load chat. Please try again.");
@@ -143,28 +154,34 @@ const ChatScreen = ({ route, navigation }) => {
                 setLoading(false);
             }
         };
-        
+
         // Mark the chat as read in storage
         const markChatAsRead = async () => {
             try {
                 // Mark as read in local storage
-                const unreadData = await AsyncStorage.getItem('unreadChats');
+                const unreadData = await AsyncStorage.getItem("unreadChats");
                 if (unreadData) {
                     const unreadChats = JSON.parse(unreadData);
                     if (unreadChats[chatId]) {
                         delete unreadChats[chatId];
-                        await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
-                        
+                        await AsyncStorage.setItem(
+                            "unreadChats",
+                            JSON.stringify(unreadChats)
+                        );
+
                         // Update global notification status if needed
                         if (Object.keys(unreadChats).length === 0) {
-                            await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
+                            await AsyncStorage.setItem(
+                                "hasUnreadChats",
+                                JSON.stringify(false)
+                            );
                         }
-                        
+
                         // Update the notification badge status
                         checkUnreadStatus();
                     }
                 }
-                
+
                 // Also mark all messages as read on the server via socket
                 // This ensures proper read status syncing across devices
                 if (currentUserId) {
@@ -226,7 +243,7 @@ const ChatScreen = ({ route, navigation }) => {
             if (newMessage._id && !newMessage.sender?.isCurrentUser) {
                 SocketService.markMessageAsRead(newMessage._id, chatId);
             }
-            
+
             const formattedMessage = {
                 _id: newMessage._id || `temp-${Date.now()}`,
                 content: newMessage.content,
@@ -250,39 +267,45 @@ const ChatScreen = ({ route, navigation }) => {
                 if (messageExists) return prevMessages;
 
                 const newMessages = [...prevMessages, formattedMessage];
-                
+
                 // Scroll to bottom when receiving a new message
                 setTimeout(() => scrollToBottom(), 100);
-                
+
                 return newMessages;
             });
-            
+
             // Ensure the chat is marked as read since we're actively viewing it
             markChatAsRead();
         }
     };
-    
+
     // Mark chat as read function that can be called from multiple places
     const markChatAsRead = async () => {
         try {
             // Mark as read in local storage
-            const unreadData = await AsyncStorage.getItem('unreadChats');
+            const unreadData = await AsyncStorage.getItem("unreadChats");
             if (unreadData) {
                 const unreadChats = JSON.parse(unreadData);
                 if (unreadChats[chatId]) {
                     delete unreadChats[chatId];
-                    await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
-                    
+                    await AsyncStorage.setItem(
+                        "unreadChats",
+                        JSON.stringify(unreadChats)
+                    );
+
                     // Update global notification status if needed
                     if (Object.keys(unreadChats).length === 0) {
-                        await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
+                        await AsyncStorage.setItem(
+                            "hasUnreadChats",
+                            JSON.stringify(false)
+                        );
                     }
-                    
+
                     // Update the notification badge status
                     checkUnreadStatus();
                 }
             }
-            
+
             // Mark as read on the server via socket
             if (currentUserId) {
                 SocketService.markMessageAsRead(null, chatId);
@@ -304,7 +327,7 @@ const ChatScreen = ({ route, navigation }) => {
             [
                 {
                     text: "Cancel",
-                    style: "cancel"
+                    style: "cancel",
                 },
                 {
                     text: "Unmatch",
@@ -312,20 +335,29 @@ const ChatScreen = ({ route, navigation }) => {
                     onPress: async () => {
                         try {
                             setLoading(true);
-                            await MatchService.unmatchPet(currentPet._id, otherPet._id);
-                            
+                            await MatchService.unmatchPet(
+                                currentPet._id,
+                                otherPet._id
+                            );
+
                             // Navigate back to chat list
                             setMenuVisible(false);
                             navigation.goBack();
-                            Alert.alert("Success", `You've unmatched with ${otherPet.name}.`);
+                            Alert.alert(
+                                "Success",
+                                `You've unmatched with ${otherPet.name}.`
+                            );
                         } catch (error) {
                             console.error("Error unmatching:", error);
-                            Alert.alert("Error", "Failed to unmatch. Please try again.");
+                            Alert.alert(
+                                "Error",
+                                "Failed to unmatch. Please try again."
+                            );
                         } finally {
                             setLoading(false);
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
@@ -347,7 +379,7 @@ const ChatScreen = ({ route, navigation }) => {
             };
 
             setMessages((prevMessages) => [...prevMessages, tempMessage]);
-            
+
             // Scroll to bottom immediately after adding the message
             setTimeout(() => scrollToBottom(), 50);
 
@@ -421,64 +453,64 @@ const ChatScreen = ({ route, navigation }) => {
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        
+
         // Check if date is today
         if (date.toDateString() === today.toDateString()) {
             return "Today";
         }
-        
+
         // Check if date is yesterday
         if (date.toDateString() === yesterday.toDateString()) {
             return "Yesterday";
         }
-        
+
         // Otherwise return formatted date
         return date.toLocaleDateString(undefined, {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric'
+            weekday: "long",
+            month: "short",
+            day: "numeric",
         });
     };
 
     // Function to check if we need to show a date separator
     const shouldShowDateSeparator = (currentMsg, prevMsg) => {
         if (!prevMsg) return true; // Always show for first message
-        
+
         const currentDate = new Date(currentMsg.createdAt).toDateString();
         const prevDate = new Date(prevMsg.createdAt).toDateString();
-        
+
         return currentDate !== prevDate;
     };
 
     // Prepare data with date separators
     const prepareMessagesWithDateSeparators = () => {
         const result = [];
-        
+
         messages.forEach((message, index) => {
             const prevMessage = index > 0 ? messages[index - 1] : null;
-            
+
             // Add date separator if needed
             if (shouldShowDateSeparator(message, prevMessage)) {
                 result.push({
                     _id: `date-${message.createdAt}`,
-                    type: 'dateSeparator',
-                    date: formatDate(message.createdAt)
+                    type: "dateSeparator",
+                    date: formatDate(message.createdAt),
                 });
             }
-            
+
             // Add the actual message
             result.push({
                 ...message,
-                type: 'message'
+                type: "message",
             });
         });
-        
+
         return result;
     };
 
     const renderItem = ({ item, index }) => {
         // Render date separator
-        if (item.type === 'dateSeparator') {
+        if (item.type === "dateSeparator") {
             return (
                 <View style={styles.dateSeparatorContainer}>
                     <View style={styles.dateSeparatorLine} />
@@ -487,25 +519,26 @@ const ChatScreen = ({ route, navigation }) => {
                 </View>
             );
         }
-        
+
         // Render message
         const isCurrentUser = item.sender && item.sender.isCurrentUser;
-        
+
         // Find the previous message (that's not a date separator)
         let prevMessageIndex = index - 1;
         let prevMessage = null;
-        
+
         while (prevMessageIndex >= 0) {
-            if (preparedMessages[prevMessageIndex].type === 'message') {
+            if (preparedMessages[prevMessageIndex].type === "message") {
                 prevMessage = preparedMessages[prevMessageIndex];
                 break;
             }
             prevMessageIndex--;
         }
-        
-        const isConsecutive = prevMessage && 
-                             prevMessage.sender?.isCurrentUser === isCurrentUser &&
-                             !shouldShowDateSeparator(item, prevMessage);
+
+        const isConsecutive =
+            prevMessage &&
+            prevMessage.sender?.isCurrentUser === isCurrentUser &&
+            !shouldShowDateSeparator(item, prevMessage);
 
         const messageTime = new Date(item.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -547,7 +580,10 @@ const ChatScreen = ({ route, navigation }) => {
                                 size={12}
                                 color={
                                     isCurrentUser
-                                        ? withOpacity(theme.colors.onPrimary, 0.7)
+                                        ? withOpacity(
+                                              theme.colors.onPrimary,
+                                              0.7
+                                          )
                                         : theme.colors.textSecondary
                                 }
                             />
@@ -607,7 +643,7 @@ const ChatScreen = ({ route, navigation }) => {
     return (
         <SafeAreaView style={styles.container} edges={["bottom"]}>
             <StatusBar barStyle="dark-content" />
-            
+
             <View style={styles.chatContainer}>
                 {messages.length === 0 ? (
                     <View style={styles.emptyContainer}>
@@ -661,9 +697,16 @@ const ChatScreen = ({ route, navigation }) => {
                         onPress={sendMessage}
                         disabled={!inputText.trim() || isSending}>
                         {isSending ? (
-                            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.colors.onPrimary}
+                            />
                         ) : (
-                            <Ionicons name="send" size={20} color={theme.colors.onPrimary} />
+                            <Ionicons
+                                name="send"
+                                size={20}
+                                color={theme.colors.onPrimary}
+                            />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -686,7 +729,7 @@ const styles = StyleSheet.create({
     },
     chatContainer: {
         flex: 1,
-        width: '100%',
+        width: "100%",
     },
     loadingContainer: {
         flex: 1,
@@ -770,7 +813,8 @@ const styles = StyleSheet.create({
     },
     messageText: {
         fontSize: theme.typography.fontSize.md,
-        lineHeight: theme.typography.lineHeight.normal * theme.typography.fontSize.md,
+        lineHeight:
+            theme.typography.lineHeight.normal * theme.typography.fontSize.md,
     },
     currentUserText: {
         color: theme.colors.onPrimary,
@@ -835,9 +879,9 @@ const styles = StyleSheet.create({
     },
     // Date separator styles
     dateSeparatorContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
         marginVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.md,
     },
