@@ -12,7 +12,6 @@ import {
     Image,
     StatusBar,
     Alert,
-    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -35,7 +34,6 @@ const ChatScreen = ({ route, navigation }) => {
     const [otherPet, setOtherPet] = useState(null);
     const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
-    const scrollViewRef = useRef(); // New ref for the entire view
     const socketConnected = useRef(false);
 
     useEffect(() => {
@@ -128,10 +126,11 @@ const ChatScreen = ({ route, navigation }) => {
                 // Mark chat as read when opened
                 markChatAsRead();
 
-                // Scroll to bottom after loading messages
+                // Scroll to bottom after loading messages with a slightly longer delay
+                // to ensure layout is complete
                 setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: false });
-                }, 100); // Small delay to allow layout
+                    scrollToBottom(false);
+                }, 300);
 
             } catch (error) {
                 console.error("Error loading chat data:", error);
@@ -193,6 +192,13 @@ const ChatScreen = ({ route, navigation }) => {
         };
     }, [chatId, navigation]);
 
+    // Helper function to scroll to bottom
+    const scrollToBottom = (animated = true) => {
+        if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated });
+        }
+    };
+
     const handleNewMessage = (newMessage) => {
         console.log("Received message in ChatScreen:", newMessage);
 
@@ -219,8 +225,12 @@ const ChatScreen = ({ route, navigation }) => {
 
                 if (messageExists) return prevMessages;
 
-                // Add new message without scrolling
-                return [...prevMessages, formattedMessage];
+                const newMessages = [...prevMessages, formattedMessage];
+                
+                // Scroll to bottom when receiving a new message
+                setTimeout(() => scrollToBottom(), 100);
+                
+                return newMessages;
             });
         }
     };
@@ -280,6 +290,9 @@ const ChatScreen = ({ route, navigation }) => {
             };
 
             setMessages((prevMessages) => [...prevMessages, tempMessage]);
+            
+            // Scroll to bottom immediately after adding the message
+            setTimeout(() => scrollToBottom(), 50);
 
             const response = await ChatService.sendMessage(
                 chatId,
@@ -325,16 +338,8 @@ const ChatScreen = ({ route, navigation }) => {
                 },
             });
 
-            // Scroll to bottom of the chat after sending a message
-            setTimeout(() => {
-                if (scrollViewRef.current) {
-                    // Scroll the entire view to the bottom
-                    scrollViewRef.current.scrollToEnd && scrollViewRef.current.scrollToEnd();
-                    
-                    // Also scroll the FlatList to ensure the latest message is visible
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }
-            }, 200);
+            // Ensure we scroll to bottom after sending is complete
+            setTimeout(() => scrollToBottom(), 200);
         } catch (error) {
             console.error("Error sending message:", error);
 
@@ -353,12 +358,97 @@ const ChatScreen = ({ route, navigation }) => {
         }
     };
 
-    const renderMessage = ({ item, index }) => {
-        const isCurrentUser = item.sender && item.sender.isCurrentUser;
+    // Function to format date for date separators
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        // Check if date is today
+        if (date.toDateString() === today.toDateString()) {
+            return "Today";
+        }
+        
+        // Check if date is yesterday
+        if (date.toDateString() === yesterday.toDateString()) {
+            return "Yesterday";
+        }
+        
+        // Otherwise return formatted date
+        return date.toLocaleDateString(undefined, {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
 
-        const isConsecutive =
-            index > 0 &&
-            messages[index - 1].sender?.isCurrentUser === isCurrentUser;
+    // Function to check if we need to show a date separator
+    const shouldShowDateSeparator = (currentMsg, prevMsg) => {
+        if (!prevMsg) return true; // Always show for first message
+        
+        const currentDate = new Date(currentMsg.createdAt).toDateString();
+        const prevDate = new Date(prevMsg.createdAt).toDateString();
+        
+        return currentDate !== prevDate;
+    };
+
+    // Prepare data with date separators
+    const prepareMessagesWithDateSeparators = () => {
+        const result = [];
+        
+        messages.forEach((message, index) => {
+            const prevMessage = index > 0 ? messages[index - 1] : null;
+            
+            // Add date separator if needed
+            if (shouldShowDateSeparator(message, prevMessage)) {
+                result.push({
+                    _id: `date-${message.createdAt}`,
+                    type: 'dateSeparator',
+                    date: formatDate(message.createdAt)
+                });
+            }
+            
+            // Add the actual message
+            result.push({
+                ...message,
+                type: 'message'
+            });
+        });
+        
+        return result;
+    };
+
+    const renderItem = ({ item, index }) => {
+        // Render date separator
+        if (item.type === 'dateSeparator') {
+            return (
+                <View style={styles.dateSeparatorContainer}>
+                    <View style={styles.dateSeparatorLine} />
+                    <Text style={styles.dateSeparatorText}>{item.date}</Text>
+                    <View style={styles.dateSeparatorLine} />
+                </View>
+            );
+        }
+        
+        // Render message
+        const isCurrentUser = item.sender && item.sender.isCurrentUser;
+        
+        // Find the previous message (that's not a date separator)
+        let prevMessageIndex = index - 1;
+        let prevMessage = null;
+        
+        while (prevMessageIndex >= 0) {
+            if (preparedMessages[prevMessageIndex].type === 'message') {
+                prevMessage = preparedMessages[prevMessageIndex];
+                break;
+            }
+            prevMessageIndex--;
+        }
+        
+        const isConsecutive = prevMessage && 
+                             prevMessage.sender?.isCurrentUser === isCurrentUser &&
+                             !shouldShowDateSeparator(item, prevMessage);
 
         const messageTime = new Date(item.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -454,16 +544,14 @@ const ChatScreen = ({ route, navigation }) => {
         );
     }
 
+    // Prepare messages with date separators
+    const preparedMessages = prepareMessagesWithDateSeparators();
+
     return (
         <SafeAreaView style={styles.container} edges={["bottom"]}>
             <StatusBar barStyle="dark-content" />
             
-            {/* Use ScrollView instead of View to enable scrolling */}
-            <ScrollView 
-                style={styles.chatContainer} 
-                ref={scrollViewRef}
-                contentContainerStyle={styles.scrollViewContent}
-                showsVerticalScrollIndicator={false}>
+            <View style={styles.chatContainer}>
                 {messages.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons
@@ -479,17 +567,19 @@ const ChatScreen = ({ route, navigation }) => {
                 ) : (
                     <FlatList
                         ref={flatListRef}
-                        data={messages}
-                        renderItem={renderMessage}
+                        data={preparedMessages}
+                        renderItem={renderItem}
                         keyExtractor={(item) => item._id}
                         contentContainerStyle={styles.messagesContainer}
                         showsVerticalScrollIndicator={false}
                         initialNumToRender={15}
                         maxToRenderPerBatch={10}
                         windowSize={10}
+                        onContentSizeChange={() => scrollToBottom(false)}
+                        onLayout={() => scrollToBottom(false)}
                     />
                 )}
-            </ScrollView>
+            </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -541,9 +631,6 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
     },
-    scrollViewContent: {
-        flexGrow: 1,
-    },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
@@ -594,7 +681,7 @@ const styles = StyleSheet.create({
     messagesContainer: {
         paddingHorizontal: theme.spacing.lg,
         paddingVertical: theme.spacing.md,
-        paddingBottom: theme.spacing.xxl,
+        paddingBottom: theme.spacing.xxl * 2, // Extra padding at bottom to ensure messages aren't hidden
     },
     messageContainer: {
         marginVertical: theme.spacing.xs,
@@ -688,6 +775,25 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         backgroundColor: theme.colors.buttonDisabled,
+    },
+    // Date separator styles
+    dateSeparatorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.md,
+    },
+    dateSeparatorLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: theme.colors.divider,
+    },
+    dateSeparatorText: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        marginHorizontal: theme.spacing.md,
+        fontWeight: theme.typography.fontWeight.medium,
     },
 });
 
