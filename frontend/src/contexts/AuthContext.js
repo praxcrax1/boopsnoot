@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from 'expo-location';
 import AuthService from "../services/AuthService";
 import PetService from "../services/PetService";
+import SocketService from "../services/SocketService";
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -255,11 +256,21 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(true);
 
         try {
+            // Log out from the auth service
             await AuthService.logout();
+            
+            // Clean up socket connections and listeners
+            SocketService.cleanup();
+            
+            // Reset state
             setUser(null);
             setIsAuthenticated(false);
             setHasPets(false);
             setCheckingPetStatus(false);
+            
+            // Clear any unread chat data
+            await AsyncStorage.removeItem('unreadChats');
+            
             return { success: true };
         } catch (error) {
             console.error("Logout error:", error);

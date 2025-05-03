@@ -92,13 +92,26 @@ async function registerForPushNotificationsAsync() {
     return token;
 }
 
+// Helper function to clear all notifications 
+async function clearAllNotifications() {
+    try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        await Notifications.dismissAllNotificationsAsync();
+        await Notifications.setBadgeCountAsync(0);
+        console.log("[useNotifications] All notifications cleared");
+    } catch (error) {
+        console.error("[useNotifications] Error clearing notifications:", error);
+    }
+}
+
 // --- The Custom Hook ---
 const useNotifications = (isAuthenticated) => {
     const notificationListener = useRef();
     const responseListener = useRef();
+    const prevAuthState = useRef(isAuthenticated);
 
     useEffect(() => {
-        // Only run setup if authenticated
+        // Only proceed with notification setup if authenticated
         if (isAuthenticated) {
             console.log("[useNotifications] User authenticated, running setup.");
             
@@ -112,19 +125,24 @@ const useNotifications = (isAuthenticated) => {
                 console.log('[useNotifications] Notification tapped:', response);
                 const data = response.notification.request.content.data;
                 
-                if (data.type === 'match') {
-                    // Handle match notification tap
-                    console.log('[useNotifications] Match notification tapped:', data);
-                    if (navigationRef.current && navigationRef.current.isReady()) {
-                        // Navigate to the chat screen with the matched pet
-                        navigationRef.current.navigate('Chat', { chatId: data.chatId, isNewMatch: true });
+                // Only process notification taps if the user is authenticated
+                if (isAuthenticated) {
+                    if (data.type === 'match') {
+                        // Handle match notification tap
+                        console.log('[useNotifications] Match notification tapped:', data);
+                        if (navigationRef.current && navigationRef.current.isReady()) {
+                            // Navigate to the chat screen with the matched pet
+                            navigationRef.current.navigate('Chat', { chatId: data.chatId, isNewMatch: true });
+                        }
+                    } else if (data.chatId) {
+                        // Handle regular chat notification tap
+                        console.log('[useNotifications] Chat notification tapped:', data.chatId);
+                        if (navigationRef.current && navigationRef.current.isReady()) {
+                            navigationRef.current.navigate('Chat', { chatId: data.chatId });
+                        }
                     }
-                } else if (data.chatId) {
-                    // Handle regular chat notification tap
-                    console.log('[useNotifications] Chat notification tapped:', data.chatId);
-                    if (navigationRef.current && navigationRef.current.isReady()) {
-                        navigationRef.current.navigate('Chat', { chatId: data.chatId });
-                    }
+                } else {
+                    console.log('[useNotifications] Ignoring notification tap because user is not authenticated');
                 }
             });
 
@@ -133,25 +151,43 @@ const useNotifications = (isAuthenticated) => {
                 console.log('[useNotifications] Notification received while app foregrounded:', notification.request.content);
                 // You could potentially trigger a local state update here if needed
             });
-
-            // Cleanup listeners on hook unmount or when auth state changes to false
-            return () => {
-                console.log("[useNotifications] Cleaning up notification listeners.");
-                if (notificationListener.current) {
-                    Notifications.removeNotificationSubscription(notificationListener.current);
-                }
-                if (responseListener.current) {
-                    Notifications.removeNotificationSubscription(responseListener.current);
-                }
-            };
+        } else if (prevAuthState.current && !isAuthenticated) {
+            // User just logged out (auth state changed from true to false)
+            console.log("[useNotifications] User logged out, cleaning up notifications");
+            
+            // Clear all notifications when user logs out
+            clearAllNotifications();
+            
+            // Clean up listeners if they exist
+            if (notificationListener.current) {
+                Notifications.removeNotificationSubscription(notificationListener.current);
+                notificationListener.current = null;
+            }
+            
+            if (responseListener.current) {
+                Notifications.removeNotificationSubscription(responseListener.current);
+                responseListener.current = null;
+            }
         } else {
             console.log("[useNotifications] User not authenticated, skipping setup.");
-            // Ensure cleanup runs if auth state changes from true to false
-            return () => {};
         }
-    }, [isAuthenticated]); // Re-run effect if authentication state changes
+        
+        // Update previous auth state for next render
+        prevAuthState.current = isAuthenticated;
 
-    // The hook doesn't need to return anything for this use case
+        // Cleanup listeners on hook unmount or when auth state changes
+        return () => {
+            console.log("[useNotifications] Cleaning up notification listeners.");
+            if (notificationListener.current) {
+                Notifications.removeNotificationSubscription(notificationListener.current);
+                notificationListener.current = null;
+            }
+            if (responseListener.current) {
+                Notifications.removeNotificationSubscription(responseListener.current);
+                responseListener.current = null;
+            }
+        };
+    }, [isAuthenticated]); // Re-run effect if authentication state changes
 };
 
 export default useNotifications;

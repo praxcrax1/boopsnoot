@@ -153,6 +153,26 @@ class SocketService {
         }
     }
 
+    // Add a new cleanup method for logout
+    cleanup() {
+        console.log("[SocketService LOG] Performing full cleanup");
+        
+        // Disconnect socket if connected
+        this.disconnect();
+        
+        // Clear all listeners
+        this.globalMessageListeners.clear();
+        this.matchNotificationListeners.clear();
+        this.chatRemovalListeners.clear();
+        
+        // Reset properties
+        this.currentUserId = null;
+        this.isConnecting = false;
+        this.activeChatId = null;
+        
+        console.log("[SocketService LOG] Cleanup completed");
+    }
+
     async joinChat(chatId) {
         try {
             console.log("Attempting to join chat room:", chatId);
@@ -305,6 +325,14 @@ class SocketService {
 
     async createLocalNotification(message) {
         try {
+            // First check if user is authenticated before showing any notifications
+            const isAuth = await this.isUserAuthenticated();
+            
+            if (!isAuth) {
+                console.log("[SocketService LOG] User not authenticated, skipping notification");
+                return;
+            }
+            
             // Check if app is in foreground and user is already in the specific chat
             const appState = AppState.currentState;
             const currentRoute = navigationRef.current?.getCurrentRoute?.();
@@ -340,7 +368,18 @@ class SocketService {
             console.error("[SocketService LOG] Error creating notification:", error);
         }
     }
-
+    
+    // Add a helper method to check if the user is authenticated
+    async isUserAuthenticated() {
+        try {
+            const token = await AsyncStorage.getItem("token");
+            return !!token; // Convert to boolean
+        } catch (error) {
+            console.error("[SocketService LOG] Error checking auth status:", error);
+            return false;
+        }
+    }
+    
     async onReceiveMessage(callback) {
        console.warn("SocketService.onReceiveMessage is potentially deprecated. Use addGlobalMessageListener instead.");
        this.addGlobalMessageListener(callback);
