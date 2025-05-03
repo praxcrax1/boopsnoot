@@ -9,6 +9,7 @@ import {
     AppState,
     StatusBar,
     Platform,
+    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,7 +23,7 @@ import SocketService from "../services/SocketService";
 import PetService from "../services/PetService";
 
 // Components
-import PetSelectorModal from "../components/finder/PetSelectorModal";
+import FilterChip from "../components/chat/FilterChip";
 
 // Styles and Context
 import theme, { withOpacity } from "../styles/theme";
@@ -535,47 +536,32 @@ const ChatListScreen = ({ navigation }) => {
     };
 
     /**
-     * Renders the pet selector component
+     * Renders the pet selector component using FilterChips
      */
     const renderPetSelector = () => {
         // Only render if user has multiple pets
         if (userPets.length <= 1) return null;
 
-        // Get the selected pet object
-        const selectedPet = selectedPetId 
-            ? userPets.find(pet => pet._id === selectedPetId)
-            : null;
-
         return (
             <View style={styles.petSelectorContainer}>
                 <Text style={styles.petSelectorLabel}>
-                    Select a pet to filter messages
+                    Filter messages by pet
                 </Text>
-                <TouchableOpacity
-                    style={styles.petSelectorButton}
-                    onPress={() => setPetSelectorVisible(true)}
-                >
-                    <View style={styles.petSelectorContent}>
-                        {selectedPet ? (
-                            <>
-                                <Image
-                                    source={
-                                        selectedPet.photos && selectedPet.photos.length > 0
-                                            ? { uri: selectedPet.photos[0] }
-                                            : require("../assets/default-pet.png")
-                                    }
-                                    style={styles.selectedPetImage}
-                                />
-                                <Text style={styles.selectedPetName}>
-                                    {selectedPet.name}
-                                </Text>
-                            </>
-                        ) : (
-                            <Text style={styles.selectedPetName}>All Pets</Text>
-                        )}
-                        <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
-                    </View>
-                </TouchableOpacity>
+                <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterChipsContainer}
+                >                    
+                    {/* One chip for each pet */}
+                    {userPets.map((pet) => (
+                        <FilterChip
+                            key={pet._id}
+                            pet={pet}
+                            isSelected={selectedPetId === pet._id}
+                            onSelect={(petId) => setSelectedPetId(petId)}
+                        />
+                    ))}
+                </ScrollView>
             </View>
         );
     };
@@ -609,18 +595,6 @@ const ChatListScreen = ({ navigation }) => {
                     showsVerticalScrollIndicator={false}
                 />
             ) : renderEmptyState()}
-
-            {/* Pet Selector Modal */}
-            <PetSelectorModal
-                visible={petSelectorVisible}
-                pets={userPets}
-                selectedPetId={selectedPetId}
-                onClose={() => setPetSelectorVisible(false)}
-                onSelectPet={(petId) => {
-                    setSelectedPetId(petId); // Toggle off if the same pet is selected
-                    setPetSelectorVisible(false);
-                }}
-            />
         </SafeAreaView>
     );
 };
@@ -688,7 +662,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         marginRight: theme.spacing.sm,
         borderWidth: 1,
-        borderColor: theme.colors.primary,
+        borderColor: withOpacity(theme.colors.primary, 0.2),
     },
     selectedPetName: {
         fontSize: theme.typography.fontSize.md,
@@ -782,6 +756,12 @@ const styles = StyleSheet.create({
         color: theme.colors.onPrimary,
         fontSize: theme.typography.fontSize.md,
         fontWeight: theme.typography.fontWeight.semiBold,
+    },
+    filterChipsContainer: {
+        paddingVertical: theme.spacing.sm,
+        paddingBottom: theme.spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
 

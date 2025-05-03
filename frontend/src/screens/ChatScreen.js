@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
     View,
     Text,
@@ -12,7 +12,6 @@ import {
     Image,
     StatusBar,
     Alert,
-    ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +21,7 @@ import MatchService from "../services/MatchService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import theme, { withOpacity } from "../styles/theme";
 import MenuBottomSheet from "../components/MenuBottomSheet";
+import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 
 const ChatScreen = ({ route, navigation }) => {
     const { chatId } = route.params;
@@ -35,8 +35,10 @@ const ChatScreen = ({ route, navigation }) => {
     const [otherPet, setOtherPet] = useState(null);
     const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
-    const scrollViewRef = useRef(); // New ref for the entire view
     const socketConnected = useRef(false);
+
+    // Add reference to the ChatNotificationContext
+    const { checkUnreadStatus } = useContext(ChatNotificationContext);
 
     useEffect(() => {
         const getUserId = async () => {
@@ -64,7 +66,11 @@ const ChatScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
+                    <Ionicons
+                        name="arrow-back"
+                        size={24}
+                        color={theme.colors.textPrimary}
+                    />
                 </TouchableOpacity>
             ),
         });
@@ -76,37 +82,45 @@ const ChatScreen = ({ route, navigation }) => {
 
                 if (chatResponse.chat && chatResponse.chat.participants) {
                     const foundCurrentPet = chatResponse.chat.participants.find(
-                        p => p.isCurrentUser
+                        (p) => p.isCurrentUser
                     );
                     const foundOtherPet = chatResponse.chat.participants.find(
-                        p => !p.isCurrentUser
+                        (p) => !p.isCurrentUser
                     );
-                    
+
                     if (foundCurrentPet && foundCurrentPet.pet) {
                         setCurrentPet(foundCurrentPet.pet);
                     }
-                    
+
                     if (foundOtherPet && foundOtherPet.pet) {
                         setOtherPet(foundOtherPet.pet);
                         navigation.setOptions({
                             headerTitle: () => (
-                                <View style={styles.headerTitleContainer}>
-                                    <Image
-                                        source={
-                                            foundOtherPet.pet.photos &&
-                                            foundOtherPet.pet.photos.length > 0
-                                                ? {
-                                                      uri: foundOtherPet.pet
-                                                          .photos[0],
-                                                  }
-                                                : require("../assets/default-pet.png")
-                                        }
-                                        style={styles.headerAvatar}
-                                    />
-                                    <Text style={styles.headerTitle}>
-                                        {foundOtherPet.pet.name}
-                                    </Text>
-                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        navigation.navigate("PetProfile", {
+                                            petId: foundOtherPet.pet._id,
+                                        });
+                                    }}>
+                                    <View style={styles.headerTitleContainer}>
+                                        <Image
+                                            source={
+                                                foundOtherPet.pet.photos &&
+                                                foundOtherPet.pet.photos
+                                                    .length > 0
+                                                    ? {
+                                                          uri: foundOtherPet.pet
+                                                              .photos[0],
+                                                      }
+                                                    : require("../assets/default-pet.png")
+                                            }
+                                            style={styles.headerAvatar}
+                                        />
+                                        <Text style={styles.headerTitle}>
+                                            {foundOtherPet.pet.name}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
                             ),
                             headerRight: () => (
                                 <TouchableOpacity
@@ -124,15 +138,15 @@ const ChatScreen = ({ route, navigation }) => {
                 }
 
                 setMessages(chatResponse.messages || []);
-                
+
                 // Mark chat as read when opened
                 markChatAsRead();
 
-                // Scroll to bottom after loading messages
+                // Scroll to bottom after loading messages with a slightly longer delay
+                // to ensure layout is complete
                 setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: false });
-                }, 100); // Small delay to allow layout
-
+                    scrollToBottom(false);
+                }, 300);
             } catch (error) {
                 console.error("Error loading chat data:", error);
                 Alert.alert("Error", "Failed to load chat. Please try again.");
@@ -140,16 +154,31 @@ const ChatScreen = ({ route, navigation }) => {
                 setLoading(false);
             }
         };
-        
+
         // Mark the chat as read in storage
         const markChatAsRead = async () => {
             try {
-                const unreadData = await AsyncStorage.getItem('unreadChats');
+                // Mark as read in local storage
+                const unreadData = await AsyncStorage.getItem("unreadChats");
                 if (unreadData) {
                     const unreadChats = JSON.parse(unreadData);
                     if (unreadChats[chatId]) {
                         delete unreadChats[chatId];
-                        await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                        await AsyncStorage.setItem(
+                            "unreadChats",
+                            JSON.stringify(unreadChats)
+                        );
+
+                        // Update global notification status if needed
+                        if (Object.keys(unreadChats).length === 0) {
+                            await AsyncStorage.setItem(
+                                "hasUnreadChats",
+                                JSON.stringify(false)
+                            );
+                        }
+
+                        // Update the notification badge status
+                        checkUnreadStatus();
                     }
                 }
             } catch (error) {
@@ -191,7 +220,14 @@ const ChatScreen = ({ route, navigation }) => {
             SocketService.offReceiveMessage();
             SocketService.setActiveChatId(null);
         };
-    }, [chatId, navigation]);
+    }, [chatId, navigation, checkUnreadStatus]);
+
+    // Helper function to scroll to bottom
+    const scrollToBottom = (animated = true) => {
+        if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated });
+        }
+    };
 
     const handleNewMessage = (newMessage) => {
         console.log("Received message in ChatScreen:", newMessage);
@@ -219,8 +255,12 @@ const ChatScreen = ({ route, navigation }) => {
 
                 if (messageExists) return prevMessages;
 
-                // Add new message without scrolling
-                return [...prevMessages, formattedMessage];
+                const newMessages = [...prevMessages, formattedMessage];
+
+                // Scroll to bottom when receiving a new message
+                setTimeout(() => scrollToBottom(), 100);
+
+                return newMessages;
             });
         }
     };
@@ -237,7 +277,7 @@ const ChatScreen = ({ route, navigation }) => {
             [
                 {
                     text: "Cancel",
-                    style: "cancel"
+                    style: "cancel",
                 },
                 {
                     text: "Unmatch",
@@ -245,20 +285,29 @@ const ChatScreen = ({ route, navigation }) => {
                     onPress: async () => {
                         try {
                             setLoading(true);
-                            await MatchService.unmatchPet(currentPet._id, otherPet._id);
-                            
+                            await MatchService.unmatchPet(
+                                currentPet._id,
+                                otherPet._id
+                            );
+
                             // Navigate back to chat list
                             setMenuVisible(false);
                             navigation.goBack();
-                            Alert.alert("Success", `You've unmatched with ${otherPet.name}.`);
+                            Alert.alert(
+                                "Success",
+                                `You've unmatched with ${otherPet.name}.`
+                            );
                         } catch (error) {
                             console.error("Error unmatching:", error);
-                            Alert.alert("Error", "Failed to unmatch. Please try again.");
+                            Alert.alert(
+                                "Error",
+                                "Failed to unmatch. Please try again."
+                            );
                         } finally {
                             setLoading(false);
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
@@ -280,6 +329,9 @@ const ChatScreen = ({ route, navigation }) => {
             };
 
             setMessages((prevMessages) => [...prevMessages, tempMessage]);
+
+            // Scroll to bottom immediately after adding the message
+            setTimeout(() => scrollToBottom(), 50);
 
             const response = await ChatService.sendMessage(
                 chatId,
@@ -325,16 +377,8 @@ const ChatScreen = ({ route, navigation }) => {
                 },
             });
 
-            // Scroll to bottom of the chat after sending a message
-            setTimeout(() => {
-                if (scrollViewRef.current) {
-                    // Scroll the entire view to the bottom
-                    scrollViewRef.current.scrollToEnd && scrollViewRef.current.scrollToEnd();
-                    
-                    // Also scroll the FlatList to ensure the latest message is visible
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }
-            }, 200);
+            // Ensure we scroll to bottom after sending is complete
+            setTimeout(() => scrollToBottom(), 200);
         } catch (error) {
             console.error("Error sending message:", error);
 
@@ -353,12 +397,98 @@ const ChatScreen = ({ route, navigation }) => {
         }
     };
 
-    const renderMessage = ({ item, index }) => {
+    // Function to format date for date separators
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        // Check if date is today
+        if (date.toDateString() === today.toDateString()) {
+            return "Today";
+        }
+
+        // Check if date is yesterday
+        if (date.toDateString() === yesterday.toDateString()) {
+            return "Yesterday";
+        }
+
+        // Otherwise return formatted date
+        return date.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+        });
+    };
+
+    // Function to check if we need to show a date separator
+    const shouldShowDateSeparator = (currentMsg, prevMsg) => {
+        if (!prevMsg) return true; // Always show for first message
+
+        const currentDate = new Date(currentMsg.createdAt).toDateString();
+        const prevDate = new Date(prevMsg.createdAt).toDateString();
+
+        return currentDate !== prevDate;
+    };
+
+    // Prepare data with date separators
+    const prepareMessagesWithDateSeparators = () => {
+        const result = [];
+
+        messages.forEach((message, index) => {
+            const prevMessage = index > 0 ? messages[index - 1] : null;
+
+            // Add date separator if needed
+            if (shouldShowDateSeparator(message, prevMessage)) {
+                result.push({
+                    _id: `date-${message.createdAt}`,
+                    type: "dateSeparator",
+                    date: formatDate(message.createdAt),
+                });
+            }
+
+            // Add the actual message
+            result.push({
+                ...message,
+                type: "message",
+            });
+        });
+
+        return result;
+    };
+
+    const renderItem = ({ item, index }) => {
+        // Render date separator
+        if (item.type === "dateSeparator") {
+            return (
+                <View style={styles.dateSeparatorContainer}>
+                    <View style={styles.dateSeparatorLine} />
+                    <Text style={styles.dateSeparatorText}>{item.date}</Text>
+                    <View style={styles.dateSeparatorLine} />
+                </View>
+            );
+        }
+
+        // Render message
         const isCurrentUser = item.sender && item.sender.isCurrentUser;
 
+        // Find the previous message (that's not a date separator)
+        let prevMessageIndex = index - 1;
+        let prevMessage = null;
+
+        while (prevMessageIndex >= 0) {
+            if (preparedMessages[prevMessageIndex].type === "message") {
+                prevMessage = preparedMessages[prevMessageIndex];
+                break;
+            }
+            prevMessageIndex--;
+        }
+
         const isConsecutive =
-            index > 0 &&
-            messages[index - 1].sender?.isCurrentUser === isCurrentUser;
+            prevMessage &&
+            prevMessage.sender?.isCurrentUser === isCurrentUser &&
+            !shouldShowDateSeparator(item, prevMessage);
 
         const messageTime = new Date(item.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -400,7 +530,10 @@ const ChatScreen = ({ route, navigation }) => {
                                 size={12}
                                 color={
                                     isCurrentUser
-                                        ? withOpacity(theme.colors.onPrimary, 0.7)
+                                        ? withOpacity(
+                                              theme.colors.onPrimary,
+                                              0.7
+                                          )
                                         : theme.colors.textSecondary
                                 }
                             />
@@ -454,16 +587,14 @@ const ChatScreen = ({ route, navigation }) => {
         );
     }
 
+    // Prepare messages with date separators
+    const preparedMessages = prepareMessagesWithDateSeparators();
+
     return (
         <SafeAreaView style={styles.container} edges={["bottom"]}>
             <StatusBar barStyle="dark-content" />
-            
-            {/* Use ScrollView instead of View to enable scrolling */}
-            <ScrollView 
-                style={styles.chatContainer} 
-                ref={scrollViewRef}
-                contentContainerStyle={styles.scrollViewContent}
-                showsVerticalScrollIndicator={false}>
+
+            <View style={styles.chatContainer}>
                 {messages.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons
@@ -479,17 +610,19 @@ const ChatScreen = ({ route, navigation }) => {
                 ) : (
                     <FlatList
                         ref={flatListRef}
-                        data={messages}
-                        renderItem={renderMessage}
+                        data={preparedMessages}
+                        renderItem={renderItem}
                         keyExtractor={(item) => item._id}
                         contentContainerStyle={styles.messagesContainer}
                         showsVerticalScrollIndicator={false}
                         initialNumToRender={15}
                         maxToRenderPerBatch={10}
                         windowSize={10}
+                        onContentSizeChange={() => scrollToBottom(false)}
+                        onLayout={() => scrollToBottom(false)}
                     />
                 )}
-            </ScrollView>
+            </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -514,9 +647,16 @@ const ChatScreen = ({ route, navigation }) => {
                         onPress={sendMessage}
                         disabled={!inputText.trim() || isSending}>
                         {isSending ? (
-                            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.colors.onPrimary}
+                            />
                         ) : (
-                            <Ionicons name="send" size={20} color={theme.colors.onPrimary} />
+                            <Ionicons
+                                name="send"
+                                size={20}
+                                color={theme.colors.onPrimary}
+                            />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -539,10 +679,7 @@ const styles = StyleSheet.create({
     },
     chatContainer: {
         flex: 1,
-        width: '100%',
-    },
-    scrollViewContent: {
-        flexGrow: 1,
+        width: "100%",
     },
     loadingContainer: {
         flex: 1,
@@ -594,7 +731,7 @@ const styles = StyleSheet.create({
     messagesContainer: {
         paddingHorizontal: theme.spacing.lg,
         paddingVertical: theme.spacing.md,
-        paddingBottom: theme.spacing.xxl,
+        paddingBottom: theme.spacing.xxl * 2, // Extra padding at bottom to ensure messages aren't hidden
     },
     messageContainer: {
         marginVertical: theme.spacing.xs,
@@ -626,7 +763,8 @@ const styles = StyleSheet.create({
     },
     messageText: {
         fontSize: theme.typography.fontSize.md,
-        lineHeight: theme.typography.lineHeight.normal * theme.typography.fontSize.md,
+        lineHeight:
+            theme.typography.lineHeight.normal * theme.typography.fontSize.md,
     },
     currentUserText: {
         color: theme.colors.onPrimary,
@@ -688,6 +826,25 @@ const styles = StyleSheet.create({
     },
     disabledButton: {
         backgroundColor: theme.colors.buttonDisabled,
+    },
+    // Date separator styles
+    dateSeparatorContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        marginVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.md,
+    },
+    dateSeparatorLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: theme.colors.divider,
+    },
+    dateSeparatorText: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        marginHorizontal: theme.spacing.md,
+        fontWeight: theme.typography.fontWeight.medium,
     },
 });
 
