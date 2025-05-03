@@ -73,13 +73,17 @@ class ChatService {
             
             // Update unread status based on API response
             let updatedUnread = { ...existingUnread };
+            let hasAnyUnread = false;
             
             chats.forEach(chat => {
                 if (chat.lastMessage && chat.lastMessage.unread) {
                     updatedUnread[chat._id] = true;
+                    hasAnyUnread = true;
                 } else {
                     // Keep chat as unread if it was already marked as such, unless API explicitly says it's read
-                    if (!existingUnread[chat._id]) {
+                    if (existingUnread[chat._id]) {
+                        hasAnyUnread = true;
+                    } else {
                         delete updatedUnread[chat._id];
                     }
                 }
@@ -87,6 +91,9 @@ class ChatService {
             
             // Save updated unread state
             await AsyncStorage.setItem('unreadChats', JSON.stringify(updatedUnread));
+            
+            // Also set a separate flag for unread status (used by tab indicator)
+            await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasAnyUnread));
             
             return updatedUnread;
         } catch (error) {

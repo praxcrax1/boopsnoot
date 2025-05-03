@@ -215,6 +215,16 @@ export const AuthProvider = ({ children }) => {
                 // Fetch chats to update unread status
                 const chatService = require("../services/ChatService").default;
                 await chatService.getChats();
+                
+                // Directly check if there are unread messages after login
+                const unreadData = await AsyncStorage.getItem('unreadChats');
+                if (unreadData) {
+                    const unreadChats = JSON.parse(unreadData);
+                    const hasUnreadMessages = Object.keys(unreadChats).length > 0;
+                    
+                    // Directly set the flag in AsyncStorage to trigger notification badge
+                    await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnreadMessages));
+                }
             } catch (error) {
                 console.error("Error checking for unread messages after login:", error);
             }
@@ -255,6 +265,16 @@ export const AuthProvider = ({ children }) => {
                 // Fetch chats to update unread status
                 const chatService = require("../services/ChatService").default;
                 await chatService.getChats();
+                
+                // Directly check if there are unread messages after login
+                const unreadData = await AsyncStorage.getItem('unreadChats');
+                if (unreadData) {
+                    const unreadChats = JSON.parse(unreadData);
+                    const hasUnreadMessages = Object.keys(unreadChats).length > 0;
+                    
+                    // Directly set the flag in AsyncStorage to trigger notification badge
+                    await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnreadMessages));
+                }
             } catch (error) {
                 console.error("Error checking for unread messages after Google login:", error);
             }
