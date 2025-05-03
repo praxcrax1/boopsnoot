@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from 'react-native';
+import SocketService from "../services/SocketService";
 
 // Create the chat notification context
 export const ChatNotificationContext = createContext();
@@ -24,7 +25,15 @@ export const ChatNotificationProvider = ({ children }) => {
             if (unreadData) {
                 const unreadChats = JSON.parse(unreadData);
                 // If any unread chats exist, set the flag to true
-                setHasUnreadChats(Object.keys(unreadChats).length > 0);
+                const hasUnread = Object.keys(unreadChats).length > 0;
+                setHasUnreadChats(hasUnread);
+                
+                // Also update the AsyncStorage flag to keep it in sync
+                await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnread));
+            } else {
+                // No unread chats data found, set both states to false
+                setHasUnreadChats(false);
+                await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
             }
         } catch (error) {
             console.error("Error checking unread chat state:", error);
@@ -42,6 +51,40 @@ export const ChatNotificationProvider = ({ children }) => {
         }
     };
     
+    // Setup socket listener for chat status updates
+    useEffect(() => {
+        // Set up a message listener that updates notification status when messages arrive
+        const messageListener = async (message) => {
+            if (!message || !message.chatId) return;
+            
+            // Check if this chat is active (user is viewing it)
+            const activeChatId = SocketService.getActiveChatId();
+            
+            // Skip updating unread status if the user is already viewing this chat
+            if (activeChatId === message.chatId) return;
+            
+            // Otherwise, mark as unread since the message is for a non-active chat
+            updateUnreadStatus(true);
+        };
+        
+        // Listen for message read events to update notification badge status
+        const setupSocketListeners = async () => {
+            try {
+                await SocketService.connect();
+                SocketService.addGlobalMessageListener(messageListener);
+            } catch (error) {
+                console.error("Error setting up socket listeners in ChatNotificationContext:", error);
+            }
+        };
+        
+        setupSocketListeners();
+        
+        return () => {
+            // Clean up socket listener on unmount
+            SocketService.removeGlobalMessageListener(messageListener);
+        };
+    }, []);
+    
     // Load unread state when component mounts
     useEffect(() => {
         checkUnreadStatus();
@@ -54,13 +97,8 @@ export const ChatNotificationProvider = ({ children }) => {
             }
         });
         
-        // Set up an interval to periodically check for unread status
-        // This ensures the badge updates even if other mechanisms fail
-        const intervalId = setInterval(checkUnreadStatus, 2000);
-        
         return () => {
             subscription.remove();
-            clearInterval(intervalId);
         };
     }, []);
 

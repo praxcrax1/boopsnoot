@@ -278,6 +278,59 @@ class SocketService {
         });
     }
 
+    // Method to mark a message as read via socket
+    async markMessageAsRead(messageId, chatId) {
+        try {
+            if (!this.socket || !this.socket.connected) {
+                await this.connect();
+            }
+            
+            if (!this.currentUserId) {
+                await this.getCurrentUser();
+            }
+            
+            console.log(`[SocketService LOG] Marking message ${messageId} in chat ${chatId} as read`);
+            this.socket.emit("mark_message_read", {
+                messageId,
+                chatId,
+                userId: this.currentUserId
+            });
+            
+            // Also update local unread state
+            this.updateLocalUnreadState(chatId);
+            
+            return true;
+        } catch (error) {
+            console.error("[SocketService LOG] Error marking message as read:", error);
+            return false;
+        }
+    }
+    
+    // Helper method to update local unread state for a chat
+    async updateLocalUnreadState(chatId) {
+        try {
+            // Update unread status in AsyncStorage
+            const unreadData = await AsyncStorage.getItem('unreadChats');
+            if (unreadData) {
+                const unreadChats = JSON.parse(unreadData);
+                if (unreadChats[chatId]) {
+                    // Remove this chat from unread list
+                    delete unreadChats[chatId];
+                    await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                    
+                    // Update hasUnreadChats flag if needed
+                    if (Object.keys(unreadChats).length === 0) {
+                        await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
+                    }
+                    
+                    console.log(`[SocketService LOG] Removed chat ${chatId} from unread state`);
+                }
+            }
+        } catch (error) {
+            console.error("[SocketService LOG] Error updating local unread state:", error);
+        }
+    }
+
     setupGlobalMessageListener() {
         if (!this.socket) {
             console.error("Cannot set up global message listener: socket not initialized");
@@ -313,11 +366,43 @@ class SocketService {
                 },
             };
 
+            // Check if this message belongs to the active chat
+            const chatId = data.chatId;
+            const isActiveChat = this.activeChatId && this.activeChatId === chatId;
+            
+            // If the message is for the active chat, mark it as read immediately
+            if (isActiveChat && !isCurrentUser) {
+                console.log("[SocketService LOG] Message belongs to active chat, marking as read");
+                this.markMessageAsRead(data._id, chatId);
+            } else if (!isCurrentUser) {
+                // If not active chat, update unread state in AsyncStorage
+                try {
+                    const unreadData = await AsyncStorage.getItem('unreadChats');
+                    const unreadChats = unreadData ? JSON.parse(unreadData) : {};
+                    
+                    // Add or update unread count for this chat
+                    if (!unreadChats[chatId]) {
+                        unreadChats[chatId] = { count: 0 };
+                    }
+                    unreadChats[chatId].count += 1;
+                    unreadChats[chatId].lastMessage = standardizedMessage;
+                    
+                    await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                    await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(true));
+                    
+                    console.log(`[SocketService LOG] Updated unread count for chat ${chatId}: ${unreadChats[chatId].count}`);
+                } catch (error) {
+                    console.error("[SocketService LOG] Error updating unread state:", error);
+                }
+            }
+
             console.log("[SocketService LOG] Preparing to notify global listeners with message:", JSON.stringify(standardizedMessage, null, 2));
             this.notifyGlobalListeners(standardizedMessage);
             
-            // Create local notification for the received message
-            this.createLocalNotification(standardizedMessage);
+            // Create local notification for the received message only if not active chat
+            if (!isActiveChat) {
+                this.createLocalNotification(standardizedMessage);
+            }
         });
 
         console.log("[SocketService LOG] Global 'receive_message' listener setup complete.");

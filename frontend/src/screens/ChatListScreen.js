@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         marginRight: theme.spacing.sm,
         borderWidth: 1,
-        borderColor: theme.colors.primary,
+        borderColor: withOpacity(theme.colors.primary, 0.2),
     },
     selectedPetName: {
         fontSize: theme.typography.fontSize.md,

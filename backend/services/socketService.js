@@ -1,4 +1,5 @@
 const Chat = require("../models/Chat");
+const Message = require("../models/Message");
 
 // Track users and their socket IDs
 const connectedUsers = new Map();
@@ -67,6 +68,53 @@ const setupSocketIO = (io) => {
             const roomId = typeof data === "object" ? data.chatId : data;
             socket.join(roomId);
             console.log(`User ${socket.id} joined chat: ${roomId} (alt format)`);
+        });
+
+        // Handle marking messages as read
+        socket.on("mark_message_read", async (data) => {
+            try {
+                const { messageId, chatId, userId } = data;
+                
+                if (!chatId || !userId) {
+                    console.error("Missing chatId or userId in mark_message_read:", data);
+                    return;
+                }
+                
+                console.log(`User ${userId} marking messages as read in chat ${chatId}`);
+                
+                // If a specific message ID is provided
+                if (messageId) {
+                    await Message.findByIdAndUpdate(messageId, {
+                        $addToSet: {
+                            readBy: {
+                                user: userId,
+                                readAt: new Date()
+                            }
+                        }
+                    });
+                    console.log(`Marked message ${messageId} as read by user ${userId}`);
+                } else {
+                    // Mark all unread messages in this chat as read
+                    await Message.updateMany(
+                        {
+                            chat: chatId,
+                            sender: { $ne: userId },
+                            "readBy.user": { $ne: userId }
+                        },
+                        {
+                            $addToSet: {
+                                readBy: {
+                                    user: userId,
+                                    readAt: new Date()
+                                }
+                            }
+                        }
+                    );
+                    console.log(`Marked all unread messages in chat ${chatId} as read by user ${userId}`);
+                }
+            } catch (error) {
+                console.error("Error marking message as read:", error);
+            }
         });
 
         // Send message

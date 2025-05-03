@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
     View,
     Text,
@@ -21,6 +21,7 @@ import MatchService from "../services/MatchService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import theme, { withOpacity } from "../styles/theme";
 import MenuBottomSheet from "../components/MenuBottomSheet";
+import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 
 const ChatScreen = ({ route, navigation }) => {
     const { chatId } = route.params;
@@ -35,6 +36,9 @@ const ChatScreen = ({ route, navigation }) => {
     const [currentPet, setCurrentPet] = useState(null);
     const flatListRef = useRef();
     const socketConnected = useRef(false);
+    
+    // Add reference to the ChatNotificationContext
+    const { checkUnreadStatus } = useContext(ChatNotificationContext);
 
     useEffect(() => {
         const getUserId = async () => {
@@ -143,13 +147,28 @@ const ChatScreen = ({ route, navigation }) => {
         // Mark the chat as read in storage
         const markChatAsRead = async () => {
             try {
+                // Mark as read in local storage
                 const unreadData = await AsyncStorage.getItem('unreadChats');
                 if (unreadData) {
                     const unreadChats = JSON.parse(unreadData);
                     if (unreadChats[chatId]) {
                         delete unreadChats[chatId];
                         await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                        
+                        // Update global notification status if needed
+                        if (Object.keys(unreadChats).length === 0) {
+                            await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
+                        }
+                        
+                        // Update the notification badge status
+                        checkUnreadStatus();
                     }
+                }
+                
+                // Also mark all messages as read on the server via socket
+                // This ensures proper read status syncing across devices
+                if (currentUserId) {
+                    SocketService.markMessageAsRead(null, chatId);
                 }
             } catch (error) {
                 console.error("Error marking chat as read:", error);
@@ -190,7 +209,7 @@ const ChatScreen = ({ route, navigation }) => {
             SocketService.offReceiveMessage();
             SocketService.setActiveChatId(null);
         };
-    }, [chatId, navigation]);
+    }, [chatId, navigation, checkUnreadStatus]);
 
     // Helper function to scroll to bottom
     const scrollToBottom = (animated = true) => {
@@ -203,6 +222,11 @@ const ChatScreen = ({ route, navigation }) => {
         console.log("Received message in ChatScreen:", newMessage);
 
         if (newMessage && newMessage.chatId === chatId) {
+            // Mark the message as read since we're actively viewing this chat
+            if (newMessage._id && !newMessage.sender?.isCurrentUser) {
+                SocketService.markMessageAsRead(newMessage._id, chatId);
+            }
+            
             const formattedMessage = {
                 _id: newMessage._id || `temp-${Date.now()}`,
                 content: newMessage.content,
@@ -232,6 +256,39 @@ const ChatScreen = ({ route, navigation }) => {
                 
                 return newMessages;
             });
+            
+            // Ensure the chat is marked as read since we're actively viewing it
+            markChatAsRead();
+        }
+    };
+    
+    // Mark chat as read function that can be called from multiple places
+    const markChatAsRead = async () => {
+        try {
+            // Mark as read in local storage
+            const unreadData = await AsyncStorage.getItem('unreadChats');
+            if (unreadData) {
+                const unreadChats = JSON.parse(unreadData);
+                if (unreadChats[chatId]) {
+                    delete unreadChats[chatId];
+                    await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadChats));
+                    
+                    // Update global notification status if needed
+                    if (Object.keys(unreadChats).length === 0) {
+                        await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(false));
+                    }
+                    
+                    // Update the notification badge status
+                    checkUnreadStatus();
+                }
+            }
+            
+            // Mark as read on the server via socket
+            if (currentUserId) {
+                SocketService.markMessageAsRead(null, chatId);
+            }
+        } catch (error) {
+            console.error("Error marking chat as read:", error);
         }
     };
 
