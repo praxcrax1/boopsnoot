@@ -156,16 +156,25 @@ const ChatListScreen = ({ navigation }) => {
         try {
             const response = await ChatService.getChats();
             
-            // Load saved unread state
+            // Load saved unread state which has now been updated by ChatService
             const unreadState = await loadUnreadState();
             setUnreadChats(unreadState || {});
             
+            // Process API response to identify unread chats
+            const updatedChats = (response.chats || []).map(chat => {
+                // If the backend indicates a message is unread, make sure it's marked in our state
+                if (chat.lastMessage && chat.lastMessage.unread) {
+                    unreadState[chat._id] = true;
+                }
+                return chat;
+            });
+            
             // Sort chats before setting state
-            const sortedChats = sortChats(response.chats || [], unreadState || {});
+            const sortedChats = sortChats(updatedChats, unreadState || {});
             setChats(sortedChats);
             
-            // Update the global unread status
-            updateUnreadStatus(Object.keys(unreadState || {}).length > 0);
+            // Make sure the unread state is saved and global notification status is updated
+            saveUnreadState(unreadState);
         } catch (error) {
             console.error("Error fetching chats:", error);
         } finally {

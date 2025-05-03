@@ -210,6 +210,15 @@ export const AuthProvider = ({ children }) => {
                 requestAndUpdateLocation();
             }
             
+            // Check for unread messages that arrived while offline
+            try {
+                // Fetch chats to update unread status
+                const chatService = require("../services/ChatService").default;
+                await chatService.getChats();
+            } catch (error) {
+                console.error("Error checking for unread messages after login:", error);
+            }
+            
             return { success: true, user: response.user };
         } catch (error) {
             console.error("Login error:", error);
@@ -239,6 +248,15 @@ export const AuthProvider = ({ children }) => {
                  (response.user.location.coordinates[0] === 0 && 
                   response.user.location.coordinates[1] === 0))) {
                 requestAndUpdateLocation();
+            }
+            
+            // Check for unread messages that arrived while offline
+            try {
+                // Fetch chats to update unread status
+                const chatService = require("../services/ChatService").default;
+                await chatService.getChats();
+            } catch (error) {
+                console.error("Error checking for unread messages after Google login:", error);
             }
             
             return { success: true, user: response.user };

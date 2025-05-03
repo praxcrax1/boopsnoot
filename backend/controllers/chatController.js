@@ -16,7 +16,7 @@ exports.getUserChats = async (req, res) => {
             .populate("match")
             .populate({
                 path: "lastMessage",
-                select: "content createdAt sender",
+                select: "content createdAt sender readBy",
             })
             .sort({ "lastMessage.createdAt": -1 });
 
@@ -101,6 +101,23 @@ exports.getUserChats = async (req, res) => {
                             pet1.owner.toString() === req.user.id ? pet2 : pet1;
                     }
 
+                    // Check for unread messages in this chat
+                    let hasUnreadMessages = false;
+                    if (chat.lastMessage) {
+                        // Check if current user has read the last message
+                        hasUnreadMessages = chat.lastMessage.sender.toString() !== req.user.id && 
+                            (!chat.lastMessage.readBy || 
+                             !chat.lastMessage.readBy.some(read => read.user.toString() === req.user.id));
+                    }
+
+                    // Count the number of unread messages
+                    const unreadCount = hasUnreadMessages ? 
+                        await Message.countDocuments({
+                            chat: chat._id,
+                            sender: { $ne: req.user.id },
+                            "readBy.user": { $ne: req.user.id }
+                        }) : 0;
+
                     return {
                         _id: chat._id,
                         matchId: chat.match._id,
@@ -126,7 +143,8 @@ exports.getUserChats = async (req, res) => {
                             ? {
                                   content: chat.lastMessage.content,
                                   createdAt: chat.lastMessage.createdAt,
-                                  unread: false, // Would need more logic to determine if unread
+                                  unread: hasUnreadMessages,
+                                  unreadCount: unreadCount,
                               }
                             : null,
                         createdAt: chat.createdAt,
@@ -229,9 +247,19 @@ exports.getChatById = async (req, res) => {
             .limit(Number(limit))
             .populate("sender", "name profilePicture");
 
-        // Format messages with sender info
+        // Count unread messages before marking as read
+        const unreadCount = await Message.countDocuments({
+            chat: id,
+            sender: { $ne: req.user.id },
+            "readBy.user": { $ne: req.user.id }
+        });
+
+        // Format messages with sender info and read status
         const formattedMessages = messages.reverse().map((message) => {
             const isCurrentUser = message.sender._id.toString() === req.user.id;
+            const isRead = isCurrentUser || 
+                (message.readBy && message.readBy.some(read => read.user.toString() === req.user.id));
+            
             return {
                 _id: message._id,
                 content: message.content,
@@ -239,6 +267,7 @@ exports.getChatById = async (req, res) => {
                 sender: {
                     isCurrentUser: isCurrentUser,
                 },
+                read: isRead,
                 attachments: message.attachments || [],
             };
         });
@@ -283,6 +312,7 @@ exports.getChatById = async (req, res) => {
                     },
                 ],
                 createdAt: chat.createdAt,
+                unreadCount: unreadCount,
             },
             messages: formattedMessages,
         });
