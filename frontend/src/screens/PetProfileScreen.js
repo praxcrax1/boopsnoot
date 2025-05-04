@@ -14,7 +14,7 @@ import {
     Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import PetService from "../services/PetService";
 import Button from "../components/Button";

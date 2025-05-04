@@ -19,7 +19,7 @@ import {
     StatusBar,
     Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { AuthContext } from "../contexts/AuthContext";
@@ -580,7 +580,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: theme.spacing.md,
-        ...theme.shadows.medium,
     },
     quickActionText: {
         fontSize: theme.typography.fontSize.sm,
@@ -603,7 +602,6 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.sm,
         borderWidth: 2,
         borderColor: theme.colors.primary,
-        ...theme.shadows.small,
     },
     matchName: {
         fontSize: theme.typography.fontSize.sm,

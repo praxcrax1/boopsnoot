@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native";
 import theme from '../../styles/theme';
 
 const SplashScreen = ({ navigation }) => {

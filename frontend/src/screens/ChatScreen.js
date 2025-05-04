@@ -13,7 +13,7 @@ import {
     StatusBar,
     Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ChatService from "../services/ChatService";
 import SocketService from "../services/SocketService";
