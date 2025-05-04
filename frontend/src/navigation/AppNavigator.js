@@ -3,7 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { View } from "react-native";
+import { View, Text } from "react-native";
 import { AuthContext } from "../contexts/AuthContext";
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 import { navigationRef } from '../../App';
@@ -149,7 +149,7 @@ const MainStack = () => (
 
 // Root navigator that handles auth state
 const AppNavigator = () => {
-    const { isAuthenticated, isLoading, hasPets, checkingPetStatus, authError } = useContext(AuthContext);
+    const { isAuthenticated, isLoading, hasPets, authError } = useContext(AuthContext);
     const [initialLoad, setInitialLoad] = useState(true);
     
     // Track the initial app load
@@ -163,9 +163,8 @@ const AppNavigator = () => {
     // The hook itself will handle the logic based on isAuthenticated
     useNotifications(isAuthenticated); 
 
-    // Only show splash screen on initial app load or when checking pet status
-    // Don't show it after failed login/register attempts
-    if ((isLoading && initialLoad) || (isAuthenticated && checkingPetStatus)) {
+    // Only show splash screen on initial app load
+    if (isLoading && initialLoad) {
         return <SplashScreen />;
     }
 

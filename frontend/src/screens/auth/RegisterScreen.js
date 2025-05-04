@@ -132,9 +132,8 @@ const RegisterScreen = ({ navigation }) => {
                 password: formData.password,
             });
 
-            if (result.success) {
-                navigation.navigate("PetProfileSetup")
-            }
+            // Remove explicit navigation - AuthContext will handle this
+            // The AppNavigator will route to the right screen based on hasPets value
         } catch (error) {
             Alert.alert(
                 "Registration Failed",
@@ -155,20 +154,8 @@ const RegisterScreen = ({ navigation }) => {
                 // Use the token to log in via our backend
                 const loginResult = await loginWithGoogle(result.accessToken);
                 
-                if (loginResult.success) {
-                    Alert.alert(
-                        "Registration Successful",
-                        "Let's set up your pet profile!",
-                        [
-                            {
-                                text: "Continue",
-                                onPress: () =>
-                                    navigation.navigate("PetProfileSetup"),
-                            },
-                        ],
-                        { cancelable: false }
-                    );
-                }
+                // Remove explicit navigation and alert - AuthContext will handle this
+                // The AppNavigator will route to the right screen based on hasPets value
             } else {
                 Alert.alert("Authentication Failed", result.error);
             }

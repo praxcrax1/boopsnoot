@@ -101,11 +101,9 @@ const LoginScreen = ({ navigation }) => {
         try {
             await login(formData.email, formData.password);
             // Success - AuthContext will update user state and navigator will switch to app stack
+            // No explicit navigation needed - AppNavigator will handle based on authentication state
         } catch (error) {
             console.log('Login error details:', error);
-            console.log('Error type:', error.errorType);
-            console.log('Error message:', error.message);
-            console.log('Full error object:', JSON.stringify(error, null, 2));
             
             // Handle specific error types from the backend
             if (error.errorType === 'email') {

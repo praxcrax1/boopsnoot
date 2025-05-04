@@ -82,15 +82,20 @@ export const AuthProvider = ({ children }) => {
                 setTransitioningToPetSetup(true);
             }
 
-            setTimeout(() => {
-                setHasPets(hasUserPets);
-                setCheckingPetStatus(false);
-            }, 300);
+            // Return a promise that resolves when pet status is updated
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    setHasPets(hasUserPets);
+                    setCheckingPetStatus(false);
+                    resolve(hasUserPets); // Resolve with the pet status
+                }, 300);
+            });
             
         } catch (error) {
             console.error("Error checking pet status:", error);
             setHasPets(false);
             setCheckingPetStatus(false);
+            return false; // Return false if there was an error
         }
     };
 
@@ -166,18 +171,18 @@ export const AuthProvider = ({ children }) => {
 
         try {
             const response = await AuthService.register(userData);
+            // Store user data but DON'T set isAuthenticated yet
             setUser(response.user);
-            setIsAuthenticated(true);
             
-            // Set initial pet status to false for new user with a transition
-            setTransitioningToPetSetup(true);
-            setTimeout(() => {
-                setHasPets(false);
-                setCheckingPetStatus(false);
-            }, 300);
+            // For new registrations, check if they might have pets already (rare case but possible)
+            // AWAIT for the status check to complete
+            await checkUserPets();
             
             // After successful registration, request location
-            requestAndUpdateLocation();
+            await requestAndUpdateLocation();
+            
+            // NOW set isAuthenticated to true AFTER all checks are complete
+            setIsAuthenticated(true);
             
             return { success: true, user: response.user };
         } catch (error) {
@@ -196,18 +201,18 @@ export const AuthProvider = ({ children }) => {
 
         try {
             const response = await AuthService.login(email, password);
+            // Store user data but DON'T set isAuthenticated yet
             setUser(response.user);
-            setIsAuthenticated(true);
             
-            // Check if user has pets after login with smooth transition
-            checkUserPets();
+            // Check if user has pets after login - AWAIT for the status check to complete
+            await checkUserPets();
             
             // Check if we need to request location after login
             if (!response.user.location || 
                 (!response.user.location.coordinates || 
                  (response.user.location.coordinates[0] === 0 && 
                   response.user.location.coordinates[1] === 0))) {
-                requestAndUpdateLocation();
+                await requestAndUpdateLocation();
             }
             
             // Check for unread messages that arrived while offline
@@ -229,6 +234,9 @@ export const AuthProvider = ({ children }) => {
                 console.error("Error checking for unread messages after login:", error);
             }
             
+            // NOW set isAuthenticated to true AFTER all checks are complete
+            setIsAuthenticated(true);
+            
             return { success: true, user: response.user };
         } catch (error) {
             console.error("Login error:", error);
@@ -248,18 +256,18 @@ export const AuthProvider = ({ children }) => {
 
         try {
             const response = await AuthService.loginWithGoogle(accessToken);
+            // Store user data but DON'T set isAuthenticated yet
             setUser(response.user);
-            setIsAuthenticated(true);
             
-            // Check if user has pets after Google login with smooth transition
-            checkUserPets();
+            // Check if user has pets after Google login - AWAIT for the status check to complete
+            await checkUserPets();
             
             // Check if we need to request location after Google login
             if (!response.user.location || 
                 (!response.user.location.coordinates || 
                  (response.user.location.coordinates[0] === 0 && 
                   response.user.location.coordinates[1] === 0))) {
-                requestAndUpdateLocation();
+                await requestAndUpdateLocation();
             }
             
             // Check for unread messages that arrived while offline
@@ -280,6 +288,9 @@ export const AuthProvider = ({ children }) => {
             } catch (error) {
                 console.error("Error checking for unread messages after Google login:", error);
             }
+            
+            // NOW set isAuthenticated to true AFTER all checks are complete
+            setIsAuthenticated(true);
             
             return { success: true, user: response.user };
         } catch (error) {
