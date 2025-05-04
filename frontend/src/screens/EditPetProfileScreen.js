@@ -927,28 +927,41 @@ const styles = StyleSheet.create({
         borderBottomColor: theme.colors.divider,
         ...Platform.select({
             ios: {
-                shadowColor: theme.colors.textPrimary,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 3,
+                height: 56,
             },
             android: {
-                elevation: 2,
+                height: 80,
+                paddingTop: 25, // Add extra padding for Android status bar
             },
         }),
         zIndex: 10,
+        position: 'relative', // Add position relative for absolute positioning of title
     },
     headerTitle: {
         fontSize: theme.typography.fontSize.lg,
         fontWeight: theme.typography.fontWeight.semiBold,
         color: theme.colors.textPrimary,
+        position: 'absolute', // Position absolutely to center regardless of other elements
+        left: 0,
+        right: 0,
+        textAlign: 'center', // Center the text
+        ...Platform.select({
+            ios: {
+                top: 18, // Center vertically in iOS header
+            },
+            android: {
+                top: 40, // Center vertically in Android header accounting for status bar padding
+            },
+        }),
     },
     backButton: {
         padding: 8,
+        zIndex: 1, // Ensure buttons are above the centered title
     },
     headerRight: {
         width: 60,
         alignItems: 'flex-end',
+        zIndex: 1, // Ensure buttons are above the centered title
     },
     saveButton: {
         paddingVertical: 6,
