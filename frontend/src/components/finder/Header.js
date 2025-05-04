@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from "react-native";
+import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../styles/theme";
 
@@ -45,11 +45,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         backgroundColor: "transparent",
-        ...Platform.select({
-            android: {
-                paddingTop: 40, // Add extra padding for Android status bar
-            },
-        }),
     },
     headerTitle: {
         fontSize: 22,

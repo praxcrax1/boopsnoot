@@ -34,7 +34,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.praxcrax.boopsnoot"
+      "package": "com.praxcrax.boopsnoot",
+      "googleServicesFile": "./google-services.json"
     },
     "scheme": "boopsnoot",
     "web": {

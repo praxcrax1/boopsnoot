@@ -11,6 +11,10 @@ import {
 // Register for the AuthSession redirect
 WebBrowser.maybeCompleteAuthSession();
 
+console.log('Auth Session redirect URL:', AuthSession.makeRedirectUri({
+    native: 'com.praxcrax.boopsnoot/oauth2redirect/google'
+}));
+
 // Google OAuth configuration
 const googleAuthDiscovery = {
     authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
