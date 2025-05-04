@@ -399,6 +399,14 @@ const styles = StyleSheet.create({
             },
         }),
     },
+    contentHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: theme.spacing.xl,
+        backgroundColor: theme.colors.background,
+        height: 56,
+    },
     backButton: {
         padding: 8,
         zIndex: 1, // Ensure buttons are above the centered title
