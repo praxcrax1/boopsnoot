@@ -557,7 +557,7 @@ const FinderScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={["top"]}>
+        <SafeAreaView style={styles.container}>
             <StatusBar 
                 barStyle={Platform.OS === 'ios' ? "dark-content" : "light-content"}
                 backgroundColor="#F8F9FA" 

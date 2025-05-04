@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import PetService from "../../services/PetService";
 import { AuthContext } from "../../contexts/AuthContext";
 import {
@@ -38,6 +37,7 @@ import {
 import InputField from "../../components/InputField";
 import CustomDropdown from "../../components/CustomDropdown";
 import Button from "../../components/Button";
+import GradientHeader from "../../components/GradientHeader";
 import theme, { withOpacity } from "../../styles/theme";
 
 const { width } = Dimensions.get("window");
@@ -624,49 +624,32 @@ const PetProfileSetupScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView 
-            style={styles.container} 
-            edges={["left", "right"]} // Removed "top" to handle it manually
-        >
-            <StatusBar
-                barStyle="dark-content"
-                backgroundColor="transparent"
-                translucent={true}
+        <View style={styles.rootContainer}>
+            <GradientHeader
+                title="Set Up Pet Profile"
+                subtitle="Let's create a profile for your pet to help find playmates!"
+                centerTitle={true}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                showBackButton={currentStep > 1}
+                onBackPress={prevStep}
             />
-            <Animated.View
-                style={[
-                    { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-                    { flex: 1 }
-                ]}
-            >
-                <LinearGradient
-                    colors={[theme.colors.primaryLight, theme.colors.background]}
-                    style={styles.gradientHeader}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                >
-                    {/* Removed back button as requested */}
-                    
-                    <View style={styles.headerContainer}>
-                        <Text style={styles.headerText}>Set Up Pet Profile</Text>
-                        <Text style={styles.subHeaderText}>
-                            Let's create a profile for your pet to help find playmates!
-                        </Text>
-                        {renderStepIndicators()}
-                    </View>
-                </LinearGradient>
-                
+            
+            <SafeAreaView style={styles.safeAreaContainer}>
                 {/* Apply pan responder to the ScrollView */}
-                <View {...panResponder.panHandlers} style={styles.swipeContainer}>
+                <Animated.View
+                    style={[{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+                    {...panResponder.panHandlers}
+                >
                     <ScrollView 
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                     >
                         {renderStepContent()}
                     </ScrollView>
-                </View>
-            </Animated.View>
-        </SafeAreaView>
+                </Animated.View>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -674,47 +657,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,
-    },
-    gradientHeader: {
-        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
-        paddingBottom: 40,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        marginBottom: -30,
-        zIndex: 10,
-    },
-    headerContainer: {
-        alignItems: "center",
-        paddingHorizontal: 20,
-        marginTop: Platform.OS === 'ios' ? 15 : 5,
-    },
-    headerText: {
-        fontSize: theme.typography.fontSize.xxl,
-        fontWeight: theme.typography.fontWeight.bold,
-        color: theme.colors.textPrimary,
-        marginBottom: 8,
-    },
-    subHeaderText: {
-        fontSize: theme.typography.fontSize.md,
-        color: theme.colors.textSecondary,
-        textAlign: "center",
-        marginBottom: 20,
-    },
-    stepIndicatorContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 10,
-    },
-    stepIndicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: theme.colors.backgroundVariant,
-        marginHorizontal: 4,
-    },
-    activeStepIndicator: {
-        width: 24,
-        backgroundColor: theme.colors.primary,
     },
     scrollContent: {
         padding: 20,
@@ -860,6 +802,30 @@ const styles = StyleSheet.create({
     swipeContainer: {
         flex: 1,
         width: '100%',
+    },
+    stepIndicatorContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 10,
+    },
+    stepIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: theme.colors.backgroundVariant,
+        marginHorizontal: 4,
+    },
+    activeStepIndicator: {
+        width: 24,
+        backgroundColor: theme.colors.primary,
+    },
+    rootContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.primaryLight,
+    },
+    safeAreaContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
     },
 });
 

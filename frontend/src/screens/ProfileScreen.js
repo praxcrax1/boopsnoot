@@ -13,10 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { getBottomSpace, getStatusBarHeight } from 'react-native-iphone-x-helper';
 import { AuthContext } from "../contexts/AuthContext";
 import PetService from "../services/PetService";
 import Button from "../components/Button";
+import GradientHeader from "../components/GradientHeader";
 import theme, { withOpacity } from "../styles/theme";
 
 const ProfileScreen = ({ navigation }) => {
@@ -76,21 +77,10 @@ const ProfileScreen = ({ navigation }) => {
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={["left", "right"]}>
-            <StatusBar
-                barStyle="dark-content"
-                backgroundColor="transparent"
-                translucent={true}
-            />
-            
-            <LinearGradient
-                colors={[theme.colors.primaryLight, theme.colors.background]}
-                style={styles.gradientHeader}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-            >
-                <View style={styles.headerContainer}>
-                    <Text style={styles.headerText}>Profile</Text>
+        <View style={styles.rootContainer}>
+            <GradientHeader 
+                title="Profile"
+                rightComponent={
                     <TouchableOpacity 
                         style={styles.settingsButton}
                         onPress={navigateToSettings}
@@ -101,98 +91,100 @@ const ProfileScreen = ({ navigation }) => {
                             color={theme.colors.textPrimary}
                         />
                     </TouchableOpacity>
-                </View>
-            </LinearGradient>
-
-            <ScrollView 
-                style={styles.content}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.userInfoSection}>
-                    <View style={styles.userInfoHeader}>
-                        <View style={styles.avatarPlaceholder}>
-                            <Text style={styles.avatarText}>
-                                {user.name
-                                    ? user.name.charAt(0).toUpperCase()
-                                    : "U"}
-                            </Text>
-                        </View>
-                        <View style={styles.userDetails}>
-                            <Text style={styles.userName}>{user.name}</Text>
-                            <Text style={styles.userEmail}>{user.email}</Text>
+                }
+            />
+            
+            <SafeAreaView style={styles.safeAreaContainer}>
+                <ScrollView 
+                    style={styles.content}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.userInfoSection}>
+                        <View style={styles.userInfoHeader}>
+                            <View style={styles.avatarPlaceholder}>
+                                <Text style={styles.avatarText}>
+                                    {user.name
+                                        ? user.name.charAt(0).toUpperCase()
+                                        : "U"}
+                                </Text>
+                            </View>
+                            <View style={styles.userDetails}>
+                                <Text style={styles.userName}>{user.name}</Text>
+                                <Text style={styles.userEmail}>{user.email}</Text>
+                            </View>
                         </View>
                     </View>
-                </View>
 
-                <View style={styles.petSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Your Pets</Text>
-                        <Button
-                            title="Add Pet"
-                            onPress={handleAddPet}
-                            type="secondary"
-                            icon="add"
-                            style={styles.addPetButton}
-                            textStyle={styles.addPetButtonText}
-                        />
-                    </View>
-
-                    {pets.length > 0 ? (
-                        pets.map((pet) => (
-                            <TouchableOpacity
-                                key={pet._id}
-                                style={styles.petCard}
-                                onPress={() =>
-                                    navigation.navigate("PetProfile", {
-                                        petId: pet._id,
-                                    })
-                                }>
-                                <Image
-                                    source={
-                                        pet.photos && pet.photos.length > 0
-                                            ? { uri: pet.photos[0] }
-                                            : require("../assets/default-pet.png")
-                                    }
-                                    style={styles.petImage}
-                                />
-                                <View style={styles.petInfo}>
-                                    <Text style={styles.petName}>
-                                        {pet.name}
-                                    </Text>
-                                    <Text style={styles.petBreed}>
-                                        {pet.breed}
-                                    </Text>
-                                    <Text style={styles.petDetails}>
-                                        {pet.age} • {pet.gender} • {pet.size}
-                                    </Text>
-                                </View>
-                                <Ionicons
-                                    name="chevron-forward"
-                                    size={24}
-                                    color={theme.colors.divider}
-                                />
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <View style={styles.noPetsContainer}>
-                            <Ionicons 
-                                name="paw" 
-                                size={64} 
-                                color={withOpacity(theme.colors.primary, 0.3)} 
-                            />
-                            <Text style={styles.noPetsText}>
-                                You haven't added any pets yet
-                            </Text>
+                    <View style={styles.petSection}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Your Pets</Text>
                             <Button
-                                title="Add Your First Pet"
+                                title="Add Pet"
                                 onPress={handleAddPet}
-                                icon="add-circle"
+                                type="secondary"
+                                icon="add"
+                                style={styles.addPetButton}
+                                textStyle={styles.addPetButtonText}
                             />
                         </View>
-                    )}
-                </View>
-            </ScrollView>
-        </SafeAreaView>
+
+                        {pets.length > 0 ? (
+                            pets.map((pet) => (
+                                <TouchableOpacity
+                                    key={pet._id}
+                                    style={styles.petCard}
+                                    onPress={() =>
+                                        navigation.navigate("PetProfile", {
+                                            petId: pet._id,
+                                        })
+                                    }>
+                                    <Image
+                                        source={
+                                            pet.photos && pet.photos.length > 0
+                                                ? { uri: pet.photos[0] }
+                                                : require("../assets/default-pet.png")
+                                        }
+                                        style={styles.petImage}
+                                    />
+                                    <View style={styles.petInfo}>
+                                        <Text style={styles.petName}>
+                                            {pet.name}
+                                        </Text>
+                                        <Text style={styles.petBreed}>
+                                            {pet.breed}
+                                        </Text>
+                                        <Text style={styles.petDetails}>
+                                            {pet.age} • {pet.gender} • {pet.size}
+                                        </Text>
+                                    </View>
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={24}
+                                        color={theme.colors.divider}
+                                    />
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <View style={styles.noPetsContainer}>
+                                <Ionicons 
+                                    name="paw" 
+                                    size={64} 
+                                    color={withOpacity(theme.colors.primary, 0.3)} 
+                                />
+                                <Text style={styles.noPetsText}>
+                                    You haven't added any pets yet
+                                </Text>
+                                <Button
+                                    title="Add Your First Pet"
+                                    onPress={handleAddPet}
+                                    icon="add-circle"
+                                />
+                            </View>
+                        )}
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -219,14 +211,15 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.xl,
         textAlign: "center",
     },
-    gradientHeader: {
-        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
-        paddingBottom: 40,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        marginBottom: -20,
-        zIndex: 10,
-        paddingHorizontal: theme.spacing.xl,
+    rootContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.primaryLight,
+    },
+    safeAreaContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: getStatusBarHeight(),
+        paddingBottom: getBottomSpace(),
     },
     headerContainer: {
         flexDirection: "row",

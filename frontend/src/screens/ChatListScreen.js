@@ -13,9 +13,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from 'expo-notifications';
+import { getBottomSpace } from 'react-native-iphone-x-helper';
 
 // Services
 import ChatService from "../services/ChatService";
@@ -24,6 +24,7 @@ import PetService from "../services/PetService";
 
 // Components
 import FilterChip from "../components/chat/FilterChip";
+import GradientHeader from "../components/GradientHeader";
 
 // Styles and Context
 import theme, { withOpacity } from "../styles/theme";
@@ -517,21 +518,11 @@ const ChatListScreen = ({ navigation }) => {
      */
     const renderHeader = () => {
         return (
-            <LinearGradient
-                colors={[theme.colors.primaryLight, theme.colors.background]}
+            <GradientHeader
+                title="Messages"
+                subtitle="Connect with your pet's playmates"
                 style={styles.gradientHeader}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-            >
-                <View style={styles.headerContainer}>
-                    <View style={styles.headerTextContainer}>
-                        <Text style={styles.headerText}>Messages</Text>
-                        <Text style={styles.subHeaderText}>
-                            Connect with your pet's playmates
-                        </Text>
-                    </View>
-                </View>
-            </LinearGradient>
+            />
         );
     };
 
@@ -576,26 +567,26 @@ const ChatListScreen = ({ navigation }) => {
         : chats;
 
     return (
-        <SafeAreaView style={styles.container} edges={["left", "right"]}>
-            <StatusBar
-                barStyle="dark-content"
-                backgroundColor="transparent"
-                translucent={true}
+        <View style={styles.rootContainer}>
+            <GradientHeader
+                title="Messages"
+                subtitle="Connect with your pet's playmates"
             />
             
-            {renderHeader()}
-            {renderPetSelector()}
+            <SafeAreaView style={styles.safeAreaContainer}>
+                {renderPetSelector()}
 
-            {filteredChats.length > 0 ? (
-                <FlatList
-                    data={filteredChats}
-                    renderItem={renderChatItem}
-                    keyExtractor={(item) => item._id}
-                    contentContainerStyle={styles.listContainer}
-                    showsVerticalScrollIndicator={false}
-                />
-            ) : renderEmptyState()}
-        </SafeAreaView>
+                {filteredChats.length > 0 ? (
+                    <FlatList
+                        data={filteredChats}
+                        renderItem={renderChatItem}
+                        keyExtractor={(item) => item._id}
+                        contentContainerStyle={styles.listContainer}
+                        showsVerticalScrollIndicator={false}
+                    />
+                ) : renderEmptyState()}
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -609,6 +600,14 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: theme.colors.background,
+    },
+    rootContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.primaryLight,
+    },
+    safeAreaContainer: {
+        flex: 1,
         backgroundColor: theme.colors.background,
     },
     gradientHeader: {
