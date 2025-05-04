@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "BoopSnoot",
     "slug": "boopsnoot",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./src/assets/boopsnoot.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./src/assets/boopsnoot.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -27,7 +27,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./src/assets/boopsnoot.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -38,7 +38,7 @@
     },
     "scheme": "boopsnoot",
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./src/assets/boopsnoot.png"
     },
     "extra": {
       "eas": {
