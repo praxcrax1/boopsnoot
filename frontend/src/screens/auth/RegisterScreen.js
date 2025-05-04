@@ -148,16 +148,25 @@ const RegisterScreen = ({ navigation }) => {
         try {
             setIsGoogleLoading(true);
             
+            // Log the platform for debugging
+            console.log(`Attempting Google signup on platform: ${Platform.OS}`);
+            
             const result = await GoogleAuthService.signInWithGoogle();
+            console.log("Google auth signup result:", JSON.stringify(result).substring(0, 100) + "...");
             
             if (result.success) {
+                console.log("Google authentication successful for signup, calling backend...");
                 // Use the token to log in via our backend
                 const loginResult = await loginWithGoogle(result.accessToken);
-                
+                console.log("Backend Google signup successful");
                 // Remove explicit navigation and alert - AuthContext will handle this
                 // The AppNavigator will route to the right screen based on hasPets value
             } else {
-                Alert.alert("Authentication Failed", result.error);
+                console.error("Google signup failed:", result.error);
+                Alert.alert(
+                    "Authentication Failed", 
+                    result.error || "Failed to authenticate with Google. Please try again."
+                );
             }
         } catch (error) {
             console.error("Google auth error:", error);
@@ -316,26 +325,6 @@ const styles = StyleSheet.create({
     formContainer: {
         marginBottom: 30,
     },
-    footerContainer: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    footerText: {
-        fontSize: 16,
-        color: "#666",
-    },
-    footerLink: {
-        fontSize: 16,
-        color: "#FF6B6B",
-        fontWeight: "bold",
-    },
-    textButton: {
-        backgroundColor: "transparent",
-        padding: 0,
-        marginBottom: 0,
-        height: 20,
-    },
     googleButton: {
         backgroundColor: "#FFF",
         borderWidth: 1,
@@ -359,6 +348,26 @@ const styles = StyleSheet.create({
         color: '#666666',
         fontSize: 14,
         fontWeight: '600',
+    },
+    footerContainer: {
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    footerText: {
+        fontSize: 16,
+        color: "#666",
+    },
+    footerLink: {
+        fontSize: 16,
+        color: "#FF6B6B",
+        fontWeight: "bold",
+    },
+    textButton: {
+        backgroundColor: "transparent",
+        padding: 0,
+        marginBottom: 0,
+        height: 20,
     },
 });
 

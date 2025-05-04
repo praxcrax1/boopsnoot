@@ -10,7 +10,7 @@ import {
     Easing,
     Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from 'expo-location';
 import MatchService from "../services/MatchService";
@@ -96,12 +96,7 @@ const FinderScreen = ({ navigation }) => {
     };
 
     useEffect(() => {
-        // Set correct status bar style based on platform
         StatusBar.setBarStyle(Platform.OS === 'ios' ? "dark-content" : "light-content");
-        if (Platform.OS === 'android') {
-            StatusBar.setBackgroundColor('#F8F9FA');
-        }
-        
         fetchUserPets();
         checkLocationPermission();
 
@@ -548,88 +543,83 @@ const FinderScreen = ({ navigation }) => {
 
     if (initialLoading) {
         return (
-            <View style={styles.container}>
-                <StatusBar 
+            <SafeAreaView style={styles.container}>
+                <Header
+                    title="Find Playmates"
+                    selectedPet={selectedPet}
+                    onFilterPress={() => {}}
+                    onPetSelectorPress={() => {}}
+                    showFilter={true} // Default to showing filter during loading
                 />
-                <SafeAreaView style={styles.safeArea}>
-                    <Header
-                        title="Find Playmates"
-                        selectedPet={selectedPet}
-                        onFilterPress={() => {}}
-                        onPetSelectorPress={() => {}}
-                        showFilter={true} // Default to showing filter during loading
-                    />
-                    <SkeletonLoader />
-                </SafeAreaView>
-            </View>
+                <SkeletonLoader />
+            </SafeAreaView>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top"]}>
             <StatusBar 
                 barStyle={Platform.OS === 'ios' ? "dark-content" : "light-content"}
                 backgroundColor="#F8F9FA" 
             />
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.mainContainer}>
-                    <Header
-                        title="Find Playmates"
-                        selectedPet={selectedPet}
-                        onFilterPress={() => setFilterVisible(true)}
-                        onPetSelectorPress={() => setPetSelectorVisible(true)}
-                        showFilter={hasPets && isLocationAvailable} // Only show filter if user has pets and location is available
-                    />
 
-                    <View style={styles.contentContainer}>
-                        {renderCurrentCard()}
-                        {renderActionAnimation()}
-                    </View>
+            <View style={styles.mainContainer}>
+                <Header
+                    title="Find Playmates"
+                    selectedPet={selectedPet}
+                    onFilterPress={() => setFilterVisible(true)}
+                    onPetSelectorPress={() => setPetSelectorVisible(true)}
+                    showFilter={hasPets && isLocationAvailable} // Only show filter if user has pets and location is available
+                />
 
-                    {potentialMatches.length > 0 &&
-                        currentIndex < potentialMatches.length &&
-                        !loading &&
-                        !isTransitioning && 
-                        isLocationAvailable &&
-                        hasPets && (
-                            <View style={styles.actionsContainer}>
-                                <TouchableOpacity
-                                    style={[styles.actionButton, styles.passButton]}
-                                    onPress={handlePassAction}
-                                    disabled={isTransitioning}>
-                                    <Ionicons name="close" size={32} color="#FF6B6B" />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.actionButton, styles.likeButton]}
-                                    onPress={handleLikeAction}
-                                    disabled={isTransitioning}>
-                                    <Ionicons name="heart" size={32} color="#FFFFFF" />
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                    <FilterModal
-                        visible={filterVisible}
-                        filters={tempFilters}
-                        onClose={() => setFilterVisible(false)}
-                        onFilterChange={handleFilterChange}
-                        onApply={applyFilters}
-                    />
-
-                    <PetSelectorModal
-                        visible={petSelectorVisible}
-                        pets={userPets}
-                        selectedPetId={selectedPetId}
-                        onClose={() => setPetSelectorVisible(false)}
-                        onSelectPet={(id) => {
-                            setSelectedPetId(id);
-                            setPetSelectorVisible(false);
-                        }}
-                    />
+                <View style={styles.contentContainer}>
+                    {renderCurrentCard()}
+                    {renderActionAnimation()}
                 </View>
-            </SafeAreaView>
-        </View>
+
+                {potentialMatches.length > 0 &&
+                    currentIndex < potentialMatches.length &&
+                    !loading &&
+                    !isTransitioning && 
+                    isLocationAvailable &&
+                    hasPets && (
+                        <View style={styles.actionsContainer}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.passButton]}
+                                onPress={handlePassAction}
+                                disabled={isTransitioning}>
+                                <Ionicons name="close" size={32} color="#FF6B6B" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.likeButton]}
+                                onPress={handleLikeAction}
+                                disabled={isTransitioning}>
+                                <Ionicons name="heart" size={32} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                <FilterModal
+                    visible={filterVisible}
+                    filters={tempFilters}
+                    onClose={() => setFilterVisible(false)}
+                    onFilterChange={handleFilterChange}
+                    onApply={applyFilters}
+                />
+
+                <PetSelectorModal
+                    visible={petSelectorVisible}
+                    pets={userPets}
+                    selectedPetId={selectedPetId}
+                    onClose={() => setPetSelectorVisible(false)}
+                    onSelectPet={(id) => {
+                        setSelectedPetId(id);
+                        setPetSelectorVisible(false);
+                    }}
+                />
+            </View>
+        </SafeAreaView>
     );
 };
 
@@ -637,9 +627,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#F8F9FA",
-    },
-    safeArea: {
-        flex: 1,
     },
     mainContainer: {
         flex: 1,

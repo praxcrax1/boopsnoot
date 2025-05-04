@@ -1,6 +1,12 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI } from '../constants/apiConfig';
+import { Platform } from 'react-native';
+import { 
+  GOOGLE_CLIENT_ID, 
+  GOOGLE_ANDROID_CLIENT_ID, 
+  GOOGLE_REDIRECT_URI,
+  GOOGLE_ANDROID_REDIRECT_URI 
+} from '../constants/apiConfig';
 
 // Register for the AuthSession redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -14,10 +20,18 @@ const googleAuthDiscovery = {
 class GoogleAuthService {
     async signInWithGoogle() {
         try {
-            // Configure OAuth request
-            const clientId = GOOGLE_CLIENT_ID;
-            // Use the exact URI that was registered in Google console
-            const redirectUri = GOOGLE_REDIRECT_URI;
+            // Select platform-specific configuration
+            const clientId = Platform.OS === 'android' 
+                ? GOOGLE_ANDROID_CLIENT_ID 
+                : GOOGLE_CLIENT_ID;
+                
+            // Select platform-specific redirect URI
+            const redirectUri = Platform.OS === 'android'
+                ? GOOGLE_ANDROID_REDIRECT_URI
+                : GOOGLE_REDIRECT_URI;
+            
+            console.log(`Using clientId: ${clientId}`);
+            console.log(`Using redirectUri: ${redirectUri}`);
             
             const scopes = ['profile', 'email'];
 

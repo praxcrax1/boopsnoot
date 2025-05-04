@@ -18,15 +18,14 @@ import {
     Alert,
     StatusBar,
     Platform,
-    SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { getBottomSpace, getStatusBarHeight } from 'react-native-iphone-x-helper';
+import { LinearGradient } from "expo-linear-gradient";
 import { AuthContext } from "../contexts/AuthContext";
 import PetService from "../services/PetService";
 import MatchService from "../services/MatchService";
 import ChatService from "../services/ChatService";
-import GradientHeader from "../components/GradientHeader";
 import theme, { withOpacity } from "../styles/theme";
 
 const HomeScreen = ({ navigation, route }) => {
@@ -187,242 +186,258 @@ const HomeScreen = ({ navigation, route }) => {
     }
 
     return (
-        <View style={styles.rootContainer}>
-            <GradientHeader
-                title={`Welcome, ${user?.name || "Pet Lover"}!`}
-                subtitle={selectedPet ? `& ${selectedPet?.name}` : null}
+        <SafeAreaView style={styles.container} edges={["left", "right"]}>
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="transparent"
+                translucent={true}
             />
             
-            {/* Rest of the content in a SafeAreaView */}
-            <SafeAreaView style={styles.safeAreaContainer}>
-                {/* Pet Selection Tabs (Only show if user has multiple pets) */}
-                {pets.length > 1 && (
-                    <View style={styles.petSelectorContainer}>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.petTabsContainer}
-                            contentContainerStyle={styles.petTabsContent}>
-                            {pets.map((pet) => {
-                                const isSelected = selectedPetId === pet._id;
-                                return (
-                                    <TouchableOpacity
-                                        key={pet._id}
+            <LinearGradient
+                colors={[theme.colors.primaryLight, theme.colors.background]}
+                style={styles.gradientHeader}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+            >
+                <View style={styles.headerContainer}>
+                    <Text style={styles.headerText}>
+                        Welcome, {user?.name || "Pet Lover"}!
+                    </Text>
+                    {selectedPet && (
+                        <Text style={styles.subHeaderText}>
+                            & {selectedPet?.name}
+                        </Text>
+                    )}
+                </View>
+            </LinearGradient>
+
+            {/* Pet Selection Tabs (Only show if user has multiple pets) */}
+            {pets.length > 1 && (
+                <View style={styles.petSelectorContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.petTabsContainer}
+                        contentContainerStyle={styles.petTabsContent}>
+                        {pets.map((pet) => {
+                            const isSelected = selectedPetId === pet._id;
+                            return (
+                                <TouchableOpacity
+                                    key={pet._id}
+                                    style={[
+                                        styles.petSelectorTab,
+                                        isSelected && styles.selectedPetTab,
+                                    ]}
+                                    onPress={() => handlePetChange(pet._id)}
+                                    activeOpacity={0.7}>
+                                    <Image
+                                        source={
+                                            pet.photos && pet.photos.length > 0
+                                                ? { uri: pet.photos[0] }
+                                                : require("../assets/default-pet.png")
+                                        }
                                         style={[
-                                            styles.petSelectorTab,
-                                            isSelected && styles.selectedPetTab,
+                                            styles.petSelectorImage,
+                                            isSelected && styles.selectedPetImage
                                         ]}
-                                        onPress={() => handlePetChange(pet._id)}
-                                        activeOpacity={0.7}>
-                                        <Image
-                                            source={
-                                                pet.photos && pet.photos.length > 0
-                                                    ? { uri: pet.photos[0] }
-                                                    : require("../assets/default-pet.png")
-                                            }
-                                            style={[
-                                                styles.petSelectorImage,
-                                                isSelected && styles.selectedPetImage
-                                            ]}
-                                        />
-                                        <Text
-                                            style={[
-                                                styles.petSelectorName,
-                                                isSelected && styles.selectedPetName,
-                                            ]}>
-                                            {pet?.name}
-                                        </Text>
-                                        {isSelected && (
-                                            <View style={styles.selectedPetDot} />
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
-                    </View>
-                )}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.petSelectorName,
+                                            isSelected && styles.selectedPetName,
+                                        ]}>
+                                        {pet?.name}
+                                    </Text>
+                                    {isSelected && (
+                                        <View style={styles.selectedPetDot} />
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+            )}
 
-                <ScrollView 
-                    style={styles.scrollContainer}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Quick Actions */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Quick Actions</Text>
-                        <View style={styles.quickActionsContainer}>
+            <ScrollView 
+                style={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Quick Actions */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                    <View style={styles.quickActionsContainer}>
+                        <TouchableOpacity
+                            style={styles.quickActionButton}
+                            onPress={() => navigation.navigate("Finder")}>
+                            <View style={styles.quickActionIconContainer}>
+                                <Ionicons name="paw" size={24} color={theme.colors.onPrimary} />
+                            </View>
+                            <Text style={styles.quickActionText}>
+                                Find Playmates
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.quickActionButton}
+                            onPress={() => navigation.navigate("Chats")}>
+                            <View style={[
+                                styles.quickActionIconContainer,
+                                { backgroundColor: theme.colors.secondary }
+                            ]}>
+                                <Ionicons
+                                    name="chatbubble"
+                                    size={24}
+                                    color={theme.colors.onSecondary}
+                                />
+                            </View>
+                            <Text style={styles.quickActionText}>Messages</Text>
+                        </TouchableOpacity>
+
+                        {pets.length > 0 ? (
                             <TouchableOpacity
                                 style={styles.quickActionButton}
-                                onPress={() => navigation.navigate("Finder")}>
-                                <View style={styles.quickActionIconContainer}>
-                                    <Ionicons name="paw" size={24} color={theme.colors.onPrimary} />
-                                </View>
-                                <Text style={styles.quickActionText}>
-                                    Find Playmates
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.quickActionButton}
-                                onPress={() => navigation.navigate("Chats")}>
+                                onPress={() => navigation.navigate("Profile")}>
                                 <View style={[
                                     styles.quickActionIconContainer,
-                                    { backgroundColor: theme.colors.secondary }
+                                    { backgroundColor: theme.colors.info }
                                 ]}>
                                     <Ionicons
-                                        name="chatbubble"
+                                        name="settings"
                                         size={24}
-                                        color={theme.colors.onSecondary}
+                                        color="#FFF"
                                     />
                                 </View>
-                                <Text style={styles.quickActionText}>Messages</Text>
+                                <Text style={styles.quickActionText}>
+                                    Edit Profile
+                                </Text>
                             </TouchableOpacity>
-
-                            {pets.length > 0 ? (
-                                <TouchableOpacity
-                                    style={styles.quickActionButton}
-                                    onPress={() => navigation.navigate("Profile")}>
-                                    <View style={[
-                                        styles.quickActionIconContainer,
-                                        { backgroundColor: theme.colors.info }
-                                    ]}>
-                                        <Ionicons
-                                            name="settings"
-                                            size={24}
-                                            color="#FFF"
-                                        />
-                                    </View>
-                                    <Text style={styles.quickActionText}>
-                                        Edit Profile
-                                    </Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    style={styles.quickActionButton}
-                                    onPress={() =>
-                                        navigation.navigate("PetProfileSetup")
-                                    }>
-                                    <View style={[
-                                        styles.quickActionIconContainer,
-                                        { backgroundColor: theme.colors.success }
-                                    ]}>
-                                        <Ionicons
-                                            name="add"
-                                            size={24}
-                                            color="#FFF"
-                                        />
-                                    </View>
-                                    <Text style={styles.quickActionText}>
-                                        Add Pet
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* Recent Matches */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionTitleContainer}>
-                            <Text style={styles.sectionTitle}>Recent Matches</Text>
-                            {matches.length > 0 && (
-                                <TouchableOpacity
-                                    onPress={() => navigation.navigate("Chats")}>
-                                    <Text style={styles.viewAllText}>View All</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {/* Animated matches container */}
-                        <Animated.View style={{ opacity: matchesOpacity }}>
-                            {matchesLoading && (
-                                <View style={styles.matchesLoadingContainer}>
-                                    <ActivityIndicator
-                                        size="small"
-                                        color={theme.colors.primary}
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.quickActionButton}
+                                onPress={() =>
+                                    navigation.navigate("PetProfileSetup")
+                                }>
+                                <View style={[
+                                    styles.quickActionIconContainer,
+                                    { backgroundColor: theme.colors.success }
+                                ]}>
+                                    <Ionicons
+                                        name="add"
+                                        size={24}
+                                        color="#FFF"
                                     />
                                 </View>
-                            )}
+                                <Text style={styles.quickActionText}>
+                                    Add Pet
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
 
-                            {!matchesLoading && matches.length > 0 ? (
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.matchesContainer}>
-                                    {matches.map((match) => (
-                                        <TouchableOpacity
-                                            key={match.matchId}
-                                            style={styles.matchCard}
-                                            onPress={() =>
-                                                navigateToMatchChat(match.matchId)
-                                            }>
-                                            <Image
-                                                source={
-                                                    match?.pet?.photos &&
-                                                    match?.pet?.photos.length
-                                                        ? {
-                                                              uri: match.pet
-                                                                  .photos[0],
-                                                          }
-                                                        : require("../assets/default-pet.png")
-                                                }
-                                                style={styles.matchImage}
-                                            />
-                                            <Text style={styles.matchName}>
-                                                {match?.pet?.name}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            ) : (
-                                !matchesLoading && (
-                                    <View style={styles.emptyStateContainer}>
-                                        <Ionicons name="paw" size={48} color={withOpacity(theme.colors.primary, 0.6)} />
-                                        <Text style={styles.emptyStateText}>
-                                            No matches yet
-                                        </Text>
-                                        <TouchableOpacity
-                                            style={styles.emptyStateButton}
-                                            onPress={() =>
-                                                navigation.navigate("Finder")
-                                            }>
-                                            <Text
-                                                style={styles.emptyStateButtonText}>
-                                                Find Matches Now
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )
-                            )}
-                        </Animated.View>
+                {/* Recent Matches */}
+                <View style={styles.section}>
+                    <View style={styles.sectionTitleContainer}>
+                        <Text style={styles.sectionTitle}>Recent Matches</Text>
+                        {matches.length > 0 && (
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate("Chats")}>
+                                <Text style={styles.viewAllText}>View All</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
-                    {/* App Stats */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Your Activity</Text>
-                        <View style={styles.statsContainer}>
-                            <View style={styles.statItem}>
-                                <View style={styles.statCircle}>
-                                    <Text style={styles.statNumber}>
-                                        {matches.length || 0}
-                                    </Text>
-                                </View>
-                                <Text style={styles.statLabel}>Matches</Text>
+                    {/* Animated matches container */}
+                    <Animated.View style={{ opacity: matchesOpacity }}>
+                        {matchesLoading && (
+                            <View style={styles.matchesLoadingContainer}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={theme.colors.primary}
+                                />
                             </View>
-                            <View style={styles.statItem}>
-                                <View style={[styles.statCircle, styles.petStatCircle]}>
-                                    <Text style={styles.statNumber}>
-                                        {pets.length || 0}
+                        )}
+
+                        {!matchesLoading && matches.length > 0 ? (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.matchesContainer}>
+                                {matches.map((match) => (
+                                    <TouchableOpacity
+                                        key={match.matchId}
+                                        style={styles.matchCard}
+                                        onPress={() =>
+                                            navigateToMatchChat(match.matchId)
+                                        }>
+                                        <Image
+                                            source={
+                                                match?.pet?.photos &&
+                                                match?.pet?.photos.length
+                                                    ? {
+                                                          uri: match.pet
+                                                              .photos[0],
+                                                      }
+                                                    : require("../assets/default-pet.png")
+                                            }
+                                            style={styles.matchImage}
+                                        />
+                                        <Text style={styles.matchName}>
+                                            {match?.pet?.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        ) : (
+                            !matchesLoading && (
+                                <View style={styles.emptyStateContainer}>
+                                    <Ionicons name="paw" size={48} color={withOpacity(theme.colors.primary, 0.6)} />
+                                    <Text style={styles.emptyStateText}>
+                                        No matches yet
                                     </Text>
+                                    <TouchableOpacity
+                                        style={styles.emptyStateButton}
+                                        onPress={() =>
+                                            navigation.navigate("Finder")
+                                        }>
+                                        <Text
+                                            style={styles.emptyStateButtonText}>
+                                            Find Matches Now
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <Text style={styles.statLabel}>Pets</Text>
+                            )
+                        )}
+                    </Animated.View>
+                </View>
+
+                {/* App Stats */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Your Activity</Text>
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                            <View style={styles.statCircle}>
+                                <Text style={styles.statNumber}>
+                                    {matches.length || 0}
+                                </Text>
                             </View>
+                            <Text style={styles.statLabel}>Matches</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <View style={[styles.statCircle, styles.petStatCircle]}>
+                                <Text style={styles.statNumber}>
+                                    {pets.length || 0}
+                                </Text>
+                            </View>
+                            <Text style={styles.statLabel}>Pets</Text>
                         </View>
                     </View>
-                    
-                    {/* Extra padding at bottom for comfortable scrolling */}
-                    <View style={styles.bottomPadding} />
-                </ScrollView>
-            </SafeAreaView>
-        </View>
+                </View>
+                
+                {/* Extra padding at bottom for comfortable scrolling */}
+                <View style={styles.bottomPadding} />
+            </ScrollView>
+        </SafeAreaView>
     );
 };
 
@@ -443,10 +458,10 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     gradientHeader: {
-        paddingTop: Platform.OS === 'ios'
-            ? getStatusBarHeight(true) + 20  // Adjusted for better alignment
-            : StatusBar.currentHeight + 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
         paddingBottom: 40,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
         marginBottom: -20,
         zIndex: 10,
         paddingHorizontal: theme.spacing.xl,
@@ -455,7 +470,7 @@ const styles = StyleSheet.create({
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "flex-start",
-        marginTop: Platform.OS === 'ios' ? 0 : 20,
+        marginTop: Platform.OS === 'ios' ? 15 : 5,
     },
     headerText: {
         fontSize: theme.typography.fontSize.xxl,
@@ -565,6 +580,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: theme.spacing.md,
+        ...theme.shadows.medium,
     },
     quickActionText: {
         fontSize: theme.typography.fontSize.sm,
@@ -587,6 +603,7 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.sm,
         borderWidth: 2,
         borderColor: theme.colors.primary,
+        ...theme.shadows.small,
     },
     matchName: {
         fontSize: theme.typography.fontSize.sm,
@@ -652,25 +669,8 @@ const styles = StyleSheet.create({
         marginTop: theme.spacing.xs,
     },
     bottomPadding: {
-        height: Platform.OS === 'ios' ? getBottomSpace() + theme.spacing.xl : theme.spacing.xxxl,
-    },
-    rootContainer: {
-        flex: 1,
-        backgroundColor: theme.colors.primaryLight,
-    },
-    iosStatusBarBackground: {
-        height: getStatusBarHeight(),
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: theme.colors.primaryLight,
-        zIndex: 5,
-    },
-    safeAreaContainer: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
-    },
+        height: theme.spacing.xxxl,
+    }
 });
 
 export default HomeScreen;

@@ -142,12 +142,24 @@ const LoginScreen = ({ navigation }) => {
         try {
             setIsGoogleLoading(true);
             
+            // Log the platform for debugging
+            console.log(`Attempting Google login on platform: ${Platform.OS}`);
+            
             const result = await GoogleAuthService.signInWithGoogle();
+            console.log("Google auth result:", JSON.stringify(result).substring(0, 100) + "...");
             
             if (result.success) {
+                console.log("Google authentication successful, calling backend...");
                 // Use the token to log in via our backend
                 const loginResult = await loginWithGoogle(result.accessToken);
                 // AuthContext will handle the navigation if successful
+                console.log("Backend login successful");
+            } else {
+                console.error("Google auth failed:", result.error);
+                Alert.alert(
+                    "Google Login Failed",
+                    result.error || "Failed to authenticate with Google. Please try again."
+                );
             }
         } catch (error) {
             console.error("Google login error:", error);

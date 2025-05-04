@@ -113,57 +113,76 @@ exports.googleAuth = async (req, res) => {
             });
         }
 
-        // Use the access token to get user info from Google
-        const response = await fetch(
-            `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`
-        );
+        // Log platform for debugging
+        const platform = req.headers['user-agent'] ? 
+            (req.headers['user-agent'].includes('Android') ? 'Android' : 'Other') : 'Unknown';
+        console.log(`Processing Google auth request from platform: ${platform}`);
+        console.log(`Using access token: ${accessToken.substring(0, 10)}...`);
 
-        if (!response.ok) {
-            throw new Error("Failed to fetch user data from Google");
-        }
+        try {
+            // Use the access token to get user info from Google
+            const response = await fetch(
+                `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`
+            );
 
-        const payload = await response.json();
-        const { sub: googleId, email, name, picture } = payload;
-
-        // Check if user exists
-        let user = await User.findOne({ googleId });
-
-        if (!user) {
-            // Check if email exists
-            const existingEmail = await User.findOne({ email });
-
-            if (existingEmail) {
-                // Link Google account to existing email account
-                existingEmail.googleId = googleId;
-                existingEmail.isGoogleUser = true;
-                existingEmail.profilePicture = existingEmail.profilePicture || picture;
-                await existingEmail.save();
-                user = existingEmail;
-            } else {
-                // Create new user with Google data
-                user = await User.create({
-                    name,
-                    email,
-                    googleId,
-                    isGoogleUser: true,
-                    profilePicture: picture,
-                });
+            if (!response.ok) {
+                console.error("Google API error:", await response.text());
+                throw new Error(`Failed to fetch user data from Google: ${response.status} ${response.statusText}`);
             }
+
+            const payload = await response.json();
+            console.log("Google user info received:", JSON.stringify(payload).substring(0, 100) + "...");
+            const { sub: googleId, email, name, picture } = payload;
+
+            // Check if user exists
+            let user = await User.findOne({ googleId });
+
+            if (!user) {
+                // Check if email exists
+                const existingEmail = await User.findOne({ email });
+
+                if (existingEmail) {
+                    // Link Google account to existing email account
+                    existingEmail.googleId = googleId;
+                    existingEmail.isGoogleUser = true;
+                    existingEmail.profilePicture = existingEmail.profilePicture || picture;
+                    await existingEmail.save();
+                    user = existingEmail;
+                    console.log(`Linked Google account to existing email: ${email}`);
+                } else {
+                    // Create new user with Google data
+                    user = await User.create({
+                        name,
+                        email,
+                        googleId,
+                        isGoogleUser: true,
+                        profilePicture: picture,
+                    });
+                    console.log(`Created new user from Google auth: ${email}`);
+                }
+            }
+
+            // Generate token
+            const token = user.generateAuthToken();
+
+            res.status(200).json({
+                success: true,
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    profilePicture: user.profilePicture,
+                },
+                token,
+            });
+        } catch (googleError) {
+            console.error("Error during Google user data fetch:", googleError);
+            return res.status(401).json({
+                success: false,
+                message: "Failed to verify Google token",
+                error: googleError.message,
+            });
         }
-
-        // Generate token
-        const token = user.generateAuthToken();
-
-        res.status(200).json({
-            success: true,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                profilePicture: user.profilePicture,
-            },
-            token,
-        });
     } catch (error) {
         console.error("Google authentication error:", error);
         res.status(500).json({
