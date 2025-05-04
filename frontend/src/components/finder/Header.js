@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: "transparent",
         ...Platform.select({
             android: {
