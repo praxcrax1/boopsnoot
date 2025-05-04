@@ -1,4 +1,4 @@
-import React, { useContext } from "react"; // Removed useEffect, useRef
+import React, { useContext, useState, useEffect } from "react"; // Added useState, useEffect
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -30,18 +30,26 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Authentication stack navigator
-const AuthStack = () => (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen
-            name="PetProfileSetup"
-            component={PetProfileSetupScreen}
-            options={{ gestureEnabled: false }}
-        />
-    </Stack.Navigator>
-);
+const AuthStack = () => {
+    const { authError } = useContext(AuthContext);
+    
+    // If there's an auth error, it means we attempted login/register and failed
+    // In this case, we should start at Login screen instead of Splash
+    return (
+        <Stack.Navigator 
+            screenOptions={{ headerShown: false }}
+            initialRouteName={authError ? "Login" : "Splash"}>
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen
+                name="PetProfileSetup"
+                component={PetProfileSetupScreen}
+                options={{ gestureEnabled: false }}
+            />
+        </Stack.Navigator>
+    );
+};
 
 // Main tab navigator for the app
 const MainTabs = () => {
@@ -141,14 +149,23 @@ const MainStack = () => (
 
 // Root navigator that handles auth state
 const AppNavigator = () => {
-    const { isAuthenticated, isLoading, hasPets, checkingPetStatus } = useContext(AuthContext);
+    const { isAuthenticated, isLoading, hasPets, checkingPetStatus, authError } = useContext(AuthContext);
+    const [initialLoad, setInitialLoad] = useState(true);
+    
+    // Track the initial app load
+    useEffect(() => {
+        if (!isLoading && initialLoad) {
+            setInitialLoad(false);
+        }
+    }, [isLoading]);
     
     // Call the custom hook unconditionally, passing the auth state
     // The hook itself will handle the logic based on isAuthenticated
     useNotifications(isAuthenticated); 
 
-    // If still checking auth state or pet status, show loading screen
-    if (isLoading || (isAuthenticated && checkingPetStatus)) {
+    // Only show splash screen on initial app load or when checking pet status
+    // Don't show it after failed login/register attempts
+    if ((isLoading && initialLoad) || (isAuthenticated && checkingPetStatus)) {
         return <SplashScreen />;
     }
 

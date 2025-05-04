@@ -14,7 +14,6 @@ import { validateEmail, validatePassword } from "../../utils/validation";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
 import GoogleAuthService from "../../services/GoogleAuthService";
-import { AntDesign } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -63,6 +62,12 @@ const LoginScreen = ({ navigation }) => {
             ...formData,
             [field]: value,
         });
+        
+        // Clear errors when user types again
+        setErrors(prev => ({
+            ...prev,
+            [field]: null
+        }));
     };
 
     const handleBlur = (field) => {
@@ -97,10 +102,39 @@ const LoginScreen = ({ navigation }) => {
             await login(formData.email, formData.password);
             // Success - AuthContext will update user state and navigator will switch to app stack
         } catch (error) {
-            Alert.alert(
-                "Login Failed",
-                error.message || "Failed to login. Please try again."
-            );
+            console.log('Login error details:', error);
+            console.log('Error type:', error.errorType);
+            console.log('Error message:', error.message);
+            console.log('Full error object:', JSON.stringify(error, null, 2));
+            
+            // Handle specific error types from the backend
+            if (error.errorType === 'email') {
+                setErrors(prev => ({
+                    ...prev,
+                    email: "Account with this email doesn't exist"
+                }));
+                setTouched(prev => ({
+                    ...prev,
+                    email: true
+                }));
+            } 
+            else if (error.errorType === 'password') {
+                setErrors(prev => ({
+                    ...prev,
+                    password: "Incorrect password"
+                }));
+                setTouched(prev => ({
+                    ...prev,
+                    password: true
+                }));
+            }
+            else {
+                // For other errors, show general alert
+                Alert.alert(
+                    "Login Failed",
+                    error.message || "Failed to login. Please try again."
+                );
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -119,6 +153,10 @@ const LoginScreen = ({ navigation }) => {
             }
         } catch (error) {
             console.error("Google login error:", error);
+            Alert.alert(
+                "Google Login Failed",
+                error.message || "Failed to login with Google. Please try again."
+            );
         } finally {
             setIsGoogleLoading(false);
         }

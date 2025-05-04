@@ -25,11 +25,13 @@ apiClient.interceptors.request.use(
 // Helper function to standardize error handling
 export function handleApiError(error) {
     let errorMessage = "An unexpected error occurred";
+    let errorType = null;
 
     if (error.response) {
         // Server responded with a status code outside the 2xx range
         const serverError = error.response.data;
         errorMessage = serverError.message || String(serverError);
+        errorType = serverError.errorType; // Capture the errorType from backend
 
         // Log additional details for debugging
         console.error("API Error:", {
@@ -48,7 +50,11 @@ export function handleApiError(error) {
         console.error("API Setup Error:", error.message);
     }
 
-    return new Error(errorMessage);
+    const customError = new Error(errorMessage);
+    if (errorType) {
+        customError.errorType = errorType;
+    }
+    return customError;
 }
 
 export default apiClient;

@@ -60,18 +60,20 @@ exports.login = async (req, res) => {
         // Check if user exists
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({
+            return res.status(404).json({
                 success: false,
-                message: "Invalid credentials",
+                message: "Account not found",
+                errorType: "email"
             });
         }
 
         // Check if password matches
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
-            return res.status(400).json({
+            return res.status(401).json({
                 success: false,
-                message: "Invalid credentials",
+                message: "Incorrect password",
+                errorType: "password"
             });
         }
 
