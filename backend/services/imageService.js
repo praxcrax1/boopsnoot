@@ -10,6 +10,7 @@ const AWS = require('aws-sdk');
 const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
+const { Readable } = require('stream');
 
 dotenv.config();
 
@@ -57,21 +58,27 @@ class ImageService {
     }
 
     /**
-     * Upload an image file to the storage service
-     * @param {string} filePath - Path to the local file
+     * Upload an image file or buffer to the storage service
+     * @param {string|Buffer} fileInput - Path to the local file or Buffer containing file data
      * @param {Object} options - Upload options
      * @returns {Promise<Object>} - Upload result with standardized properties
      */
-    async uploadImage(filePath, options = {}) {
+    async uploadImage(fileInput, options = {}) {
         try {
-            console.log(`Starting upload with provider: ${this.provider}, file: ${filePath}`);
-            
-            // Check if file exists
-            if (!fs.existsSync(filePath)) {
-                throw new Error(`File not found at path: ${filePath}`);
-            }
+            console.log(`Starting upload with provider: ${this.provider}`);
             
             let result;
+            const isBuffer = Buffer.isBuffer(fileInput) || (fileInput && fileInput.buffer && Buffer.isBuffer(fileInput.buffer));
+            
+            // Log the type of input we're dealing with
+            console.log(`Upload input type: ${isBuffer ? 'Buffer' : 'File path'}`);
+            
+            if (!isBuffer && typeof fileInput === 'string') {
+                // Check if file exists when a path is provided
+                if (!fs.existsSync(fileInput)) {
+                    throw new Error(`File not found at path: ${fileInput}`);
+                }
+            }
 
             // Standardized options with defaults
             const uploadOptions = {
@@ -83,22 +90,22 @@ class ImageService {
             // Upload using the selected provider
             switch (this.provider) {
                 case 'cloudinary':
-                    result = await this._uploadWithCloudinary(filePath, uploadOptions);
+                    result = await this._uploadWithCloudinary(fileInput, uploadOptions);
                     break;
                 case 'aws':
-                    result = await this._uploadWithAWS(filePath, uploadOptions);
+                    result = await this._uploadWithAWS(fileInput, uploadOptions);
                     break;
                 default:
                     throw new Error(`Unsupported upload provider: ${this.provider}`);
             }
 
-            // Optionally delete the local file after successful upload
-            if (options.deleteLocal) {
+            // Optionally delete the local file after successful upload if it's a file path
+            if (!isBuffer && options.deleteLocal && typeof fileInput === 'string') {
                 try {
-                    fs.unlinkSync(filePath);
-                    console.log(`Local file ${filePath} deleted successfully`);
+                    fs.unlinkSync(fileInput);
+                    console.log(`Local file ${fileInput} deleted successfully`);
                 } catch (deleteError) {
-                    console.warn(`Failed to delete local file ${filePath}: ${deleteError.message}`);
+                    console.warn(`Failed to delete local file ${fileInput}: ${deleteError.message}`);
                     // Non-fatal error, continue execution
                 }
             }
@@ -146,15 +153,47 @@ class ImageService {
      * Implementation for Cloudinary upload
      * @private
      */
-    async _uploadWithCloudinary(filePath, options) {
+    async _uploadWithCloudinary(fileInput, options) {
         try {
-            console.log(`Uploading to Cloudinary: ${filePath}`);
-            const uploadResult = await cloudinary.uploader.upload(filePath, {
-                folder: options.folder,
-                use_filename: true,
-                unique_filename: options.uniqueFilename,
-                ...options
-            });
+            console.log(`Uploading to Cloudinary`);
+            
+            let uploadResult;
+            
+            if (Buffer.isBuffer(fileInput) || (fileInput && fileInput.buffer && Buffer.isBuffer(fileInput.buffer))) {
+                // Handle buffer upload for Cloudinary using buffer upload API
+                const buffer = fileInput.buffer || fileInput;
+                
+                // Create a promise to handle the buffer upload
+                uploadResult = await new Promise((resolve, reject) => {
+                    // Create upload stream to Cloudinary
+                    const uploadStream = cloudinary.uploader.upload_stream(
+                        {
+                            folder: options.folder,
+                            use_filename: true,
+                            unique_filename: options.uniqueFilename,
+                            ...options
+                        },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    );
+                    
+                    // Create a readable stream from the buffer and pipe to Cloudinary
+                    const bufferStream = new Readable();
+                    bufferStream.push(buffer);
+                    bufferStream.push(null); // Signal end of stream
+                    bufferStream.pipe(uploadStream);
+                });
+            } else {
+                // Use direct file upload for path-based input
+                uploadResult = await cloudinary.uploader.upload(fileInput, {
+                    folder: options.folder,
+                    use_filename: true,
+                    unique_filename: options.uniqueFilename,
+                    ...options
+                });
+            }
 
             // Return a standardized result object
             return {
@@ -173,15 +212,31 @@ class ImageService {
      * Implementation for AWS S3 upload
      * @private
      */
-    async _uploadWithAWS(filePath, options) {
+    async _uploadWithAWS(fileInput, options) {
         try {
-            console.log(`Uploading to AWS S3: ${filePath}, bucket: ${this.bucketName}`);
+            console.log(`Uploading to AWS S3, bucket: ${this.bucketName}`);
             
-            // Read file content
-            const fileContent = fs.readFileSync(filePath);
+            let fileContent;
+            let fileName;
+            
+            // Handle different input types
+            if (Buffer.isBuffer(fileInput)) {
+                // Direct buffer input
+                fileContent = fileInput;
+                fileName = `image-${Date.now()}.jpg`; // Default filename for direct buffers
+            } else if (fileInput && fileInput.buffer && Buffer.isBuffer(fileInput.buffer)) {
+                // Multer file object with buffer
+                fileContent = fileInput.buffer;
+                fileName = fileInput.originalname || `image-${Date.now()}.jpg`;
+            } else if (typeof fileInput === 'string') {
+                // File path
+                fileContent = fs.readFileSync(fileInput);
+                fileName = path.basename(fileInput);
+            } else {
+                throw new Error('Invalid file input: must be a Buffer, Multer file object, or file path string');
+            }
             
             // Generate a unique key for S3 object
-            const fileName = path.basename(filePath);
             let key;
             
             if (options.uniqueFilename) {
@@ -192,13 +247,16 @@ class ImageService {
                 key = `${options.folder}/${fileName}`;
             }
             
+            // Determine content type
+            const contentType = fileInput.mimetype || this._getContentType(fileName);
+            
             // Set up the S3 upload parameters
+            // Removed ACL parameter since the bucket has ACLs disabled
             const params = {
                 Bucket: this.bucketName,
                 Key: key,
                 Body: fileContent,
-                ContentType: this._getContentType(fileName),
-                ACL: 'public-read' // Make the uploaded file publicly accessible
+                ContentType: contentType
             };
             
             console.log(`AWS S3 upload params: Bucket=${params.Bucket}, Key=${params.Key}, ContentType=${params.ContentType}`);

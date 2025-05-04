@@ -85,19 +85,8 @@ exports.uploadImage = async (req, res) => {
             });
         }
 
-        // Get file path
-        const filePath = req.file.path;
-        console.log(`File received at path: ${filePath}`);
+        console.log(`File received: ${req.file.originalname}, size: ${req.file.size} bytes, mimetype: ${req.file.mimetype}`);
         
-        // Verify file exists on disk
-        if (!fs.existsSync(filePath)) {
-            console.error(`File not found at path: ${filePath}`);
-            return res.status(500).json({
-                success: false,
-                message: "File processing error - file not found on disk",
-            });
-        }
-
         // Log provider info
         const providerInfo = imageService.getProviderInfo();
         console.log(`Using upload provider: ${providerInfo.name}, configured: ${providerInfo.isConfigured}`);
@@ -107,10 +96,10 @@ exports.uploadImage = async (req, res) => {
             console.warn(`Warning: ${providerInfo.name} provider does not appear to be properly configured`);
         }
 
-        // Upload using the image service
-        const result = await imageService.uploadImage(filePath, {
+        // Upload using the image service - pass the entire file object from multer
+        // This will use the buffer stored in memory rather than a file path
+        const result = await imageService.uploadImage(req.file, {
             folder: "pet_images",
-            deleteLocal: true, // Auto-delete local file after upload
         });
 
         // Return success response with image info
