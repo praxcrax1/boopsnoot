@@ -69,13 +69,16 @@ exports.createPet = async (req, res) => {
     }
 };
 
-// @desc    Upload pet image to Cloudinary
+// @desc    Upload pet image to Cloudinary or AWS S3
 // @route   POST /api/pets/upload
 // @access  Private
 exports.uploadImage = async (req, res) => {
     try {
+        console.log("Upload image request received");
+        
         // Check if file exists
         if (!req.file) {
+            console.log("No file uploaded in request");
             return res.status(400).json({
                 success: false,
                 message: "No file uploaded",
@@ -84,6 +87,25 @@ exports.uploadImage = async (req, res) => {
 
         // Get file path
         const filePath = req.file.path;
+        console.log(`File received at path: ${filePath}`);
+        
+        // Verify file exists on disk
+        if (!fs.existsSync(filePath)) {
+            console.error(`File not found at path: ${filePath}`);
+            return res.status(500).json({
+                success: false,
+                message: "File processing error - file not found on disk",
+            });
+        }
+
+        // Log provider info
+        const providerInfo = imageService.getProviderInfo();
+        console.log(`Using upload provider: ${providerInfo.name}, configured: ${providerInfo.isConfigured}`);
+        
+        // Provide warning if provider isn't properly configured
+        if (!providerInfo.isConfigured) {
+            console.warn(`Warning: ${providerInfo.name} provider does not appear to be properly configured`);
+        }
 
         // Upload using the image service
         const result = await imageService.uploadImage(filePath, {
@@ -92,6 +114,7 @@ exports.uploadImage = async (req, res) => {
         });
 
         // Return success response with image info
+        console.log(`Upload successful, URL: ${result.url}`);
         res.status(200).json({
             success: true,
             message: "Image uploaded successfully",
@@ -100,13 +123,29 @@ exports.uploadImage = async (req, res) => {
         });
     } catch (error) {
         console.error("Image upload error:", error);
+        console.error(`Error stack: ${error.stack}`);
+        
+        // Prepare a more detailed error response
+        let errorMessage = "Image upload failed";
+        let errorDetails = null;
+        
+        if (process.env.NODE_ENV === "development") {
+            errorDetails = {
+                message: error.message,
+                stack: error.stack,
+                provider: imageService.provider
+            };
+            
+            // Additional info for AWS S3 errors
+            if (imageService.provider === 'aws' && error.code) {
+                errorDetails.awsErrorCode = error.code;
+            }
+        }
+        
         res.status(500).json({
             success: false,
-            message: "Image upload failed",
-            error:
-                process.env.NODE_ENV === "development"
-                    ? error.message
-                    : undefined,
+            message: errorMessage,
+            error: errorDetails,
         });
     }
 };

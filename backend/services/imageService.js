@@ -48,6 +48,11 @@ class ImageService {
                 console.warn('AWS S3 bucket name not provided. Using default: "pet-uploads"');
                 this.bucketName = 'pet-uploads';
             }
+            
+            // Check if AWS credentials are properly configured
+            if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+                console.error('AWS credentials are not properly configured');
+            }
         }
     }
 
@@ -59,6 +64,13 @@ class ImageService {
      */
     async uploadImage(filePath, options = {}) {
         try {
+            console.log(`Starting upload with provider: ${this.provider}, file: ${filePath}`);
+            
+            // Check if file exists
+            if (!fs.existsSync(filePath)) {
+                throw new Error(`File not found at path: ${filePath}`);
+            }
+            
             let result;
 
             // Standardized options with defaults
@@ -82,12 +94,19 @@ class ImageService {
 
             // Optionally delete the local file after successful upload
             if (options.deleteLocal) {
-                fs.unlinkSync(filePath);
+                try {
+                    fs.unlinkSync(filePath);
+                    console.log(`Local file ${filePath} deleted successfully`);
+                } catch (deleteError) {
+                    console.warn(`Failed to delete local file ${filePath}: ${deleteError.message}`);
+                    // Non-fatal error, continue execution
+                }
             }
 
             return result;
         } catch (error) {
-            console.error(`Image upload error: ${error.message}`);
+            console.error(`Image upload error with provider ${this.provider}: ${error.message}`);
+            console.error(error.stack);
             throw error;
         }
     }
@@ -128,20 +147,26 @@ class ImageService {
      * @private
      */
     async _uploadWithCloudinary(filePath, options) {
-        const uploadResult = await cloudinary.uploader.upload(filePath, {
-            folder: options.folder,
-            use_filename: true,
-            unique_filename: options.uniqueFilename,
-            ...options
-        });
+        try {
+            console.log(`Uploading to Cloudinary: ${filePath}`);
+            const uploadResult = await cloudinary.uploader.upload(filePath, {
+                folder: options.folder,
+                use_filename: true,
+                unique_filename: options.uniqueFilename,
+                ...options
+            });
 
-        // Return a standardized result object
-        return {
-            success: true,
-            url: uploadResult.secure_url,
-            publicId: uploadResult.public_id,
-            originalResponse: uploadResult
-        };
+            // Return a standardized result object
+            return {
+                success: true,
+                url: uploadResult.secure_url,
+                publicId: uploadResult.public_id,
+                originalResponse: uploadResult
+            };
+        } catch (error) {
+            console.error(`Cloudinary upload error: ${error.message}`);
+            throw error;
+        }
     }
 
     /**
@@ -149,39 +174,50 @@ class ImageService {
      * @private
      */
     async _uploadWithAWS(filePath, options) {
-        // Read file content
-        const fileContent = fs.readFileSync(filePath);
-        
-        // Generate a unique key for S3 object
-        const fileName = path.basename(filePath);
-        let key;
-        
-        if (options.uniqueFilename) {
-            const timestamp = new Date().getTime();
-            const randomStr = Math.random().toString(36).substring(2, 10);
-            key = `${options.folder}/${timestamp}-${randomStr}-${fileName}`;
-        } else {
-            key = `${options.folder}/${fileName}`;
+        try {
+            console.log(`Uploading to AWS S3: ${filePath}, bucket: ${this.bucketName}`);
+            
+            // Read file content
+            const fileContent = fs.readFileSync(filePath);
+            
+            // Generate a unique key for S3 object
+            const fileName = path.basename(filePath);
+            let key;
+            
+            if (options.uniqueFilename) {
+                const timestamp = new Date().getTime();
+                const randomStr = Math.random().toString(36).substring(2, 10);
+                key = `${options.folder}/${timestamp}-${randomStr}-${fileName}`;
+            } else {
+                key = `${options.folder}/${fileName}`;
+            }
+            
+            // Set up the S3 upload parameters
+            const params = {
+                Bucket: this.bucketName,
+                Key: key,
+                Body: fileContent,
+                ContentType: this._getContentType(fileName),
+                ACL: 'public-read' // Make the uploaded file publicly accessible
+            };
+            
+            console.log(`AWS S3 upload params: Bucket=${params.Bucket}, Key=${params.Key}, ContentType=${params.ContentType}`);
+            
+            // Upload to S3
+            const uploadResult = await this.s3.upload(params).promise();
+            console.log(`AWS S3 upload successful: ${uploadResult.Location}`);
+            
+            // Return a standardized result object (similar to Cloudinary)
+            return {
+                success: true,
+                url: uploadResult.Location,
+                publicId: key,
+                originalResponse: uploadResult
+            };
+        } catch (error) {
+            console.error(`AWS S3 upload error: ${JSON.stringify(error)}`);
+            throw error;
         }
-        
-        // Set up the S3 upload parameters
-        const params = {
-            Bucket: this.bucketName,
-            Key: key,
-            Body: fileContent,
-            ContentType: this._getContentType(fileName)
-        };
-        
-        // Upload to S3
-        const uploadResult = await this.s3.upload(params).promise();
-        
-        // Return a standardized result object (similar to Cloudinary)
-        return {
-            success: true,
-            url: uploadResult.Location,
-            publicId: key,
-            originalResponse: uploadResult
-        };
     }
     
     /**
