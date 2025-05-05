@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { 
   GOOGLE_CLIENT_ID, 
   GOOGLE_ANDROID_CLIENT_ID, 
@@ -11,9 +12,18 @@ import {
 // Register for the AuthSession redirect
 WebBrowser.maybeCompleteAuthSession();
 
-console.log('Auth Session redirect URL:', AuthSession.makeRedirectUri({
-    native: 'com.praxcrax.boopsnoot/oauth2redirect/google'
-}));
+// Determine if we're running in a production environment
+const isProduction = !__DEV__;
+
+// Generate and log our effective redirect URI for debugging
+const effectiveRedirectUri = Platform.OS === 'android'
+    ? GOOGLE_ANDROID_REDIRECT_URI
+    : GOOGLE_REDIRECT_URI;
+
+console.log('Auth Session redirect URL:', effectiveRedirectUri);
+console.log('Environment:', isProduction ? 'Production' : 'Development');
+console.log('Expo Constants.appOwnership:', Constants.appOwnership || 'Not available');
+console.log('App manifest name:', Constants.manifest?.name || 'Not available');
 
 // Google OAuth configuration
 const googleAuthDiscovery = {
@@ -28,11 +38,17 @@ class GoogleAuthService {
             const clientId = Platform.OS === 'android' 
                 ? GOOGLE_ANDROID_CLIENT_ID 
                 : GOOGLE_CLIENT_ID;
-                
-            // Select platform-specific redirect URI
-            const redirectUri = Platform.OS === 'android'
-                ? GOOGLE_ANDROID_REDIRECT_URI
-                : GOOGLE_REDIRECT_URI;
+            
+            // Determine the correct redirect URI based on platform and environment
+            let redirectUri;
+            
+            if (Platform.OS === 'android') {
+                // For Android, use the Expo proxy URL in production builds
+                redirectUri = GOOGLE_ANDROID_REDIRECT_URI;
+            } else {
+                // For other platforms, use the default redirect URI
+                redirectUri = GOOGLE_REDIRECT_URI;
+            }
             
             console.log(`Using clientId: ${clientId}`);
             console.log(`Using redirectUri: ${redirectUri}`);
@@ -44,21 +60,25 @@ class GoogleAuthService {
                 clientId,
                 scopes,
                 redirectUri,
-                usePKCE: false, // Google requires PKCE to be disabled for mobile
+                usePKCE: false,
                 responseType: 'token',
             });
 
             const result = await request.promptAsync(googleAuthDiscovery);
+            console.log('Auth result type:', result.type);
             
             if (result.type === 'success') {
                 // Extract the access token from the response
                 const { access_token } = result.params;
+                console.log('Successfully obtained access token');
                 return { success: true, accessToken: access_token };
             } else {
+                console.warn('Google sign in was not successful:', result.type);
                 // User cancelled or auth failed
                 return { 
                     success: false, 
-                    error: 'Google sign in was cancelled or failed' 
+                    error: 'Google sign in was cancelled or failed',
+                    details: result 
                 };
             }
         } catch (error) {

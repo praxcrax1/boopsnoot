@@ -34,7 +34,24 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.praxcrax.boopsnoot"
+      "package": "com.praxcrax.boopsnoot",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "boopsnoot",
+              "host": "oauth2redirect",
+              "pathPrefix": "/google"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "scheme": "boopsnoot",
     "web": {

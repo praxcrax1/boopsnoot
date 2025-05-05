@@ -3,4 +3,6 @@ export const SOCKET_URL = API_URL.replace('/api', '');
 export const GOOGLE_CLIENT_ID = '474314594002-tqidlcfif5aal78ap613f1jc1mp4oum6.apps.googleusercontent.com';
 export const GOOGLE_ANDROID_CLIENT_ID = '474314594002-apopigau24c6kfjqkut44ed0f07j1o4j.apps.googleusercontent.com';
 export const GOOGLE_REDIRECT_URI = 'http://localhost:8081/auth/google/callback';
-export const GOOGLE_ANDROID_REDIRECT_URI = 'com.praxcrax.boopsnoot/oauth2redirect/google';
+// For production Android APK builds, we use the Expo authentication proxy
+// Format: https://auth.expo.io/@your-expo-username/your-app-slug
+export const GOOGLE_ANDROID_REDIRECT_URI = 'https://auth.expo.io/@praxcrax/boopsnoot';
