@@ -18,6 +18,7 @@ import { AuthContext } from "../contexts/AuthContext";
 import PetService from "../services/PetService";
 import Button from "../components/Button";
 import theme, { withOpacity } from "../styles/theme";
+import { getBreedLabelByValue } from "../constants/petBreeds";
 
 const ProfileScreen = ({ navigation }) => {
     const { user } = useContext(AuthContext);
@@ -160,7 +161,7 @@ const ProfileScreen = ({ navigation }) => {
                                         {pet.name}
                                     </Text>
                                     <Text style={styles.petBreed}>
-                                        {pet.breed}
+                                        {getBreedLabelByValue(pet.breed) || pet.breed}
                                     </Text>
                                     <Text style={styles.petDetails}>
                                         {pet.age} • {pet.gender} • {pet.size}

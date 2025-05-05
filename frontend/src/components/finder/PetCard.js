@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DetailBadge from "./DetailBadge";
 import { DISPLAY_VALUES } from "../../constants/petConstants";
 import LocationService from "../../services/LocationService";
+import { getBreedLabelByValue } from "../../constants/petBreeds";
 
 // Using icon.png as a placeholder image
 const PLACEHOLDER_IMAGE = "https://blocks.astratic.com/img/general-img-landscape.png"
@@ -118,7 +119,7 @@ const PetCard = memo(({ pet, onCardPress, animationStyle }) => {
                     </Text>
                 </View>
                 <View style={styles.breedAgeContainer}>
-                    <Text style={styles.breed}>{pet.breed}</Text>
+                    <Text style={styles.breed}>{getBreedLabelByValue(pet.breed)}</Text>
                     {pet.age && <Text style={styles.age}>, {pet.age}</Text>}
                 </View>
             </View>

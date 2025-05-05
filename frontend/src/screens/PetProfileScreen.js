@@ -21,6 +21,7 @@ import Button from "../components/Button";
 import { DISPLAY_VALUES } from "../constants/petConstants";
 import theme, { withOpacity } from "../styles/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getBreedLabelByValue } from "../constants/petBreeds";
 
 const { width } = Dimensions.get("window");
 const PHOTO_HEIGHT = 400; // Increased for better visual impact
@@ -261,7 +262,7 @@ const PetProfileScreen = ({ route, navigation }) => {
                     <View style={styles.contentHeader}>
                         <View>
                             <Text style={styles.petName}>{pet.name}</Text>
-                            <Text style={styles.petBreed}>{pet.breed}</Text>
+                            <Text style={styles.petBreed}>{getBreedLabelByValue(pet.breed)}</Text>
                         </View>
                         <View style={styles.ageContainer}>
                             <Text style={styles.ageLabel}>Age</Text>

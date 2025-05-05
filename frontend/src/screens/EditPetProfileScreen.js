@@ -35,8 +35,10 @@ import {
     CAT_PLAYMATE_PREFERENCES,
     PET_TYPES,
 } from "../constants/petConstants";
+import DOG_BREEDS, { getBreedLabelByValue } from "../constants/petBreeds";
 import InputField from "../components/InputField";
 import CustomDropdown from "../components/CustomDropdown";
+import BreedSelector from "../components/BreedSelector";
 import Button from "../components/Button";
 import theme, { withOpacity } from "../styles/theme";
 
@@ -545,12 +547,12 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                             onBlur={() => handleBlur("name")}
                         />
 
-                        <InputField
+                        <BreedSelector
                             label="Breed"
                             required
-                            placeholder="e.g., Golden Retriever"
-                            value={petData.breed}
-                            onChangeText={(value) => handleInputChange("breed", value)}
+                            petType={petData.type}
+                            selectedValue={petData.breed}
+                            onValueChange={(value) => handleInputChange("breed", value)}
                             error={errors.breed}
                             touched={touched.breed}
                             onBlur={() => handleBlur("breed")}
@@ -815,7 +817,7 @@ const EditPetProfileScreen = ({ route, navigation }) => {
                 <View style={styles.previewInfo}>
                     <View>
                         <Text style={styles.previewName}>{petData.name}</Text>
-                        <Text style={styles.previewBreed}>{petData.breed}</Text>
+                        <Text style={styles.previewBreed}>{getBreedLabelByValue(petData.breed) || petData.breed}</Text>
                     </View>
                 </View>
             </View>

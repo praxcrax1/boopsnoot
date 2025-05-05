@@ -35,8 +35,10 @@ import {
     CAT_PLAYMATE_PREFERENCES,
     PET_TYPES,
 } from "../../constants/petConstants";
+import DOG_BREEDS, { getBreedValueByLabel } from "../../constants/petBreeds";
 import InputField from "../../components/InputField";
 import CustomDropdown from "../../components/CustomDropdown";
+import BreedSelector from "../../components/BreedSelector";
 import Button from "../../components/Button";
 import theme, { withOpacity } from "../../styles/theme";
 
@@ -390,22 +392,22 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 onBlur={() => handleBlur("name")}
             />
 
-            <InputField
-                label="Breed"
-                required
-                placeholder="e.g., Golden Retriever"
-                value={petData.breed}
-                onChangeText={(value) => handleInputChange("breed", value)}
-                error={errors.breed}
-                touched={touched.breed}
-                onBlur={() => handleBlur("breed")}
-            />
-
             <CustomDropdown
                 label="Type"
                 options={petTypeOptions}
                 selectedValue={petData.type}
                 onValueChange={(value) => handleInputChange("type", value)}
+            />
+
+            <BreedSelector
+                label="Breed"
+                required
+                petType={petData.type}
+                selectedValue={petData.breed}
+                onValueChange={(value) => handleInputChange("breed", value)}
+                error={errors.breed}
+                touched={touched.breed}
+                onBlur={() => handleBlur("breed")}
             />
 
             <InputField
