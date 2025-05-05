@@ -620,11 +620,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: theme.spacing.xl,
     },
     headerContainer: {
-        alignItems: "center",
+        alignItems: "flex-start",
         marginTop: Platform.OS === 'ios' ? 15 : 5,
     },
     headerTextContainer: {
-        alignItems: "center",
+        alignItems: "flex-start",
     },
     headerText: {
         fontSize: theme.typography.fontSize.xxl,
