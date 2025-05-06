@@ -1054,8 +1054,8 @@ const styles = StyleSheet.create({
     },
     errorBadge: {
         position: 'absolute',
-        top: 10,
-        right: 'auto',
+        top: 15,
+        right: 5,
         marginLeft: 20,
         backgroundColor: theme.colors.error,
         width: 16,
