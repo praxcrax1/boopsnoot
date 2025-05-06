@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { getBreedLabelByValue } from "../../constants/petBreeds";
 
 const { width, height } = Dimensions.get("window");
 
@@ -60,7 +61,7 @@ const PetSelectorModal = ({
                                     {pet.name}
                                 </Text>
                                 <Text style={styles.petItemBreed}>
-                                    {pet.breed}
+                                    {getBreedLabelByValue(pet.breed)}
                                 </Text>
                             </View>
                             {selectedPetId === pet._id && (
