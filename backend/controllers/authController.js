@@ -123,9 +123,10 @@ exports.googleAuthRedirect = (req, res) => {
         console.log(`Frontend redirect URL: ${frontendRedirectUrl}`);
         
         // Determine which client to use based on the redirect URL
-        // For APK builds, the redirect URL will start with boopsnoot:// 
+        // Updated to detect both old and new URI schemes for Android
         const isAndroidApp = frontendRedirectUrl && (
             frontendRedirectUrl.startsWith('boopsnoot://') || 
+            frontendRedirectUrl.startsWith('com.praxcrax.boopsnoot://') || 
             frontendRedirectUrl.includes('com.praxcrax.boopsnoot')
         );
         
@@ -172,9 +173,10 @@ exports.googleAuthCallback = async (req, res) => {
             throw new Error("Authorization code not provided");
         }
 
-        // Determine which client to use based on the redirect URL
+        // Updated to detect both old and new URI schemes for Android
         const isAndroidApp = frontendRedirectUrl && (
             frontendRedirectUrl.startsWith('boopsnoot://') || 
+            frontendRedirectUrl.startsWith('com.praxcrax.boopsnoot://') || 
             frontendRedirectUrl.includes('com.praxcrax.boopsnoot')
         );
         

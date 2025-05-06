@@ -20,7 +20,8 @@
           "locationWhenInUsePermission": "Allow BoopSnoot to access your location while using the app."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin"
     ],
     "ios": {
       "supportsTablet": true,
@@ -31,7 +32,10 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["boopsnoot"]
+            "CFBundleURLSchemes": [
+              "com.praxcrax.boopsnoot",
+              "boopsnoot"
+            ]
           }
         ]
       }
@@ -64,7 +68,7 @@
         }
       ]
     },
-    "scheme": "boopsnoot",
+    "scheme": "com.praxcrax.boopsnoot",
     "web": {
       "favicon": "./src/assets/boopsnoot.png"
     },
