@@ -1,10 +1,15 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+// Load environment variables directly in the controller for extra security
+require('dotenv').config();
+
 const User = require("../models/User");
 const { OAuth2Client } = require("google-auth-library");
 
 // Initialize Google OAuth client
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+);
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -99,8 +104,108 @@ exports.login = async (req, res) => {
     }
 };
 
-// @desc    Authenticate with Google
-// @route   POST /api/auth/google
+// @desc    Redirect to Google OAuth login
+// @route   GET /api/auth/google
+// @access  Public
+exports.googleAuthRedirect = (req, res) => {
+    try {
+        // Get the redirect URL from the frontend
+        const frontendRedirectUrl = req.query.redirect_url || process.env.FRONTEND_URL;
+        
+        console.log("Google Auth Redirect:");
+        console.log(`Frontend redirect URL: ${frontendRedirectUrl}`);
+        console.log(`Client ID being used: ${process.env.GOOGLE_CLIENT_ID}`);
+        
+        // Generate the authentication URL from Google
+        const authUrl = googleClient.generateAuthUrl({
+            access_type: 'offline',
+            scope: ['profile', 'email'],
+            prompt: 'consent', // to ensure we get the refresh token
+            state: encodeURIComponent(frontendRedirectUrl), // Pass frontend redirect URL in state
+            client_id: process.env.GOOGLE_CLIENT_ID // Explicitly include client_id
+        });
+
+        console.log(`Generated auth URL: ${authUrl}`);
+        
+        // Redirect the user to the Google auth URL
+        res.redirect(authUrl);
+    } catch (error) {
+        console.error("Google auth redirect error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to initiate Google authentication",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        });
+    }
+};
+
+// @desc    Google OAuth callback handler
+// @route   GET /api/auth/google/callback
+// @access  Public
+exports.googleAuthCallback = async (req, res) => {
+    try {
+        const { code, state } = req.query;
+        const frontendRedirectUrl = decodeURIComponent(state);
+        
+        if (!code) {
+            throw new Error("Authorization code not provided");
+        }
+
+        // Exchange code for tokens
+        const { tokens } = await googleClient.getToken(code);
+        const { access_token, id_token } = tokens;
+
+        // Verify the token
+        const ticket = await googleClient.verifyIdToken({
+            idToken: id_token,
+            audience: process.env.GOOGLE_CLIENT_ID
+        });
+
+        const payload = ticket.getPayload();
+        const { sub: googleId, email, name, picture } = payload;
+
+        // Check if user exists
+        let user = await User.findOne({ googleId });
+
+        if (!user) {
+            // Check if email exists
+            const existingEmail = await User.findOne({ email });
+
+            if (existingEmail) {
+                // Link Google account to existing email account
+                existingEmail.googleId = googleId;
+                existingEmail.isGoogleUser = true;
+                existingEmail.profilePicture = existingEmail.profilePicture || picture;
+                await existingEmail.save();
+                user = existingEmail;
+                console.log(`Linked Google account to existing email: ${email}`);
+            } else {
+                // Create new user with Google data
+                user = await User.create({
+                    name,
+                    email,
+                    googleId,
+                    isGoogleUser: true,
+                    profilePicture: picture,
+                });
+                console.log(`Created new user from Google auth: ${email}`);
+            }
+        }
+
+        // Generate JWT token for our app
+        const token = user.generateAuthToken();
+
+        // Redirect to the frontend with the token
+        res.redirect(`${frontendRedirectUrl}?token=${token}`);
+        
+    } catch (error) {
+        console.error("Google auth callback error:", error);
+        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=${encodeURIComponent(error.message)}`);
+    }
+};
+
+// @desc    Authenticate with Google (legacy direct token method)
+// @route   POST /api/auth/google/token
 // @access  Public
 exports.googleAuth = async (req, res) => {
     try {

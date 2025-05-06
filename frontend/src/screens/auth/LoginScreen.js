@@ -138,35 +138,27 @@ const LoginScreen = ({ navigation }) => {
         }
     };
 
-    const handleGoogleLogin = async () => {
+    // Handle Google sign-in
+    const handleGoogleSignIn = async () => {
+        setIsGoogleLoading(true);
+        setErrors({ email: null, password: null }); // Clear previous errors
+
         try {
-            setIsGoogleLoading(true);
+            const result = await loginWithGoogle();
             
-            // Log the platform for debugging
-            console.log(`Attempting Google login on platform: ${Platform.OS}`);
-            
-            const result = await GoogleAuthService.signInWithGoogle();
-            console.log("Google auth result:", JSON.stringify(result).substring(0, 100) + "...");
-            
-            if (result.success) {
-                console.log("Google authentication successful, calling backend...");
-                // Use the token to log in via our backend
-                const loginResult = await loginWithGoogle(result.accessToken);
-                // AuthContext will handle the navigation if successful
-                console.log("Backend login successful");
-            } else {
-                console.error("Google auth failed:", result.error);
-                Alert.alert(
-                    "Google Login Failed",
-                    result.error || "Failed to authenticate with Google. Please try again."
-                );
+            if (!result.success) {
+                setErrors(prev => ({
+                    ...prev,
+                    email: result.error || "Google login failed. Please try again."
+                }));
             }
+            // Success is handled by AuthContext's loginWithGoogle which sets isAuthenticated
         } catch (error) {
-            console.error("Google login error:", error);
-            Alert.alert(
-                "Google Login Failed",
-                error.message || "Failed to login with Google. Please try again."
-            );
+            console.error("Google Sign-in error:", error);
+            setErrors(prev => ({
+                ...prev,
+                email: error.message || "Google login failed. Please try again."
+            }));
         } finally {
             setIsGoogleLoading(false);
         }
@@ -232,7 +224,7 @@ const LoginScreen = ({ navigation }) => {
                                 ? "Connecting to Google..."
                                 : "Continue with Google"
                         }
-                        onPress={handleGoogleLogin}
+                        onPress={handleGoogleSignIn}
                         type="secondary"
                         style={styles.googleButton}
                         textStyle={styles.googleButtonText}

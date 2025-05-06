@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import AuthService from "../services/AuthService";
 import PetService from "../services/PetService";
 import SocketService from "../services/SocketService";
+import GoogleAuthService from "../services/GoogleAuthService";
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -250,23 +251,36 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Login with Google
-    const loginWithGoogle = async (accessToken) => {
+    const loginWithGoogle = async () => {
         setIsLoading(true);
         setAuthError(null);
 
         try {
-            const response = await AuthService.loginWithGoogle(accessToken);
+            // Call our new Google Auth flow that uses the backend
+            const response = await GoogleAuthService.signInWithGoogle();
+            
+            if (!response.success) {
+                throw new Error(response.error || "Google authentication failed");
+            }
+            
+            // We already have the token from the auth flow, now get the user data
+            const userData = await AuthService.getCurrentUser();
+            
+            if (!userData || !userData.user) {
+                throw new Error("Failed to get user data after Google authentication");
+            }
+            
             // Store user data but DON'T set isAuthenticated yet
-            setUser(response.user);
+            setUser(userData.user);
             
             // Check if user has pets after Google login - AWAIT for the status check to complete
             await checkUserPets();
             
             // Check if we need to request location after Google login
-            if (!response.user.location || 
-                (!response.user.location.coordinates || 
-                 (response.user.location.coordinates[0] === 0 && 
-                  response.user.location.coordinates[1] === 0))) {
+            if (!userData.user.location || 
+                (!userData.user.location.coordinates || 
+                 (userData.user.location.coordinates[0] === 0 && 
+                  userData.user.location.coordinates[1] === 0))) {
                 await requestAndUpdateLocation();
             }
             
@@ -292,7 +306,7 @@ export const AuthProvider = ({ children }) => {
             // NOW set isAuthenticated to true AFTER all checks are complete
             setIsAuthenticated(true);
             
-            return { success: true, user: response.user };
+            return { success: true, user: userData.user };
         } catch (error) {
             console.error("Google login error:", error);
             setAuthError(error.message);
