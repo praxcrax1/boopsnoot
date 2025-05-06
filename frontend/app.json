@@ -20,8 +20,7 @@
           "locationWhenInUsePermission": "Allow BoopSnoot to access your location while using the app."
         }
       ],
-      "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": true,
