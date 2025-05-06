@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { API_URL, GOOGLE_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '../constants/apiConfig';
+import { API_URL, GOOGLE_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_ANDROID_REDIRECT_URI } from '../constants/apiConfig';
 
 // Register for the WebBrowser redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -20,8 +20,14 @@ const createRedirectUrl = () => {
         return window.location.origin;
     }
     
-    // For standalone apps (APK/IPA), use the direct app scheme
-    if (isStandalone) {
+    // For standalone apps (APK/IPA), use the direct app scheme with proper format
+    if (isStandalone && Platform.OS === 'android') {
+        // Use the format that Google expects for Android: scheme://host/path
+        return GOOGLE_ANDROID_REDIRECT_URI;
+    }
+    
+    // For iOS standalone
+    if (isStandalone && Platform.OS === 'ios') {
         return `${appScheme}://auth/google-callback`;
     }
     
@@ -59,6 +65,8 @@ class GoogleAuthService {
             if (result.type === 'success') {
                 // Parse the URL to extract our token
                 const responseUrl = result.url;
+                console.log('Response URL:', responseUrl);
+                
                 const urlParams = new URLSearchParams(responseUrl.split('?')[1]);
                 const token = urlParams.get('token');
                 

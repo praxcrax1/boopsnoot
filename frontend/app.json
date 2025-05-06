@@ -52,12 +52,7 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "boopsnoot",
-              "host": "auth",
-              "pathPrefix": "/google-callback"
-            },
-            {
-              "scheme": "boopsnoot",
+              "scheme": "com.praxcrax.boopsnoot",
               "host": "oauth2redirect",
               "pathPrefix": "/google"
             }
