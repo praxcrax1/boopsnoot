@@ -15,15 +15,38 @@ WebBrowser.maybeCompleteAuthSession();
 // Determine if we're running in a production environment
 const isProduction = !__DEV__;
 
-// Generate and log our effective redirect URI for debugging
-const effectiveRedirectUri = Platform.OS === 'android'
-    ? GOOGLE_ANDROID_REDIRECT_URI
+// Determine the app's scheme from manifest
+const appScheme = Constants.manifest?.scheme || 'boopsnoot';
+
+// Get the correct redirect URI based on platform and environment
+const getRedirectUri = () => {
+  // For Expo Go, we need to use the Expo authentication proxy
+  if (Constants.appOwnership === 'expo') {
+    return AuthSession.makeRedirectUri({
+      useProxy: true,
+    });
+  }
+  
+  // For standalone/development client builds
+  if (Platform.OS === 'android') {
+    return AuthSession.makeRedirectUri({
+      native: `${appScheme}://oauth2redirect/google`
+    });
+  }
+  
+  // For web and iOS
+  return Platform.OS === 'web' 
+    ? AuthSession.makeRedirectUri() 
     : GOOGLE_REDIRECT_URI;
+};
+
+const effectiveRedirectUri = getRedirectUri();
 
 console.log('Auth Session redirect URL:', effectiveRedirectUri);
 console.log('Environment:', isProduction ? 'Production' : 'Development');
 console.log('Expo Constants.appOwnership:', Constants.appOwnership || 'Not available');
 console.log('App manifest name:', Constants.manifest?.name || 'Not available');
+console.log('App scheme:', appScheme);
 
 // Google OAuth configuration
 const googleAuthDiscovery = {
@@ -39,30 +62,30 @@ class GoogleAuthService {
                 ? GOOGLE_ANDROID_CLIENT_ID 
                 : GOOGLE_CLIENT_ID;
             
-            // Determine the correct redirect URI based on platform and environment
-            let redirectUri;
-            
-            if (Platform.OS === 'android') {
-                // For Android, use the Expo proxy URL in production builds
-                redirectUri = GOOGLE_ANDROID_REDIRECT_URI;
-            } else {
-                // For other platforms, use the default redirect URI
-                redirectUri = GOOGLE_REDIRECT_URI;
-            }
+            // Get the appropriate redirect URI
+            const redirectUri = getRedirectUri();
             
             console.log(`Using clientId: ${clientId}`);
             console.log(`Using redirectUri: ${redirectUri}`);
             
             const scopes = ['profile', 'email'];
 
-            // Create and load the request
-            const request = new AuthSession.AuthRequest({
+            // Configure auth request
+            const config = {
                 clientId,
                 scopes,
                 redirectUri,
-                usePKCE: false,
                 responseType: 'token',
-            });
+                usePKCE: false,
+            };
+
+            // For Expo Go, we need to use the authentication proxy
+            if (Constants.appOwnership === 'expo') {
+                config.useProxy = true;
+            }
+            
+            // Create and load the request
+            const request = new AuthSession.AuthRequest(config);
 
             const result = await request.promptAsync(googleAuthDiscovery);
             console.log('Auth result type:', result.type);
