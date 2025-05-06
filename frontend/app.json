@@ -23,7 +23,18 @@
       "expo-web-browser"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.praxcrax.boopsnoot",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["boopsnoot"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,6 +51,11 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
+            {
+              "scheme": "boopsnoot",
+              "host": "auth",
+              "pathPrefix": "/google-callback"
+            },
             {
               "scheme": "boopsnoot",
               "host": "oauth2redirect",

@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { API_URL } from '../constants/apiConfig';
+import { API_URL, GOOGLE_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '../constants/apiConfig';
 
 // Register for the WebBrowser redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -11,14 +11,28 @@ WebBrowser.maybeCompleteAuthSession();
 // Get the app's URL scheme from manifest
 const appScheme = Constants.manifest?.scheme || 'boopsnoot';
 
+// Determine if we're running in a standalone app (production build) vs Expo Go
+const isStandalone = Constants.executionEnvironment === "standalone";
+
 // Create URL that the backend can redirect to after successful auth
 const createRedirectUrl = () => {
     if (Platform.OS === 'web') {
         return window.location.origin;
     }
     
-    // For mobile apps, we'll use the app scheme directly
-    return `${appScheme}://auth/google-callback`;
+    // For standalone apps (APK/IPA), use the direct app scheme
+    if (isStandalone) {
+        return `${appScheme}://auth/google-callback`;
+    }
+    
+    // For Expo Go, use the expo-auth-session proxy
+    const redirectUrl = Linking.createURL('auth/google-callback', {
+        // Use preferredScheme to specify the scheme
+        preferredScheme: appScheme,
+    });
+    
+    console.log('Created redirect URL:', redirectUrl);
+    return redirectUrl;
 };
 
 class GoogleAuthService {
@@ -27,6 +41,8 @@ class GoogleAuthService {
             // Get the redirect URL for our app
             const redirectUrl = createRedirectUrl();
             console.log('Using redirect URL:', redirectUrl);
+            console.log('Is standalone build:', isStandalone);
+            console.log('Platform:', Platform.OS);
             
             // Create a URL for our backend's Google OAuth endpoint
             const authUrl = `${API_URL}/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
@@ -88,18 +104,15 @@ class GoogleAuthService {
             const { makeRedirectUri, AuthRequest } = await import('expo-auth-session');
             
             // Get platform-specific client ID based on constants
-            const {  
-                GOOGLE_CLIENT_ID, 
-                GOOGLE_ANDROID_CLIENT_ID 
-            } = require('../constants/apiConfig');
-            
             const clientId = Platform.OS === 'android' 
                 ? GOOGLE_ANDROID_CLIENT_ID 
                 : GOOGLE_CLIENT_ID;
             
+            // For standalone builds, use the direct app scheme
+            // For Expo Go, use the auth proxy
             const redirectUri = makeRedirectUri({
-                useProxy: Constants.appOwnership === 'expo',
-                native: `${appScheme}://oauth2redirect/google`
+                useProxy: !isStandalone && Constants.appOwnership === 'expo',
+                native: isStandalone ? `${appScheme}://oauth2redirect/google` : undefined
             });
             
             console.log(`Using clientId: ${clientId}`);
@@ -123,7 +136,8 @@ class GoogleAuthService {
             };
 
             // For Expo Go, we need to use the authentication proxy
-            if (Constants.appOwnership === 'expo') {
+            // Don't use proxy for standalone builds
+            if (!isStandalone && Constants.appOwnership === 'expo') {
                 config.useProxy = true;
             }
             

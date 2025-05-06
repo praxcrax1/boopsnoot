@@ -11,6 +11,13 @@ const googleClient = new OAuth2Client(
     process.env.GOOGLE_REDIRECT_URI
 );
 
+// Initialize Android-specific Google OAuth client for redirects from APK builds
+const androidGoogleClient = new OAuth2Client(
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_ANDROID_REDIRECT_URI
+);
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -114,15 +121,29 @@ exports.googleAuthRedirect = (req, res) => {
         
         console.log("Google Auth Redirect:");
         console.log(`Frontend redirect URL: ${frontendRedirectUrl}`);
-        console.log(`Client ID being used: ${process.env.GOOGLE_CLIENT_ID}`);
+        
+        // Determine which client to use based on the redirect URL
+        // For APK builds, the redirect URL will start with boopsnoot:// 
+        const isAndroidApp = frontendRedirectUrl && (
+            frontendRedirectUrl.startsWith('boopsnoot://') || 
+            frontendRedirectUrl.includes('com.praxcrax.boopsnoot')
+        );
+        
+        const clientToUse = isAndroidApp ? androidGoogleClient : googleClient;
+        const clientId = isAndroidApp ? 
+            process.env.GOOGLE_ANDROID_CLIENT_ID : 
+            process.env.GOOGLE_CLIENT_ID;
+        
+        console.log(`Using client ID: ${clientId}`);
+        console.log(`Is Android app: ${isAndroidApp}`);
         
         // Generate the authentication URL from Google
-        const authUrl = googleClient.generateAuthUrl({
+        const authUrl = clientToUse.generateAuthUrl({
             access_type: 'offline',
             scope: ['profile', 'email'],
             prompt: 'consent', // to ensure we get the refresh token
             state: encodeURIComponent(frontendRedirectUrl), // Pass frontend redirect URL in state
-            client_id: process.env.GOOGLE_CLIENT_ID // Explicitly include client_id
+            client_id: clientId // Explicitly include client_id
         });
 
         console.log(`Generated auth URL: ${authUrl}`);
@@ -151,14 +172,30 @@ exports.googleAuthCallback = async (req, res) => {
             throw new Error("Authorization code not provided");
         }
 
+        // Determine which client to use based on the redirect URL
+        const isAndroidApp = frontendRedirectUrl && (
+            frontendRedirectUrl.startsWith('boopsnoot://') || 
+            frontendRedirectUrl.includes('com.praxcrax.boopsnoot')
+        );
+        
+        const clientToUse = isAndroidApp ? androidGoogleClient : googleClient;
+        
+        console.log(`Using client ID for callback: ${isAndroidApp ? 
+            process.env.GOOGLE_ANDROID_CLIENT_ID : 
+            process.env.GOOGLE_CLIENT_ID}`);
+        console.log(`Callback is for Android app: ${isAndroidApp}`);
+        console.log(`Frontend redirect URL: ${frontendRedirectUrl}`);
+
         // Exchange code for tokens
-        const { tokens } = await googleClient.getToken(code);
+        const { tokens } = await clientToUse.getToken(code);
         const { access_token, id_token } = tokens;
 
-        // Verify the token
-        const ticket = await googleClient.verifyIdToken({
+        // Verify the token with appropriate client
+        const ticket = await clientToUse.verifyIdToken({
             idToken: id_token,
-            audience: process.env.GOOGLE_CLIENT_ID
+            audience: isAndroidApp ? 
+                process.env.GOOGLE_ANDROID_CLIENT_ID : 
+                process.env.GOOGLE_CLIENT_ID
         });
 
         const payload = ticket.getPayload();
@@ -194,6 +231,9 @@ exports.googleAuthCallback = async (req, res) => {
 
         // Generate JWT token for our app
         const token = user.generateAuthToken();
+        
+        console.log(`Generated token for user: ${user.email}`);
+        console.log(`Redirecting to: ${frontendRedirectUrl}?token=${token.substring(0, 10)}...`);
 
         // Redirect to the frontend with the token
         res.redirect(`${frontendRedirectUrl}?token=${token}`);
