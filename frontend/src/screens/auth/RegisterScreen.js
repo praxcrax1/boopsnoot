@@ -18,7 +18,6 @@ import {
 } from "../../utils/validation";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
-import GoogleAuthService from "../../services/GoogleAuthService";
 
 const RegisterScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -151,23 +150,18 @@ const RegisterScreen = ({ navigation }) => {
             // Log the platform for debugging
             console.log(`Attempting Google signup on platform: ${Platform.OS}`);
             
-            const result = await GoogleAuthService.signInWithGoogle();
+            // Use the loginWithGoogle function from AuthContext directly
+            const result = await loginWithGoogle();
             console.log("Google auth signup result:", JSON.stringify(result).substring(0, 100) + "...");
             
-            if (result.success) {
-                console.log("Google authentication successful for signup, calling backend...");
-                // Use the token to log in via our backend
-                const loginResult = await loginWithGoogle(result.accessToken);
-                console.log("Backend Google signup successful");
-                // Remove explicit navigation and alert - AuthContext will handle this
-                // The AppNavigator will route to the right screen based on hasPets value
-            } else {
-                console.error("Google signup failed:", result.error);
+            if (!result || !result.success) {
+                console.error("Google signup failed:", result?.error || "Unknown error");
                 Alert.alert(
                     "Authentication Failed", 
-                    result.error || "Failed to authenticate with Google. Please try again."
+                    result?.error || "Failed to authenticate with Google. Please try again."
                 );
             }
+            // Success is handled by AuthContext - no need to do anything else
         } catch (error) {
             console.error("Google auth error:", error);
             Alert.alert(

@@ -41,7 +41,7 @@ export const useGoogleAuth = () => {
         console.log('Successfully obtained Google access token');
         
         // Send the token to your backend for verification and user creation/login
-        const backendResponse = await fetch(`${API_URL}/auth/google-token`, {
+        const backendResponse = await fetch(`${API_URL}/auth/google/token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ class GoogleAuthService {
   async processTokenResponse(accessToken) {
     try {
       // Send the token to your backend for verification and user creation/login
-      const backendResponse = await fetch(`${API_URL}/auth/google-token`, {
+      const backendResponse = await fetch(`${API_URL}/auth/google/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
