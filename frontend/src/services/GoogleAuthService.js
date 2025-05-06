@@ -12,9 +12,7 @@ const googleConfig = {
   expoClientId: GOOGLE_CLIENT_ID,
   androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   iosClientId: GOOGLE_CLIENT_ID,
-  // iOS client ID would go here if you have one
-  // iosClientId: GOOGLE_IOS_CLIENT_ID,
-  // webClientId: GOOGLE_WEB_CLIENT_ID,
+  webClientId: GOOGLE_CLIENT_ID,
   scopes: ['profile', 'email']
 };
 

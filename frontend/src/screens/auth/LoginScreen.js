@@ -13,7 +13,6 @@ import { AuthContext } from "../../contexts/AuthContext";
 import { validateEmail, validatePassword } from "../../utils/validation";
 import InputField from "../../components/InputField";
 import Button from "../../components/Button";
-import GoogleAuthService from "../../services/GoogleAuthService";
 
 const LoginScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
