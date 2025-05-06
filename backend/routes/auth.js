@@ -8,9 +8,7 @@ router.post("/register", authController.register);
 router.post("/login", authController.login);
 
 // Google OAuth routes
-router.get("/google", authController.googleAuthRedirect);
-router.get("/google/callback", authController.googleAuthCallback);
-router.post("/google/token", authController.googleAuth); // Legacy route for backward compatibility
+router.post("/google/token", authController.googleAuth);
 
 // Protected routes
 router.get("/me", protect, authController.getMe);

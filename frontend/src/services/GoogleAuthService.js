@@ -22,24 +22,24 @@ const googleConfig = {
 export const useGoogleAuth = () => {
   // Using the Google auth hook properly inside a React component
   const [request, response, promptAsync] = Google.useAuthRequest(googleConfig);
-  
+
   const signIn = async () => {
     try {
       console.log('Starting Google auth flow');
       console.log('Platform:', Platform.OS);
       console.log('Is standalone build:', Constants.executionEnvironment === 'standalone');
-      
+
       // Start the auth flow
       const result = await promptAsync();
       console.log('Auth result type:', result.type);
-      
+
       if (result.type === 'success') {
         // Get the access token from the response
         const { authentication } = result;
         const accessToken = authentication.accessToken;
-        
+
         console.log('Successfully obtained Google access token');
-        
+
         // Send the token to your backend for verification and user creation/login
         const backendResponse = await fetch(`${API_URL}/auth/google/token`, {
           method: 'POST',
@@ -48,9 +48,9 @@ export const useGoogleAuth = () => {
           },
           body: JSON.stringify({ accessToken }),
         });
-        
+
         const data = await backendResponse.json();
-        
+
         if (!backendResponse.ok) {
           console.error('Backend verification failed:', data);
           return {
@@ -58,30 +58,56 @@ export const useGoogleAuth = () => {
             error: data.message || 'Failed to verify with backend'
           };
         }
-        
+
         // Store the JWT token from our backend
         const token = data.token;
-        await AsyncStorage.setItem('token', token);
-        console.log('Successfully authenticated with backend');
-        
+        if (!token) {
+          console.error('No token received from backend');
+          return {
+            success: false,
+            error: 'No authentication token received from server'
+          };
+        }
+
+        try {
+          // Make sure to store the token properly
+          await AsyncStorage.setItem('token', token);
+          // Double check that token was stored
+          const storedToken = await AsyncStorage.getItem('token');
+          if (!storedToken) {
+            console.error('Token was not stored properly');
+            return {
+              success: false,
+              error: 'Failed to store authentication token'
+            };
+          }
+          console.log('Successfully authenticated with backend and stored token');
+        } catch (storageError) {
+          console.error('Error storing token:', storageError);
+          return {
+            success: false,
+            error: 'Failed to store authentication token'
+          };
+        }
+
         return { success: true, token };
       } else {
         console.warn('Google sign in was not successful:', result.type);
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Google sign in was cancelled or failed',
-          details: result 
+          details: result
         };
       }
     } catch (error) {
       console.error('Google auth error:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Failed to authenticate with Google' 
+      return {
+        success: false,
+        error: error.message || 'Failed to authenticate with Google'
       };
     }
   };
-  
+
   return {
     request,
     response,
@@ -103,9 +129,9 @@ class GoogleAuthService {
         },
         body: JSON.stringify({ accessToken }),
       });
-      
+
       const data = await backendResponse.json();
-      
+
       if (!backendResponse.ok) {
         console.error('Backend verification failed:', data);
         return {
@@ -113,18 +139,43 @@ class GoogleAuthService {
           error: data.message || 'Failed to verify with backend'
         };
       }
-      
+
       // Store the JWT token from our backend
       const token = data.token;
-      await AsyncStorage.setItem('token', token);
-      console.log('Successfully authenticated with backend');
-      
+      if (!token) {
+        console.error('No token received from backend');
+        return {
+          success: false,
+          error: 'No authentication token received from server'
+        };
+      }
+
+      try {
+        await AsyncStorage.setItem('token', token);
+        // Verify token was stored
+        const storedToken = await AsyncStorage.getItem('token');
+        if (!storedToken) {
+          console.error('Token was not stored properly');
+          return {
+            success: false,
+            error: 'Failed to store authentication token'
+          };
+        }
+        console.log('Successfully authenticated with backend');
+      } catch (storageError) {
+        console.error('Error storing token:', storageError);
+        return {
+          success: false,
+          error: 'Failed to store authentication token'
+        };
+      }
+
       return { success: true, token };
     } catch (error) {
       console.error('Backend verification error:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Failed to verify with backend' 
+      return {
+        success: false,
+        error: error.message || 'Failed to verify with backend'
       };
     }
   }

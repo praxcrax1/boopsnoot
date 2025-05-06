@@ -267,6 +267,19 @@ export const AuthProvider = ({ children }) => {
                 throw new Error(response.error || "Google authentication failed");
             }
             
+            // Explicitly verify the token is set in AsyncStorage
+            const storedToken = await AsyncStorage.getItem('token');
+            if (!storedToken) {
+                console.error("No token found after Google sign-in");
+                // Try to set the token again if it's available in the response
+                if (response.token) {
+                    await AsyncStorage.setItem('token', response.token);
+                    console.log("Re-stored token from Google response");
+                } else {
+                    throw new Error("Authentication token not received from server");
+                }
+            }
+            
             // We already have the token from the auth flow, now get the user data
             const userData = await AuthService.getCurrentUser();
             

@@ -144,21 +144,45 @@ const LoginScreen = ({ navigation }) => {
         setErrors({ email: null, password: null }); // Clear previous errors
 
         try {
+            // Call the AuthContext's loginWithGoogle method
             const result = await loginWithGoogle();
             
+            // Only show errors if the Google login failed
             if (!result.success) {
+                console.error("Google login failed:", result.error);
                 setErrors(prev => ({
                     ...prev,
                     email: result.error || "Google login failed. Please try again."
                 }));
+                setTouched(prev => ({
+                    ...prev,
+                    email: true
+                }));
+                
+                // Show error alert for better visibility
+                Alert.alert(
+                    "Login Failed",
+                    result.error || "Failed to login with Google. Please try again."
+                );
             }
-            // Success is handled by AuthContext's loginWithGoogle which sets isAuthenticated
+            // Success is handled by AuthContext which sets isAuthenticated
+            
         } catch (error) {
             console.error("Google Sign-in error:", error);
             setErrors(prev => ({
                 ...prev,
                 email: error.message || "Google login failed. Please try again."
             }));
+            setTouched(prev => ({
+                ...prev,
+                email: true
+            }));
+            
+            // Show error alert
+            Alert.alert(
+                "Login Error",
+                error.message || "Google login failed. Please try again."
+            );
         } finally {
             setIsGoogleLoading(false);
         }

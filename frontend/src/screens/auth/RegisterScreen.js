@@ -144,26 +144,53 @@ const RegisterScreen = ({ navigation }) => {
     };
 
     const handleGoogleSignup = async () => {
+        setIsGoogleLoading(true);
+        setErrors({
+            name: null,
+            email: null,
+            password: null,
+            confirmPassword: null
+        }); // Clear previous errors
+        
         try {
-            setIsGoogleLoading(true);
-            
             // Log the platform for debugging
             console.log(`Attempting Google signup on platform: ${Platform.OS}`);
             
             // Use the loginWithGoogle function from AuthContext directly
             const result = await loginWithGoogle();
-            console.log("Google auth signup result:", JSON.stringify(result).substring(0, 100) + "...");
             
-            if (!result || !result.success) {
-                console.error("Google signup failed:", result?.error || "Unknown error");
+            // Only process errors - success is handled by AuthContext
+            if (!result.success) {
+                console.error("Google signup failed:", result.error);
+                setErrors(prev => ({
+                    ...prev,
+                    email: result.error || "Google signup failed. Please try again."
+                }));
+                setTouched(prev => ({
+                    ...prev,
+                    email: true
+                }));
+                
+                // Show error alert for better visibility
                 Alert.alert(
-                    "Authentication Failed", 
-                    result?.error || "Failed to authenticate with Google. Please try again."
+                    "Signup Failed",
+                    result.error || "Failed to sign up with Google. Please try again."
                 );
             }
-            // Success is handled by AuthContext - no need to do anything else
+            // Success is handled by AuthContext which sets isAuthenticated
+            
         } catch (error) {
             console.error("Google auth error:", error);
+            setErrors(prev => ({
+                ...prev,
+                email: error.message || "Google signup failed. Please try again."
+            }));
+            setTouched(prev => ({
+                ...prev,
+                email: true
+            }));
+            
+            // Show error alert
             Alert.alert(
                 "Authentication Error",
                 error.message || "Failed to authenticate with Google"
