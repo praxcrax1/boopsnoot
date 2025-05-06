@@ -4,51 +4,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { GOOGLE_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, API_URL } from '../constants/apiConfig';
-
 // Register for the WebBrowser redirect
 WebBrowser.maybeCompleteAuthSession();
 
-class GoogleAuthService {
-  constructor() {
-    // Initialize Google auth request
-    const [request, response, promptAsync] = Google.useAuthRequest({
-      expoClientId: GOOGLE_CLIENT_ID,
-      androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-      // iOS client ID would go here if you have one
-      // iosClientId: GOOGLE_IOS_CLIENT_ID,
-      // Web client ID if you support web
-      // webClientId: GOOGLE_WEB_CLIENT_ID,
-      scopes: ['profile', 'email'],
-    });
-    
-    this.request = request;
-    this.response = response;
-    this.promptAsync = promptAsync;
-  }
+// Configuration for Google Authentication
+const googleConfig = {
+  expoClientId: GOOGLE_CLIENT_ID,
+  androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+  iosClientId: GOOGLE_CLIENT_ID,
+  // iOS client ID would go here if you have one
+  // iosClientId: GOOGLE_IOS_CLIENT_ID,
+  // webClientId: GOOGLE_WEB_CLIENT_ID,
+  scopes: ['profile', 'email']
+};
 
-  async signInWithGoogle() {
+// This hook must be used inside React components
+export const useGoogleAuth = () => {
+  // Using the Google auth hook properly inside a React component
+  const [request, response, promptAsync] = Google.useAuthRequest(googleConfig);
+  
+  const signIn = async () => {
     try {
-      // This is a class method but we're using React hooks in the constructor
-      // So we need to create a new instance each time this method is called
-      const [request, _, promptAsync] = Google.useAuthRequest({
-        expoClientId: GOOGLE_CLIENT_ID,
-        androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-        // iOS client ID would go here if you have one
-        // iosClientId: GOOGLE_IOS_CLIENT_ID,
-        scopes: ['profile', 'email'],
-      });
-
       console.log('Starting Google auth flow');
       console.log('Platform:', Platform.OS);
       console.log('Is standalone build:', Constants.executionEnvironment === 'standalone');
       
       // Start the auth flow
-      const response = await promptAsync();
-      console.log('Auth result type:', response.type);
+      const result = await promptAsync();
+      console.log('Auth result type:', result.type);
       
-      if (response.type === 'success') {
+      if (result.type === 'success') {
         // Get the access token from the response
-        const { authentication } = response;
+        const { authentication } = result;
         const accessToken = authentication.accessToken;
         
         console.log('Successfully obtained Google access token');
@@ -79,11 +66,11 @@ class GoogleAuthService {
         
         return { success: true, token };
       } else {
-        console.warn('Google sign in was not successful:', response.type);
+        console.warn('Google sign in was not successful:', result.type);
         return { 
           success: false, 
           error: 'Google sign in was cancelled or failed',
-          details: response 
+          details: result 
         };
       }
     } catch (error) {
@@ -91,6 +78,53 @@ class GoogleAuthService {
       return { 
         success: false, 
         error: error.message || 'Failed to authenticate with Google' 
+      };
+    }
+  };
+  
+  return {
+    request,
+    response,
+    signIn
+  };
+};
+
+// This is a singleton class for non-hook based access
+// It will need to be used alongside components that use the hooks
+class GoogleAuthService {
+  // For any methods that don't need hooks
+  async processTokenResponse(accessToken) {
+    try {
+      // Send the token to your backend for verification and user creation/login
+      const backendResponse = await fetch(`${API_URL}/auth/google-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accessToken }),
+      });
+      
+      const data = await backendResponse.json();
+      
+      if (!backendResponse.ok) {
+        console.error('Backend verification failed:', data);
+        return {
+          success: false,
+          error: data.message || 'Failed to verify with backend'
+        };
+      }
+      
+      // Store the JWT token from our backend
+      const token = data.token;
+      await AsyncStorage.setItem('token', token);
+      console.log('Successfully authenticated with backend');
+      
+      return { success: true, token };
+    } catch (error) {
+      console.error('Backend verification error:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Failed to verify with backend' 
       };
     }
   }

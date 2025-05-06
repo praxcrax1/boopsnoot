@@ -4,7 +4,8 @@ import * as Location from 'expo-location';
 import AuthService from "../services/AuthService";
 import PetService from "../services/PetService";
 import SocketService from "../services/SocketService";
-import GoogleAuthService from "../services/GoogleAuthService";
+// Import the hook instead of the class instance
+import { useGoogleAuth } from "../services/GoogleAuthService";
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -18,6 +19,9 @@ export const AuthProvider = ({ children }) => {
     const [hasPets, setHasPets] = useState(false);
     const [checkingPetStatus, setCheckingPetStatus] = useState(true);
     const [transitioningToPetSetup, setTransitioningToPetSetup] = useState(false);
+    
+    // Use the Google Auth hook
+    const { signIn: googleSignIn } = useGoogleAuth();
 
     // Check for existing token and load user data on app start
     useEffect(() => {
@@ -256,8 +260,8 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
 
         try {
-            // Call our new Google Auth flow that uses the backend
-            const response = await GoogleAuthService.signInWithGoogle();
+            // Call our hook-based Google Auth flow
+            const response = await googleSignIn();
             
             if (!response.success) {
                 throw new Error(response.error || "Google authentication failed");
