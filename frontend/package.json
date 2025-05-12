@@ -30,6 +30,7 @@
     "expo-location": "~18.1.4",
     "expo-notifications": "~0.31.1",
     "expo-random": "^14.0.1",
+    "expo-secure-store": "^14.2.3",
     "expo-status-bar": "~2.2.3",
     "expo-web-browser": "~14.1.6",
     "react": "19.0.0",

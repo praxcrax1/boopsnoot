@@ -1,11 +1,15 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from 'expo-location';
+import * as WebBrowser from 'expo-web-browser';
 import AuthService from "../services/AuthService";
 import PetService from "../services/PetService";
 import SocketService from "../services/SocketService";
-// Import the hook instead of the class instance
+// Import the hook from the Google Auth Service
 import { useGoogleAuth } from "../services/GoogleAuthService";
+
+// Register for WebBrowser redirect
+WebBrowser.maybeCompleteAuthSession();
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -254,46 +258,33 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Login with Google
+    // Login with Google - Simplified implementation
     const loginWithGoogle = async () => {
         setIsLoading(true);
         setAuthError(null);
 
         try {
-            // Call our hook-based Google Auth flow
+            // Call our simplified Google Auth flow
             const response = await googleSignIn();
             
             if (!response.success) {
                 throw new Error(response.error || "Google authentication failed");
             }
             
-            // Explicitly verify the token is set in AsyncStorage
-            const storedToken = await AsyncStorage.getItem('token');
-            if (!storedToken) {
-                console.error("No token found after Google sign-in");
-                // Try to set the token again if it's available in the response
-                if (response.token) {
-                    await AsyncStorage.setItem('token', response.token);
-                    console.log("Re-stored token from Google response");
-                } else {
-                    throw new Error("Authentication token not received from server");
-                }
-            }
-            
-            // We already have the token from the auth flow, now get the user data
+            // Get the user data from our backend using the token that was stored during signIn
             const userData = await AuthService.getCurrentUser();
             
             if (!userData || !userData.user) {
                 throw new Error("Failed to get user data after Google authentication");
             }
             
-            // Store user data but DON'T set isAuthenticated yet
+            // Store user data
             setUser(userData.user);
             
-            // Check if user has pets after Google login - AWAIT for the status check to complete
+            // Check if user has pets
             await checkUserPets();
             
-            // Check if we need to request location after Google login
+            // Check if we need to request location
             if (!userData.user.location || 
                 (!userData.user.location.coordinates || 
                  (userData.user.location.coordinates[0] === 0 && 
@@ -301,26 +292,22 @@ export const AuthProvider = ({ children }) => {
                 await requestAndUpdateLocation();
             }
             
-            // Check for unread messages that arrived while offline
+            // Check for unread messages
             try {
-                // Fetch chats to update unread status
                 const chatService = require("../services/ChatService").default;
                 await chatService.getChats();
                 
-                // Directly check if there are unread messages after login
                 const unreadData = await AsyncStorage.getItem('unreadChats');
                 if (unreadData) {
                     const unreadChats = JSON.parse(unreadData);
                     const hasUnreadMessages = Object.keys(unreadChats).length > 0;
-                    
-                    // Directly set the flag in AsyncStorage to trigger notification badge
                     await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnreadMessages));
                 }
             } catch (error) {
                 console.error("Error checking for unread messages after Google login:", error);
             }
             
-            // NOW set isAuthenticated to true AFTER all checks are complete
+            // Set authenticated after all checks are complete
             setIsAuthenticated(true);
             
             return { success: true, user: userData.user };
