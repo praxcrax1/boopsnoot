@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { API_URL, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_CLIENT_ID } from '../constants/apiConfig';
 import * as AuthSession from 'expo-auth-session';
 
@@ -26,16 +24,6 @@ export const useGoogleAuth = () => {
       useProxy: false,
     }),
   });
-
-  const [authResult, setAuthResult] = useState(null);
-
-  // Warm up the browser to improve UX
-  useEffect(() => {
-    WebBrowser.warmUpAsync();
-    return () => {
-      WebBrowser.coolDownAsync();
-    };
-  }, []);
 
   // Handle the authentication response
   useEffect(() => {
@@ -74,7 +62,6 @@ export const useGoogleAuth = () => {
           // Also store in AsyncStorage for compatibility with existing code
           await AsyncStorage.setItem('token', token);
 
-          setAuthResult({ success: true, token });
         } catch (error) {
           console.error('Error during backend token exchange:', error);
         }
@@ -108,13 +95,6 @@ export const useGoogleAuth = () => {
   };
 
   return {
-    request,
-    response,
-    signIn,
-    authResult,
-    isLoading: !request,
+    signIn
   };
 };
-
-// For backward compatibility
-export default { processTokenResponse: () => console.warn('Using deprecated GoogleAuthService class') };
