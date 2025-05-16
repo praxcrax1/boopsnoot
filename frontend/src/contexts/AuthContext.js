@@ -58,8 +58,6 @@ export const AuthProvider = ({ children }) => {
                 setIsAuthenticated(false);
                 setUser(null);
             } finally {
-                // Add slight delay before removing the loading state
-                // to ensure smoother transitions
                 setTimeout(() => {
                     setIsLoading(false);
                 }, 300);
@@ -85,8 +83,7 @@ export const AuthProvider = ({ children }) => {
     const requestAndUpdateLocation = async () => {
         try {
             setIsLoading(true);
-            
-            // Request permissions first
+
             const { status } = await Location.requestForegroundPermissionsAsync();
             setLocationPermissionStatus(status);
             
@@ -95,22 +92,19 @@ export const AuthProvider = ({ children }) => {
                 return false;
             }
             
-            // Get current position
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
             });
             
-            // Update user with location information
             if (location && location.coords) {
                 const { latitude, longitude } = location.coords;
                 
-                // Get address information
+
                 const [addressInfo] = await Location.reverseGeocodeAsync({
                     latitude,
                     longitude
                 });
                 
-                // Prepare location data with proper GeoJSON format
                 const locationData = {
                     location: {
                         type: 'Point', // Required for GeoJSON
@@ -122,11 +116,10 @@ export const AuthProvider = ({ children }) => {
                     }
                 };
                 
-                // Update user in backend
+
                 const response = await AuthService.updateUserLocation(locationData);
                 
                 if (response.success) {
-                    // Update local user state
                     setUser(prevUser => ({
                         ...prevUser,
                         ...locationData
@@ -152,17 +145,9 @@ export const AuthProvider = ({ children }) => {
 
         try {
             const response = await AuthService.register(userData);
-            // Store user data but DON'T set isAuthenticated yet
             setUser(response.user);
-            
-            // For new registrations, check if they might have pets already (rare case but possible)
-            // AWAIT for the status check to complete
-            await checkUserPets();
-            
-            // After successful registration, request location
             await requestAndUpdateLocation();
             
-            // NOW set isAuthenticated to true AFTER all checks are complete
             setIsAuthenticated(true);
             
             return { success: true, user: response.user };
@@ -214,15 +199,12 @@ export const AuthProvider = ({ children }) => {
                 console.error("Error checking for unread messages after login:", error);
             }
             
-            // NOW set isAuthenticated to true AFTER all checks are complete
             setIsAuthenticated(true);
             
             return { success: true, user: response.user };
         } catch (error) {
             console.error("Login error:", error);
             setAuthError(error.message);
-            // Return the complete error object instead of just the message
-            // This will include errorType if it exists
             throw error;
         } finally {
             setIsLoading(false);

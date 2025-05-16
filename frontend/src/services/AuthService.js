@@ -85,7 +85,7 @@ class AuthService {
 
     async loginWithGoogle(accessToken) {
         try {
-            const response = await apiClient.post("/auth/google", {
+            const response = await apiClient.post("/auth/google/token", {
                 accessToken
             });
             await AsyncStorage.setItem("token", response.data.token);
