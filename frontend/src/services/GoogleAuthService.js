@@ -1,17 +1,21 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as AuthSession from "expo-auth-session";
 import {
+    API_URL,
     GOOGLE_ANDROID_CLIENT_ID,
     GOOGLE_CLIENT_ID,
 } from "../constants/apiConfig";
-import * as AuthSession from "expo-auth-session";
 import AuthService from "./AuthService";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export const useGoogleAuth = () => {
+    const accessTokenRef = useRef(null);
+    const resolverRef = useRef(null);
+
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: GOOGLE_ANDROID_CLIENT_ID,
         iosClientId: GOOGLE_ANDROID_CLIENT_ID,
@@ -23,54 +27,89 @@ export const useGoogleAuth = () => {
         }),
     });
 
+    // Listen to the auth response after the redirect
+    useEffect(() => {
+        const handleResponse = async () => {
+            if (response?.type === "success") {
+                const { authentication } = response;
+                if (authentication?.accessToken) {
+                    accessTokenRef.current = authentication.accessToken;
+
+                    // Resolve the promise waiting in signIn()
+                    if (resolverRef.current) {
+                        resolverRef.current({
+                            success: true,
+                            accessToken: authentication.accessToken,
+                        });
+                        resolverRef.current = null;
+                    }
+                } else {
+                    console.error(
+                        "Access token missing in authentication object"
+                    );
+                    if (resolverRef.current) {
+                        resolverRef.current({
+                            success: false,
+                            error: "Missing access token",
+                        });
+                        resolverRef.current = null;
+                    }
+                }
+            } else if (response?.type === "error") {
+                console.error("Google auth error:", response.error);
+                if (resolverRef.current) {
+                    resolverRef.current({
+                        success: false,
+                        error: "Authentication error",
+                    });
+                    resolverRef.current = null;
+                }
+            }
+        };
+
+        handleResponse();
+    }, [response]);
+
     const signIn = async () => {
         try {
-            console.log("Starting Google authentication flow");
+            const promptResult = await promptAsync();
 
-            const result = await promptAsync();
+            return await new Promise((resolve) => {
+                resolverRef.current = async ({
+                    success,
+                    accessToken,
+                    error,
+                }) => {
+                    if (!success) {
+                        return resolve({ success: false, error });
+                    }
 
-            if (result.type !== "success") {
-                console.error("Authentication was not successful");
-                return { success: false, error: "Authentication failed" };
-            }
+                    try {
+                        const backendResponse = await AuthService.loginWithGoogle(accessToken)
 
-            const { authentication } = result;
-            if (!authentication || !authentication.accessToken) {
-                console.error(
-                    "Authentication object is null or missing accessToken"
-                );
-                return { success: false, error: "Missing access token" };
-            }
+                        if (!backendResponse.token) {
+                            return resolve({
+                                success: false,
+                                error:
+                                    backendResponse?.error ||
+                                    "Backend authentication failed",
+                            });
+                        }
 
-            const accessToken = authentication.accessToken;
-
-            const backendResponse = await AuthService.loginWithGoogle(
-                accessToken
-            );
-
-            if (!backendResponse.success) {
-                console.error("Backend verification failed:", backendResponse);
-                return { success: false, error: "Backend verification failed" };
-            }
-
-            const token = backendResponse.token;
-            if (!token) {
-                console.error("No token received from backend");
-                return {
-                    success: false,
-                    error: "No token received from backend",
+                        await AsyncStorage.setItem("token", backendResponse.token);
+                        resolve({ success: true });
+                    } catch (err) {
+                        console.error("Backend auth error:", err);
+                        resolve({
+                            success: false,
+                            error: err.message || "Network error",
+                        });
+                    }
                 };
-            }
-
-            await AsyncStorage.setItem("token", token);
-
-            return { success: true };
-        } catch (error) {
-            console.error("Google authentication error:", error);
-            return {
-                success: false,
-                error: error.message || "Failed to authenticate with Google",
-            };
+            });
+        } catch (err) {
+            console.error("Google login error:", err);
+            return { success: false, error: err.message || "Unknown error" };
         }
     };
 
