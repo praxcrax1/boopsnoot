@@ -1,23 +1,16 @@
-import React, { useEffect } from "react";
+import React from "react";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-    API_URL,
     GOOGLE_ANDROID_CLIENT_ID,
     GOOGLE_CLIENT_ID,
 } from "../constants/apiConfig";
 import * as AuthSession from "expo-auth-session";
 import AuthService from "./AuthService";
 
-// Register for the WebBrowser redirect
 WebBrowser.maybeCompleteAuthSession();
 
-/**
- * Hook for Google authentication
- * This provides a simplified interface for Google OAuth authentication
- * that works in both development and production environments
- */
 export const useGoogleAuth = () => {
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: GOOGLE_ANDROID_CLIENT_ID,
@@ -30,61 +23,47 @@ export const useGoogleAuth = () => {
         }),
     });
 
-    // Handle the authentication response
-    useEffect(() => {
-        const handleAuthResponse = async () => {
-            if (response?.type === "success") {
-                const { authentication } = response;
-                if (!authentication || !authentication.accessToken) {
-                    console.error(
-                        "Authentication object is null or missing accessToken"
-                    );
-                    return;
-                }
-
-                const accessToken = authentication.accessToken;
-
-                try {
-                    const backendResponse = await AuthService.loginWithGoogle(accessToken);
-                    const data = await backendResponse.json();
-
-                    if (!backendResponse.ok) {
-                        console.error("Backend verification failed:", data);
-                        return;
-                    }
-
-                    const token = data.token;
-                    if (!token) {
-                        console.error("No token received from backend");
-                        return;
-                    }
-                    // Also store in AsyncStorage for compatibility with existing code
-                    await AsyncStorage.setItem("token", token);
-                } catch (error) {
-                    console.error(
-                        "Error during backend token exchange:",
-                        error
-                    );
-                }
-            } else if (response?.type === "error") {
-                console.error("Authentication error:", response.error);
-            }
-        };
-
-        handleAuthResponse();
-    }, [response]);
-
-    /**
-     * Initiates Google Sign-In flow
-     */
     const signIn = async () => {
         try {
             console.log("Starting Google authentication flow");
 
-            // Start OAuth flow
-            await promptAsync();
+            const result = await promptAsync();
 
-            // The response will be handled in the useEffect above
+            if (result.type !== "success") {
+                console.error("Authentication was not successful");
+                return { success: false, error: "Authentication failed" };
+            }
+
+            const { authentication } = result;
+            if (!authentication || !authentication.accessToken) {
+                console.error(
+                    "Authentication object is null or missing accessToken"
+                );
+                return { success: false, error: "Missing access token" };
+            }
+
+            const accessToken = authentication.accessToken;
+
+            const backendResponse = await AuthService.loginWithGoogle(
+                accessToken
+            );
+
+            if (!backendResponse.success) {
+                console.error("Backend verification failed:", backendResponse);
+                return { success: false, error: "Backend verification failed" };
+            }
+
+            const token = backendResponse.token;
+            if (!token) {
+                console.error("No token received from backend");
+                return {
+                    success: false,
+                    error: "No token received from backend",
+                };
+            }
+
+            await AsyncStorage.setItem("token", token);
+
             return { success: true };
         } catch (error) {
             console.error("Google authentication error:", error);
