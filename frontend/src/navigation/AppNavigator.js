@@ -3,7 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import { AuthContext } from "../contexts/AuthContext";
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 import { navigationRef } from '../../App';
@@ -29,12 +29,10 @@ import SettingsScreen from "../screens/SettingsScreen";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Authentication stack navigator
+
 const AuthStack = () => {
     const { authError } = useContext(AuthContext);
     
-    // If there's an auth error, it means we attempted login/register and failed
-    // In this case, we should start at Login screen instead of Splash
     return (
         <Stack.Navigator 
             screenOptions={{ headerShown: false }}
@@ -42,18 +40,13 @@ const AuthStack = () => {
             <Stack.Screen name="Splash" component={SplashScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen
-                name="PetProfileSetup"
-                component={PetProfileSetupScreen}
-                options={{ gestureEnabled: false }}
-            />
         </Stack.Navigator>
     );
 };
 
-// Main tab navigator for the app
+
 const MainTabs = () => {
-    // Get unread chat status from context
+
     const { hasUnreadChats } = useContext(ChatNotificationContext);
     
     return (
@@ -115,55 +108,58 @@ const MainTabs = () => {
     );
 };
 
-// Main stack navigator including the tab navigator
-const MainStack = () => (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen
-            name="Chat"
-            component={ChatScreen}
-            options={{ headerShown: true }}
-        />
-        <Stack.Screen
-            name="PetProfile"
-            component={PetProfileScreen}
-            options={{ headerShown: false }}
-        />
-        <Stack.Screen
-            name="EditPetProfile"
-            component={EditPetProfileScreen}
-            options={{ headerShown: false }}
-        />
-        <Stack.Screen
-            name="PetProfileSetup"
-            component={PetProfileSetupScreen}
-            options={{ headerShown: false }}
-        />
-        <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{ headerShown: false }}
-        />
-    </Stack.Navigator>
-);
 
-// Root navigator that handles auth state
+const MainStack = () => {
+    const { hasPets } = useContext(AuthContext);
+    
+    return (
+        <Stack.Navigator 
+            initialRouteName={hasPets ? "MainTabs" : "PetProfileSetup"}
+            screenOptions={{ headerShown: false }}
+        >
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen
+                name="Chat"
+                component={ChatScreen}
+                options={{ headerShown: true }}
+            />
+            <Stack.Screen
+                name="PetProfile"
+                component={PetProfileScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="EditPetProfile"
+                component={EditPetProfileScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="PetProfileSetup"
+                component={PetProfileSetupScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ headerShown: false }}
+            />
+        </Stack.Navigator>
+    );
+};
+
+
 const AppNavigator = () => {
-    const { isAuthenticated, isLoading, hasPets, authError } = useContext(AuthContext);
+    const { isAuthenticated, isLoading } = useContext(AuthContext);
     const [initialLoad, setInitialLoad] = useState(true);
     
-    // Track the initial app load
     useEffect(() => {
         if (!isLoading && initialLoad) {
             setInitialLoad(false);
         }
     }, [isLoading]);
-    
-    // Call the custom hook unconditionally, passing the auth state
-    // The hook itself will handle the logic based on isAuthenticated
+
     useNotifications(isAuthenticated); 
 
-    // Only show splash screen on initial app load
     if (isLoading && initialLoad) {
         return <SplashScreen />;
     }
@@ -171,17 +167,7 @@ const AppNavigator = () => {
     return (
         <NavigationContainer ref={navigationRef}>
             {isAuthenticated ? (
-                hasPets ? (
-                    <MainStack />
-                ) : (
-                    <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: false }}>
-                        <Stack.Screen 
-                            name="PetProfileSetup" 
-                            component={PetProfileSetupScreen}
-                            options={{ gestureEnabled: false }}
-                        />
-                    </Stack.Navigator>
-                )
+                <MainStack />
             ) : (
                 <AuthStack />
             )}

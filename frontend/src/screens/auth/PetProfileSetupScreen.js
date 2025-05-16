@@ -35,12 +35,11 @@ import {
     CAT_PLAYMATE_PREFERENCES,
     PET_TYPES,
 } from "../../constants/petConstants";
-import DOG_BREEDS, { getBreedValueByLabel } from "../../constants/petBreeds";
 import InputField from "../../components/InputField";
 import CustomDropdown from "../../components/CustomDropdown";
 import BreedSelector from "../../components/BreedSelector";
 import Button from "../../components/Button";
-import theme, { withOpacity } from "../../styles/theme";
+import theme from "../../styles/theme";
 
 const { width } = Dimensions.get("window");
 const photoSize = (width - 48) / 3;
@@ -61,11 +60,11 @@ const PetProfileSetupScreen = ({ navigation }) => {
         temperament: [],
         preferredPlaymates: [],
     });
-    
+
     // Animation values
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
-    
+
     // Local image URIs and cloud URLs mapping
     const [localImages, setLocalImages] = useState([]);
     const [cloudinaryUrls, setCloudinaryUrls] = useState([]);
@@ -90,12 +89,16 @@ const PetProfileSetupScreen = ({ navigation }) => {
     // Request permission for image library
     useEffect(() => {
         (async () => {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to upload images!');
+            const { status } =
+                await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== "granted") {
+                Alert.alert(
+                    "Permission Required",
+                    "Sorry, we need camera roll permissions to upload images!"
+                );
             }
         })();
-        
+
         // Run entrance animation
         Animated.parallel([
             Animated.timing(fadeAnim, {
@@ -109,13 +112,12 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 useNativeDriver: true,
             }),
         ]).start();
-        
     }, []);
 
     // Get appropriate playmates based on pet type
     const getPlaymatePreferences = () => {
-        return petData.type === PET_TYPES.DOG 
-            ? DOG_PLAYMATE_PREFERENCES 
+        return petData.type === PET_TYPES.DOG
+            ? DOG_PLAYMATE_PREFERENCES
             : CAT_PLAYMATE_PREFERENCES;
     };
 
@@ -187,46 +189,49 @@ const PetProfileSetupScreen = ({ navigation }) => {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const selectedImage = result.assets[0];
-                
+
                 // Add to local images
                 setLocalImages([...localImages, selectedImage.uri]);
-                
+
                 // Start upload to Cloudinary
                 uploadImageToCloudinary(selectedImage.uri);
-                
+
                 setTouched({ ...touched, photos: true });
             }
         } catch (error) {
-            console.error('Image picker error:', error);
+            console.error("Image picker error:", error);
             Alert.alert("Error", "Failed to pick image");
         }
     };
-    
+
     const uploadImageToCloudinary = async (imageUri) => {
         setImageUploading(true);
         try {
             // Upload to Cloudinary
             const response = await PetService.uploadPetImage(imageUri);
-            
+
             if (response.success && response.imageUrl) {
                 // Add Cloudinary URL to state
                 const newUrls = [...cloudinaryUrls, response.imageUrl];
                 setCloudinaryUrls(newUrls);
-                
+
                 // Also update petData.photos which will be sent to API
-                setPetData(prev => ({
+                setPetData((prev) => ({
                     ...prev,
-                    photos: newUrls
+                    photos: newUrls,
                 }));
             } else {
-                throw new Error('Upload failed');
+                throw new Error("Upload failed");
             }
         } catch (error) {
-            console.error('Cloudinary upload error:', error);
-            Alert.alert('Upload Failed', 'Failed to upload image to cloud storage.');
-            
+            console.error("Cloudinary upload error:", error);
+            Alert.alert(
+                "Upload Failed",
+                "Failed to upload image to cloud storage."
+            );
+
             // Remove the local image if upload fails
-            setLocalImages(localImages.filter(uri => uri !== imageUri));
+            setLocalImages(localImages.filter((uri) => uri !== imageUri));
         } finally {
             setImageUploading(false);
         }
@@ -236,19 +241,19 @@ const PetProfileSetupScreen = ({ navigation }) => {
         // Remove from both local and cloudinary arrays
         const newLocalImages = [...localImages];
         const newCloudinaryUrls = [...cloudinaryUrls];
-        
+
         newLocalImages.splice(index, 1);
         newCloudinaryUrls.splice(index, 1);
-        
+
         setLocalImages(newLocalImages);
         setCloudinaryUrls(newCloudinaryUrls);
-        
+
         // Update petData.photos
         setPetData({
             ...petData,
-            photos: newCloudinaryUrls
+            photos: newCloudinaryUrls,
         });
-        
+
         setTouched({ ...touched, photos: true });
     };
 
@@ -285,16 +290,11 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 photos: cloudinaryUrls, // Use Cloudinary URLs
                 ownerId: user.id,
             };
-
             await PetService.createPet(petWithOwner);
-            
-            // Update pet status in AuthContext
-            if (updatePetStatus) {
-                updatePetStatus(true);
-            }
 
-            // Fixed navigation - use CommonActions instead of reset
-            // This works regardless of which navigator stack we're in
+            // First update the pet status in context
+            updatePetStatus(true);
+
             navigation.navigate("MainTabs");
         } catch (error) {
             console.error("Error creating pet:", error);
@@ -316,11 +316,11 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 breed: true,
                 age: true,
             });
-            
+
             const nameError = validateField("name", petData.name);
             const breedError = validateField("breed", petData.breed);
             const ageError = validateField("age", petData.age);
-            
+
             if (nameError || breedError || ageError) {
                 return;
             }
@@ -330,19 +330,19 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 ...touched,
                 photos: true,
             });
-            
+
             const photosError = validateField("photos", cloudinaryUrls);
-            
+
             if (photosError) {
                 return;
             }
         }
-        
-        setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+
+        setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
     };
 
     const prevStep = () => {
-        setCurrentStep(prev => Math.max(prev - 1, 1));
+        setCurrentStep((prev) => Math.max(prev - 1, 1));
     };
 
     // Set up Pan Responder for swipe gestures
@@ -351,7 +351,10 @@ const PetProfileSetupScreen = ({ navigation }) => {
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: (e, gestureState) => {
                 // Only recognize horizontal gestures that are significant enough
-                return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+                return (
+                    Math.abs(gestureState.dx) > 30 &&
+                    Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
+                );
             },
             onPanResponderRelease: (e, gestureState) => {
                 // If user swiped right with enough force and we're not on the first step
@@ -359,7 +362,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                     prevStep();
                 }
                 // We could add swipe left to go to next step, but we'll leave that to the buttons for clarity
-            }
+            },
         })
     ).current;
 
@@ -367,11 +370,11 @@ const PetProfileSetupScreen = ({ navigation }) => {
     const renderStepIndicators = () => (
         <View style={styles.stepIndicatorContainer}>
             {Array.from({ length: totalSteps }).map((_, index) => (
-                <View 
-                    key={index} 
+                <View
+                    key={index}
                     style={[
-                        styles.stepIndicator, 
-                        currentStep > index && styles.activeStepIndicator
+                        styles.stepIndicator,
+                        currentStep > index && styles.activeStepIndicator,
                     ]}
                 />
             ))}
@@ -438,9 +441,9 @@ const PetProfileSetupScreen = ({ navigation }) => {
             />
 
             <View style={styles.navigationButtonsContainer}>
-                <Button 
-                    title="Next" 
-                    onPress={nextStep} 
+                <Button
+                    title="Next"
+                    onPress={nextStep}
                     style={styles.navigationButton}
                 />
             </View>
@@ -455,15 +458,19 @@ const PetProfileSetupScreen = ({ navigation }) => {
                     Pet Photos <Text style={styles.requiredMark}>*</Text>
                 </Text>
                 <Text style={styles.photoHelperText}>
-                    Add at least 2 photos of your pet to help potential playmates get to know them better
+                    Add at least 2 photos of your pet to help potential
+                    playmates get to know them better
                 </Text>
-                
+
                 <TouchableOpacity
                     style={styles.photoUploadButton}
                     onPress={pickImage}
                     disabled={imageUploading}>
                     {imageUploading ? (
-                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                        <ActivityIndicator
+                            size="small"
+                            color={theme.colors.primary}
+                        />
                     ) : (
                         <>
                             <Ionicons
@@ -479,9 +486,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 {touched.photos && errors.photos && (
-                    <Text style={styles.errorText}>
-                        {errors.photos}
-                    </Text>
+                    <Text style={styles.errorText}>{errors.photos}</Text>
                 )}
 
                 <View style={styles.photoContainer}>
@@ -495,16 +500,19 @@ const PetProfileSetupScreen = ({ navigation }) => {
                                 <TouchableOpacity
                                     style={styles.removePhotoButton}
                                     onPress={() => removeImage(index)}>
-                                    <Ionicons 
-                                        name="close-circle" 
-                                        size={22} 
-                                        color="white" 
+                                    <Ionicons
+                                        name="close-circle"
+                                        size={22}
+                                        color="white"
                                     />
                                 </TouchableOpacity>
                             )}
                             {index >= cloudinaryUrls.length && (
                                 <View style={styles.uploadingOverlay}>
-                                    <ActivityIndicator size="small" color="#FFF" />
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#FFF"
+                                    />
                                 </View>
                             )}
                         </View>
@@ -513,15 +521,15 @@ const PetProfileSetupScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.navigationButtonsContainer}>
-                <Button 
-                    title="Back" 
-                    onPress={prevStep} 
+                <Button
+                    title="Back"
+                    onPress={prevStep}
                     type="secondary"
                     style={styles.navigationButton}
                 />
-                <Button 
-                    title="Next" 
-                    onPress={nextStep} 
+                <Button
+                    title="Next"
+                    onPress={nextStep}
                     style={styles.navigationButton}
                 />
             </View>
@@ -535,7 +543,9 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 label="Description"
                 placeholder="Tell us a bit about your pet..."
                 value={petData.description}
-                onChangeText={(value) => handleInputChange("description", value)}
+                onChangeText={(value) =>
+                    handleInputChange("description", value)
+                }
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -552,9 +562,7 @@ const PetProfileSetupScreen = ({ navigation }) => {
                             petData.temperament?.includes(item) &&
                                 styles.selectedOption,
                         ]}
-                        onPress={() =>
-                            toggleArrayItem("temperament", item)
-                        }>
+                        onPress={() => toggleArrayItem("temperament", item)}>
                         <Text
                             style={[
                                 styles.optionText,
@@ -594,14 +602,18 @@ const PetProfileSetupScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.navigationButtonsContainer}>
-                <Button 
-                    title="Back" 
-                    onPress={prevStep} 
+                <Button
+                    title="Back"
+                    onPress={prevStep}
                     type="secondary"
                     style={styles.navigationButton}
                 />
                 <Button
-                    title={isSubmitting ? "Creating Profile..." : "Create Pet Profile"}
+                    title={
+                        isSubmitting
+                            ? "Creating Profile..."
+                            : "Create Pet Profile"
+                    }
                     onPress={handleSubmit}
                     disabled={isSubmitting || imageUploading}
                     loading={isSubmitting}
@@ -626,8 +638,8 @@ const PetProfileSetupScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView 
-            style={styles.container} 
+        <SafeAreaView
+            style={styles.container}
             edges={["left", "right"]} // Removed "top" to handle it manually
         >
             <StatusBar
@@ -637,33 +649,41 @@ const PetProfileSetupScreen = ({ navigation }) => {
             />
             <Animated.View
                 style={[
-                    { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-                    { flex: 1 }
-                ]}
-            >
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    },
+                    { flex: 1 },
+                ]}>
                 <LinearGradient
-                    colors={[theme.colors.primaryLight, theme.colors.background]}
+                    colors={[
+                        theme.colors.primaryLight,
+                        theme.colors.background,
+                    ]}
                     style={styles.gradientHeader}
                     start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                >
+                    end={{ x: 0, y: 1 }}>
                     {/* Removed back button as requested */}
-                    
+
                     <View style={styles.headerContainer}>
-                        <Text style={styles.headerText}>Set Up Pet Profile</Text>
+                        <Text style={styles.headerText}>
+                            Set Up Pet Profile
+                        </Text>
                         <Text style={styles.subHeaderText}>
-                            Let's create a profile for your pet to help find playmates!
+                            Let's create a profile for your pet to help find
+                            playmates!
                         </Text>
                         {renderStepIndicators()}
                     </View>
                 </LinearGradient>
-                
+
                 {/* Apply pan responder to the ScrollView */}
-                <View {...panResponder.panHandlers} style={styles.swipeContainer}>
-                    <ScrollView 
+                <View
+                    {...panResponder.panHandlers}
+                    style={styles.swipeContainer}>
+                    <ScrollView
                         contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
+                        showsVerticalScrollIndicator={false}>
                         {renderStepContent()}
                     </ScrollView>
                 </View>
@@ -678,7 +698,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     gradientHeader: {
-        paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 20,
+        paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 20,
         paddingBottom: 40,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
@@ -688,7 +708,7 @@ const styles = StyleSheet.create({
     headerContainer: {
         alignItems: "center",
         paddingHorizontal: 20,
-        marginTop: Platform.OS === 'ios' ? 15 : 5,
+        marginTop: Platform.OS === "ios" ? 15 : 5,
     },
     headerText: {
         fontSize: theme.typography.fontSize.xxl,
@@ -703,8 +723,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     stepIndicatorContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
+        flexDirection: "row",
+        justifyContent: "center",
         marginTop: 10,
     },
     stepIndicator: {
@@ -829,15 +849,15 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     uploadingOverlay: {
-        position: 'absolute',
+        position: "absolute",
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
         borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: "center",
+        justifyContent: "center",
     },
     requiredMark: {
         color: theme.colors.error,
@@ -850,8 +870,8 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
     navigationButtonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        flexDirection: "row",
+        justifyContent: "space-between",
         marginTop: 16,
     },
     navigationButton: {
@@ -861,7 +881,7 @@ const styles = StyleSheet.create({
     },
     swipeContainer: {
         flex: 1,
-        width: '100%',
+        width: "100%",
     },
 });
 

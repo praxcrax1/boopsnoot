@@ -5,13 +5,10 @@ import * as WebBrowser from 'expo-web-browser';
 import AuthService from "../services/AuthService";
 import PetService from "../services/PetService";
 import SocketService from "../services/SocketService";
-// Import the hook from the Google Auth Service
 import { useGoogleAuth } from "../services/GoogleAuthService";
 
-// Register for WebBrowser redirect
 WebBrowser.maybeCompleteAuthSession();
 
-// Create the auth context
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -21,13 +18,9 @@ export const AuthProvider = ({ children }) => {
     const [authError, setAuthError] = useState(null);
     const [locationPermissionStatus, setLocationPermissionStatus] = useState(null);
     const [hasPets, setHasPets] = useState(false);
-    const [checkingPetStatus, setCheckingPetStatus] = useState(true);
-    const [transitioningToPetSetup, setTransitioningToPetSetup] = useState(false);
     
-    // Use the Google Auth hook
     const { signIn: googleSignIn } = useGoogleAuth();
 
-    // Check for existing token and load user data on app start
     useEffect(() => {
         const loadUser = async () => {
             try {
@@ -54,19 +47,16 @@ export const AuthProvider = ({ children }) => {
                         await AsyncStorage.removeItem("token");
                         setIsAuthenticated(false);
                         setUser(null);
-                        setCheckingPetStatus(false);
                     }
                 } else {
                     setIsAuthenticated(false);
                     setUser(null);
-                    setCheckingPetStatus(false);
                 }
             } catch (error) {
                 console.error("Error loading user:", error);
                 setAuthError(error.message);
                 setIsAuthenticated(false);
                 setUser(null);
-                setCheckingPetStatus(false);
             } finally {
                 // Add slight delay before removing the loading state
                 // to ensure smoother transitions
@@ -79,36 +69,19 @@ export const AuthProvider = ({ children }) => {
         loadUser();
     }, []);
     
-    // Check if user has pets with a smooth transition
     const checkUserPets = async () => {
         try {
-            setCheckingPetStatus(true);
             const petsResponse = await PetService.getUserPets();
             const hasUserPets = petsResponse.pets && petsResponse.pets.length > 0;
-            
-            // Use a slight delay to make transition smoother
-            if (!hasUserPets) {
-                setTransitioningToPetSetup(true);
-            }
-
-            // Return a promise that resolves when pet status is updated
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    setHasPets(hasUserPets);
-                    setCheckingPetStatus(false);
-                    resolve(hasUserPets); // Resolve with the pet status
-                }, 300);
-            });
+            setHasPets(hasUserPets);
             
         } catch (error) {
             console.error("Error checking pet status:", error);
             setHasPets(false);
-            setCheckingPetStatus(false);
-            return false; // Return false if there was an error
+            return false;
         }
     };
 
-    // Request location permission and update user location
     const requestAndUpdateLocation = async () => {
         try {
             setIsLoading(true);
@@ -173,7 +146,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Register user
     const register = async (userData) => {
         setIsLoading(true);
         setAuthError(null);
@@ -203,7 +175,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Login user
     const login = async (email, password) => {
         setIsLoading(true);
         setAuthError(null);
@@ -258,7 +229,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Login with Google - Simplified implementation
     const loginWithGoogle = async () => {
         setIsLoading(true);
         setAuthError(null);
@@ -335,7 +305,6 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setIsAuthenticated(false);
             setHasPets(false);
-            setCheckingPetStatus(false);
             
             // Clear any unread chat data
             await AsyncStorage.removeItem('unreadChats');
@@ -360,16 +329,7 @@ export const AuthProvider = ({ children }) => {
 
     // Update pets status after creating a new pet with a smooth transition
     const updatePetStatus = (hasUserPets = true) => {
-        // First set transitions
-        if (hasUserPets) {
-            setTransitioningToPetSetup(false);
-        }
-        
-        // Then update the pet status after a slight delay
-        setTimeout(() => {
-            setHasPets(hasUserPets);
-            setCheckingPetStatus(false);
-        }, 300);
+        setHasPets(hasUserPets);
     };
 
     // Clear any auth errors
@@ -393,10 +353,8 @@ export const AuthProvider = ({ children }) => {
                 requestAndUpdateLocation,
                 locationPermissionStatus,
                 hasPets,
-                checkingPetStatus,
                 updatePetStatus,
                 checkUserPets,
-                transitioningToPetSetup
             }}>
             {children}
         </AuthContext.Provider>
