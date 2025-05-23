@@ -110,11 +110,9 @@ const MainTabs = () => {
 
 
 const MainStack = () => {
-    const { hasPets } = useContext(AuthContext);
     
     return (
         <Stack.Navigator 
-            initialRouteName={hasPets ? "MainTabs" : "PetProfileSetup"}
             screenOptions={{ headerShown: false }}
         >
             <Stack.Screen name="MainTabs" component={MainTabs} />
