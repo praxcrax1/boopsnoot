@@ -392,21 +392,9 @@ const ChatListScreen = ({ navigation }) => {
         });
     }, []);
 
-    /**
-     * Handle new match notification
-     * Adds the new match to the chat list
-     */
-    const handleMatchCreated = useCallback((matchData) => {
-        console.log('Socket: New match notification received', matchData);
-        
-        // Fetch all chats to refresh the list with the new match
-        fetchChats();
-    }, [fetchChats]);
-
     // Register socket event listeners using our custom hook
     useSocketListener('receive_message', handleNewMessage);
     useSocketListener('chat_removed', handleChatRemoved);
-    useSocketListener('match_created', handleMatchCreated);
 
     // Track active screen for message handling
     useEffect(() => {
