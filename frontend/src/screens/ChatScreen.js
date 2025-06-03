@@ -1,3 +1,8 @@
+/**
+ * @file ChatScreen.js
+ * @description Individual chat conversation screen with message list and input
+ * @module screens/ChatScreen
+ */
 import React, { useState, useEffect, useRef, useContext } from "react";
 import {
     View,
@@ -15,15 +20,48 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ChatService from "../services/ChatService";
-import SocketService from "../services/SocketService";
-import MatchService from "../services/MatchService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import theme, { withOpacity } from "../styles/theme";
+
+// Services
+import ChatService from "../services/ChatService";
+import MatchService from "../services/MatchService";
+
+// Components and Styles
 import MenuBottomSheet from "../components/MenuBottomSheet";
+import theme, { withOpacity } from "../styles/theme";
+
+// Context
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
 
+// Constants
+const STORAGE_KEYS = {
+    USER: "user",
+    UNREAD_CHATS: "unreadChats",
+    HAS_UNREAD_CHATS: "hasUnreadChats",
+};
+
+const MESSAGE_TYPES = {
+    DATE_SEPARATOR: "dateSeparator",
+    MESSAGE: "message",
+};
+
+/**
+ * ChatScreen component
+ *
+ * Displays an individual chat conversation with:
+ * - Messages with timestamps and statuses
+ * - Date separators for message groups
+ * - Input area for sending new messages
+ * - Chat options for profile viewing and unmatching
+ *
+ * @param {Object} props - Component props
+ * @param {Object} props.route - React Navigation route prop containing params
+ * @param {Object} props.navigation - React Navigation prop
+ */
 const ChatScreen = ({ route, navigation }) => {
+    // =====================================================================
+    // STATE MANAGEMENT
+    // =====================================================================
     const { chatId } = route.params;
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
@@ -34,237 +72,254 @@ const ChatScreen = ({ route, navigation }) => {
     const [menuVisible, setMenuVisible] = useState(false);
     const [otherPet, setOtherPet] = useState(null);
     const [currentPet, setCurrentPet] = useState(null);
-    const flatListRef = useRef();
-    const socketConnected = useRef(false);
 
-    // Add reference to the ChatNotificationContext
+    // =====================================================================
+    // REFS & CONTEXT
+    // =====================================================================
+    const flatListRef = useRef();
     const { checkUnreadStatus } = useContext(ChatNotificationContext);
 
-    useEffect(() => {
-        const getUserId = async () => {
-            try {
-                const userData = await AsyncStorage.getItem("user");
-                if (userData) {
-                    const user = JSON.parse(userData);
-                    const userId = user.id || user._id;
-                    setCurrentUserId(userId);
-                    console.log("Current user ID in ChatScreen:", userId);
-                    return userId;
-                }
-            } catch (error) {
-                console.error("Error getting user data:", error);
-            }
-            return null;
-        };
+    // =====================================================================
+    // HELPER FUNCTIONS
+    // =====================================================================
 
-        // Set this chat as active in SocketService
-        SocketService.setActiveChatId(chatId);
-
-        navigation.setOptions({
-            headerShown: true,
-            headerLeft: () => (
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}>
-                    <Ionicons
-                        name="arrow-back"
-                        size={24}
-                        color={theme.colors.textPrimary}
-                    />
-                </TouchableOpacity>
-            ),
-        });
-
-        const loadChatData = async () => {
-            try {
-                const chatResponse = await ChatService.getChatById(chatId);
-                setChatInfo(chatResponse.chat);
-
-                if (chatResponse.chat && chatResponse.chat.participants) {
-                    const foundCurrentPet = chatResponse.chat.participants.find(
-                        (p) => p.isCurrentUser
-                    );
-                    const foundOtherPet = chatResponse.chat.participants.find(
-                        (p) => !p.isCurrentUser
-                    );
-
-                    if (foundCurrentPet && foundCurrentPet.pet) {
-                        setCurrentPet(foundCurrentPet.pet);
-                    }
-
-                    if (foundOtherPet && foundOtherPet.pet) {
-                        setOtherPet(foundOtherPet.pet);
-                        navigation.setOptions({
-                            headerTitle: () => (
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        navigation.navigate("PetProfile", {
-                                            petId: foundOtherPet.pet._id,
-                                        });
-                                    }}>
-                                    <View style={styles.headerTitleContainer}>
-                                        <Image
-                                            source={
-                                                foundOtherPet.pet.photos &&
-                                                foundOtherPet.pet.photos
-                                                    .length > 0
-                                                    ? {
-                                                          uri: foundOtherPet.pet
-                                                              .photos[0],
-                                                      }
-                                                    : require("../assets/default-pet.png")
-                                            }
-                                            style={styles.headerAvatar}
-                                        />
-                                        <Text style={styles.headerTitle}>
-                                            {foundOtherPet.pet.name}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ),
-                            headerRight: () => (
-                                <TouchableOpacity
-                                    style={styles.headerButton}
-                                    onPress={() => setMenuVisible(true)}>
-                                    <Ionicons
-                                        name="ellipsis-horizontal"
-                                        size={24}
-                                        color={theme.colors.textPrimary}
-                                    />
-                                </TouchableOpacity>
-                            ),
-                        });
-                    }
-                }
-
-                setMessages(chatResponse.messages || []);
-
-                // Mark chat as read when opened
-                markChatAsRead();
-
-                // Scroll to bottom after loading messages with a slightly longer delay
-                // to ensure layout is complete
-                setTimeout(() => {
-                    scrollToBottom(false);
-                }, 300);
-            } catch (error) {
-                console.error("Error loading chat data:", error);
-                Alert.alert("Error", "Failed to load chat. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        // Mark the chat as read in storage
-        const markChatAsRead = async () => {
-            try {
-                // Mark as read in local storage
-                const unreadData = await AsyncStorage.getItem("unreadChats");
-                if (unreadData) {
-                    const unreadChats = JSON.parse(unreadData);
-                    if (unreadChats[chatId]) {
-                        delete unreadChats[chatId];
-                        await AsyncStorage.setItem(
-                            "unreadChats",
-                            JSON.stringify(unreadChats)
-                        );
-
-                        // Update global notification status if needed
-                        if (Object.keys(unreadChats).length === 0) {
-                            await AsyncStorage.setItem(
-                                "hasUnreadChats",
-                                JSON.stringify(false)
-                            );
-                        }
-
-                        // Update the notification badge status
-                        checkUnreadStatus();
-                    }
-                }
-            } catch (error) {
-                console.error("Error marking chat as read:", error);
-            }
-        };
-
-        const initializeChat = async () => {
-            const userId = await getUserId();
-            await loadChatData();
-
-            try {
-                console.log("Setting up socket for chat:", chatId);
-                await SocketService.connect();
-
-                const joined = await SocketService.joinChat(chatId);
-                socketConnected.current = joined;
-
-                if (!joined) {
-                    console.warn(
-                        "Failed to join chat room, will retry in background"
-                    );
-                    setTimeout(async () => {
-                        const retryJoin = await SocketService.joinChat(chatId);
-                        socketConnected.current = retryJoin;
-                        console.log("Retry join chat result:", retryJoin);
-                    }, 2000);
-                }
-
-                SocketService.onReceiveMessage(handleNewMessage);
-            } catch (error) {
-                console.error("Error setting up socket:", error);
-            }
-        };
-
-        initializeChat();
-
-        return () => {
-            SocketService.offReceiveMessage();
-            SocketService.setActiveChatId(null);
-        };
-    }, [chatId, navigation, checkUnreadStatus]);
-
-    // Helper function to scroll to bottom
+    /**
+     * Scroll to the bottom of the message list
+     *
+     * @param {boolean} animated - Whether to animate the scroll
+     */
     const scrollToBottom = (animated = true) => {
         if (flatListRef.current && messages.length > 0) {
             flatListRef.current.scrollToEnd({ animated });
         }
     };
 
-    const handleNewMessage = (newMessage) => {
-        console.log("Received message in ChatScreen:", newMessage);
+    /**
+     * Format date for message separators
+     *
+     * @param {string} dateString - ISO date string to format
+     * @returns {string} Formatted date string (Today, Yesterday, or full date)
+     */
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-        if (newMessage && newMessage.chatId === chatId) {
-            const formattedMessage = {
-                _id: newMessage._id || `temp-${Date.now()}`,
-                content: newMessage.content,
-                sender: {
-                    isCurrentUser: false,
-                },
-                createdAt: newMessage.createdAt || new Date().toISOString(),
-            };
+        // Check if date is today
+        if (date.toDateString() === today.toDateString()) {
+            return "Today";
+        }
 
-            setMessages((prevMessages) => {
-                const messageExists = prevMessages.some(
-                    (msg) =>
-                        msg._id === formattedMessage._id ||
-                        (msg.content === formattedMessage.content &&
-                            Math.abs(
-                                new Date(msg.createdAt) -
-                                    new Date(formattedMessage.createdAt)
-                            ) < 1000)
-                );
+        // Check if date is yesterday
+        if (date.toDateString() === yesterday.toDateString()) {
+            return "Yesterday";
+        }
 
-                if (messageExists) return prevMessages;
+        // Otherwise return formatted date
+        return date.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+        });
+    };
 
-                const newMessages = [...prevMessages, formattedMessage];
+    /**
+     * Check if a date separator should be displayed between messages
+     *
+     * @param {Object} currentMsg - Current message object
+     * @param {Object} prevMsg - Previous message object
+     * @returns {boolean} True if date separator should be shown
+     */
+    const shouldShowDateSeparator = (currentMsg, prevMsg) => {
+        if (!prevMsg) return true; // Always show for first message
 
-                // Scroll to bottom when receiving a new message
-                setTimeout(() => scrollToBottom(), 100);
+        const currentDate = new Date(currentMsg.createdAt).toDateString();
+        const prevDate = new Date(prevMsg.createdAt).toDateString();
 
-                return newMessages;
+        return currentDate !== prevDate;
+    };
+
+    /**
+     * Prepare message data with date separators inserted
+     *
+     * @returns {Array} Messages with date separators
+     */
+    const prepareMessagesWithDateSeparators = () => {
+        const result = [];
+
+        messages.forEach((message, index) => {
+            const prevMessage = index > 0 ? messages[index - 1] : null;
+
+            // Add date separator if needed
+            if (shouldShowDateSeparator(message, prevMessage)) {
+                result.push({
+                    _id: `date-${message.createdAt}`,
+                    type: MESSAGE_TYPES.DATE_SEPARATOR,
+                    date: formatDate(message.createdAt),
+                });
+            }
+
+            // Add the actual message
+            result.push({
+                ...message,
+                type: MESSAGE_TYPES.MESSAGE,
             });
+        });
+
+        return result;
+    };
+
+    // =====================================================================
+    // DATA MANAGEMENT
+    // =====================================================================
+
+    /**
+     * Load user ID from AsyncStorage
+     *
+     * @returns {string|null} User ID if found
+     */
+    const getUserId = async () => {
+        try {
+            const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER);
+            if (userData) {
+                const user = JSON.parse(userData);
+                const userId = user.id || user._id;
+                setCurrentUserId(userId);
+                return userId;
+            }
+        } catch (error) {
+            console.error("Error getting user data:", error);
+        }
+        return null;
+    };
+
+    /**
+     * Mark chat as read in storage and update notification status
+     */
+    const markChatAsRead = async () => {
+        try {
+            // Mark as read in local storage
+            const unreadData = await AsyncStorage.getItem(STORAGE_KEYS.UNREAD_CHATS);
+            if (unreadData) {
+                const unreadChats = JSON.parse(unreadData);
+                if (unreadChats[chatId]) {
+                    delete unreadChats[chatId];
+                    await AsyncStorage.setItem(
+                        STORAGE_KEYS.UNREAD_CHATS,
+                        JSON.stringify(unreadChats)
+                    );
+
+                    // Update global notification status if needed
+                    if (Object.keys(unreadChats).length === 0) {
+                        await AsyncStorage.setItem(
+                            STORAGE_KEYS.HAS_UNREAD_CHATS,
+                            JSON.stringify(false)
+                        );
+                    }
+
+                    // Update the notification badge status
+                    checkUnreadStatus();
+                }
+            }
+        } catch (error) {
+            console.error("Error marking chat as read:", error);
         }
     };
 
+    /**
+     * Load chat data from API
+     */
+    const loadChatData = async () => {
+        try {
+            const chatResponse = await ChatService.getChatById(chatId);
+            setChatInfo(chatResponse.chat);
+
+            if (chatResponse.chat && chatResponse.chat.participants) {
+                const foundCurrentPet = chatResponse.chat.participants.find(
+                    (p) => p.isCurrentUser
+                );
+                const foundOtherPet = chatResponse.chat.participants.find(
+                    (p) => !p.isCurrentUser
+                );
+
+                if (foundCurrentPet && foundCurrentPet.pet) {
+                    setCurrentPet(foundCurrentPet.pet);
+                }
+
+                if (foundOtherPet && foundOtherPet.pet) {
+                    setOtherPet(foundOtherPet.pet);
+                    setupNavigationHeader(foundOtherPet.pet);
+                }
+            }
+
+            setMessages(chatResponse.messages || []);
+
+            // Mark chat as read when opened
+            markChatAsRead();
+
+            // Scroll to bottom after loading messages
+            setTimeout(() => {
+                scrollToBottom(false);
+            }, 300);
+        } catch (error) {
+            console.error("Error loading chat data:", error);
+            Alert.alert("Error", "Failed to load chat. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // =====================================================================
+    // EVENT HANDLERS
+    // =====================================================================
+
+    /**
+     * Setup navigation header with pet info and action buttons
+     *
+     * @param {Object} pet - Pet object for header display
+     */
+    const setupNavigationHeader = (pet) => {
+        navigation.setOptions({
+            headerTitle: () => (
+                <TouchableOpacity
+                    onPress={() => {
+                        navigation.navigate("PetProfile", {
+                            petId: pet._id,
+                        });
+                    }}
+                >
+                    <View style={styles.headerTitleContainer}>
+                        <Image
+                            source={
+                                pet.photos && pet.photos.length > 0
+                                    ? { uri: pet.photos[0] }
+                                    : require("../assets/default-pet.png")
+                            }
+                            style={styles.headerAvatar}
+                        />
+                        <Text style={styles.headerTitle}>{pet.name}</Text>
+                    </View>
+                </TouchableOpacity>
+            ),
+            headerRight: () => (
+                <TouchableOpacity
+                    style={styles.headerButton}
+                    onPress={() => setMenuVisible(true)}
+                >
+                    <Ionicons
+                        name="ellipsis-horizontal"
+                        size={24}
+                        color={theme.colors.textPrimary}
+                    />
+                </TouchableOpacity>
+            ),
+        });
+    };
+
+    /**
+     * Handle unmatch action with confirmation dialog
+     */
     const handleUnmatch = () => {
         if (!currentPet || !otherPet) {
             Alert.alert("Error", "Unable to unmatch. Missing pet information.");
@@ -312,6 +367,9 @@ const ChatScreen = ({ route, navigation }) => {
         );
     };
 
+    /**
+     * Send a new message
+     */
     const sendMessage = async () => {
         if (!inputText.trim() || isSending) return;
 
@@ -320,6 +378,7 @@ const ChatScreen = ({ route, navigation }) => {
             setInputText("");
             setIsSending(true);
 
+            // Create temporary message to show immediately
             const tempMessage = {
                 _id: `temp-${Date.now()}`,
                 content: trimmedMessage,
@@ -333,6 +392,7 @@ const ChatScreen = ({ route, navigation }) => {
             // Scroll to bottom immediately after adding the message
             setTimeout(() => scrollToBottom(), 50);
 
+            // Send to server
             const response = await ChatService.sendMessage(
                 chatId,
                 trimmedMessage
@@ -342,6 +402,7 @@ const ChatScreen = ({ route, navigation }) => {
                 throw new Error("Failed to send message");
             }
 
+            // Replace temp message with confirmed message
             const confirmedMessage = {
                 ...response.message,
                 sender: {
@@ -357,31 +418,12 @@ const ChatScreen = ({ route, navigation }) => {
                 )
             );
 
-            console.log("Sending message via socket:", confirmedMessage);
-
-            if (!socketConnected.current) {
-                console.log(
-                    "Socket not connected, attempting to connect and join chat"
-                );
-                await SocketService.connect();
-                socketConnected.current = await SocketService.joinChat(chatId);
-            }
-
-            await SocketService.sendMessage({
-                ...response.message,
-                chatId,
-                senderId: currentUserId,
-                sender: {
-                    ...response.message.sender,
-                    isCurrentUser: true,
-                },
-            });
-
             // Ensure we scroll to bottom after sending is complete
             setTimeout(() => scrollToBottom(), 200);
         } catch (error) {
             console.error("Error sending message:", error);
 
+            // Mark message as failed
             setMessages((prevMessages) =>
                 prevMessages.map((msg) =>
                     msg.pending ? { ...msg, failed: true } : msg
@@ -397,80 +439,82 @@ const ChatScreen = ({ route, navigation }) => {
         }
     };
 
-    // Function to format date for date separators
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
+    // =====================================================================
+    // EFFECTS AND LIFECYCLE
+    // =====================================================================
 
-        // Check if date is today
-        if (date.toDateString() === today.toDateString()) {
-            return "Today";
-        }
-
-        // Check if date is yesterday
-        if (date.toDateString() === yesterday.toDateString()) {
-            return "Yesterday";
-        }
-
-        // Otherwise return formatted date
-        return date.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "short",
-            day: "numeric",
-        });
-    };
-
-    // Function to check if we need to show a date separator
-    const shouldShowDateSeparator = (currentMsg, prevMsg) => {
-        if (!prevMsg) return true; // Always show for first message
-
-        const currentDate = new Date(currentMsg.createdAt).toDateString();
-        const prevDate = new Date(prevMsg.createdAt).toDateString();
-
-        return currentDate !== prevDate;
-    };
-
-    // Prepare data with date separators
-    const prepareMessagesWithDateSeparators = () => {
-        const result = [];
-
-        messages.forEach((message, index) => {
-            const prevMessage = index > 0 ? messages[index - 1] : null;
-
-            // Add date separator if needed
-            if (shouldShowDateSeparator(message, prevMessage)) {
-                result.push({
-                    _id: `date-${message.createdAt}`,
-                    type: "dateSeparator",
-                    date: formatDate(message.createdAt),
-                });
-            }
-
-            // Add the actual message
-            result.push({
-                ...message,
-                type: "message",
-            });
+    useEffect(() => {
+        // Setup back button in header
+        navigation.setOptions({
+            headerShown: true,
+            headerLeft: () => (
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons
+                        name="arrow-back"
+                        size={24}
+                        color={theme.colors.textPrimary}
+                    />
+                </TouchableOpacity>
+            ),
         });
 
-        return result;
-    };
+        // Initialize chat data
+        const initializeChat = async () => {
+            await getUserId();
+            await loadChatData();
+        };
 
+        initializeChat();
+    }, [chatId, navigation, checkUnreadStatus]);
+
+    // =====================================================================
+    // RENDER HELPER FUNCTIONS
+    // =====================================================================
+
+    /**
+     * Render a message item or date separator
+     *
+     * @param {Object} param0 - FlatList renderItem params
+     * @param {Object} param0.item - Message or separator item
+     * @param {number} param0.index - Item index
+     */
     const renderItem = ({ item, index }) => {
+        // Get prepared messages with date separators
+        const preparedMessages = prepareMessagesWithDateSeparators();
+
         // Render date separator
-        if (item.type === "dateSeparator") {
-            return (
-                <View style={styles.dateSeparatorContainer}>
-                    <View style={styles.dateSeparatorLine} />
-                    <Text style={styles.dateSeparatorText}>{item.date}</Text>
-                    <View style={styles.dateSeparatorLine} />
-                </View>
-            );
+        if (item.type === MESSAGE_TYPES.DATE_SEPARATOR) {
+            return renderDateSeparator(item);
         }
 
         // Render message
+        return renderMessage(item, index, preparedMessages);
+    };
+
+    /**
+     * Render a date separator item
+     *
+     * @param {Object} item - Date separator item
+     */
+    const renderDateSeparator = (item) => (
+        <View style={styles.dateSeparatorContainer}>
+            <View style={styles.dateSeparatorLine} />
+            <Text style={styles.dateSeparatorText}>{item.date}</Text>
+            <View style={styles.dateSeparatorLine} />
+        </View>
+    );
+
+    /**
+     * Render a message item
+     *
+     * @param {Object} item - Message item
+     * @param {number} index - Item index
+     * @param {Array} preparedMessages - All messages with separators
+     */
+    const renderMessage = (item, index, preparedMessages) => {
         const isCurrentUser = item.sender && item.sender.isCurrentUser;
 
         // Find the previous message (that's not a date separator)
@@ -478,7 +522,7 @@ const ChatScreen = ({ route, navigation }) => {
         let prevMessage = null;
 
         while (prevMessageIndex >= 0) {
-            if (preparedMessages[prevMessageIndex].type === "message") {
+            if (preparedMessages[prevMessageIndex].type === MESSAGE_TYPES.MESSAGE) {
                 prevMessage = preparedMessages[prevMessageIndex];
                 break;
             }
@@ -503,7 +547,8 @@ const ChatScreen = ({ route, navigation }) => {
                         ? styles.currentUserMessage
                         : styles.otherUserMessage,
                     isConsecutive && styles.consecutiveMessage,
-                ]}>
+                ]}
+            >
                 <View
                     style={[
                         styles.messageBubble,
@@ -512,14 +557,16 @@ const ChatScreen = ({ route, navigation }) => {
                             : styles.otherUserBubble,
                         item.pending && styles.pendingMessage,
                         item.failed && styles.failedMessage,
-                    ]}>
+                    ]}
+                >
                     <Text
                         style={[
                             styles.messageText,
                             isCurrentUser
                                 ? styles.currentUserText
                                 : styles.otherUserText,
-                        ]}>
+                        ]}
+                    >
                         {item.content}
                     </Text>
 
@@ -551,7 +598,8 @@ const ChatScreen = ({ route, navigation }) => {
                                 isCurrentUser
                                     ? styles.currentUserTime
                                     : styles.otherUserTime,
-                            ]}>
+                            ]}
+                        >
                             {messageTime}
                         </Text>
                     </View>
@@ -560,6 +608,69 @@ const ChatScreen = ({ route, navigation }) => {
         );
     };
 
+    /**
+     * Render the empty state when no messages exist
+     */
+    const renderEmptyState = () => (
+        <View style={styles.emptyContainer}>
+            <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={64}
+                color={theme.colors.divider}
+            />
+            <Text style={styles.emptyText}>No messages yet</Text>
+            <Text style={styles.emptySubtext}>Start the conversation!</Text>
+        </View>
+    );
+
+    /**
+     * Render the message input area
+     */
+    const renderMessageInput = () => (
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+        >
+            <View style={styles.inputContainer}>
+                <TextInput
+                    style={styles.input}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder="Type a message..."
+                    placeholderTextColor={theme.colors.placeholder}
+                    multiline
+                    maxHeight={80}
+                />
+                <TouchableOpacity
+                    style={[
+                        styles.sendButton,
+                        !inputText.trim() || isSending
+                            ? styles.disabledButton
+                            : {},
+                    ]}
+                    onPress={sendMessage}
+                    disabled={!inputText.trim() || isSending}
+                >
+                    {isSending ? (
+                        <ActivityIndicator
+                            size="small"
+                            color={theme.colors.onPrimary}
+                        />
+                    ) : (
+                        <Ionicons
+                            name="send"
+                            size={20}
+                            color={theme.colors.onPrimary}
+                        />
+                    )}
+                </TouchableOpacity>
+            </View>
+        </KeyboardAvoidingView>
+    );
+
+    // =====================================================================
+    // MENU OPTIONS
+    // =====================================================================
     const menuOptions = [
         {
             label: "View Profile",
@@ -579,6 +690,11 @@ const ChatScreen = ({ route, navigation }) => {
         },
     ];
 
+    // =====================================================================
+    // MAIN RENDER
+    // =====================================================================
+
+    // Show loading state
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -596,17 +712,7 @@ const ChatScreen = ({ route, navigation }) => {
 
             <View style={styles.chatContainer}>
                 {messages.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Ionicons
-                            name="chatbubble-ellipses-outline"
-                            size={64}
-                            color={theme.colors.divider}
-                        />
-                        <Text style={styles.emptyText}>No messages yet</Text>
-                        <Text style={styles.emptySubtext}>
-                            Start the conversation!
-                        </Text>
-                    </View>
+                    renderEmptyState()
                 ) : (
                     <FlatList
                         ref={flatListRef}
@@ -624,43 +730,7 @@ const ChatScreen = ({ route, navigation }) => {
                 )}
             </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}>
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        placeholder="Type a message..."
-                        placeholderTextColor={theme.colors.placeholder}
-                        multiline
-                        maxHeight={80}
-                    />
-                    <TouchableOpacity
-                        style={[
-                            styles.sendButton,
-                            !inputText.trim() || isSending
-                                ? styles.disabledButton
-                                : {},
-                        ]}
-                        onPress={sendMessage}
-                        disabled={!inputText.trim() || isSending}>
-                        {isSending ? (
-                            <ActivityIndicator
-                                size="small"
-                                color={theme.colors.onPrimary}
-                            />
-                        ) : (
-                            <Ionicons
-                                name="send"
-                                size={20}
-                                color={theme.colors.onPrimary}
-                            />
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </KeyboardAvoidingView>
+            {renderMessageInput()}
 
             <MenuBottomSheet
                 visible={menuVisible}
@@ -672,6 +742,9 @@ const ChatScreen = ({ route, navigation }) => {
     );
 };
 
+// =====================================================================
+// STYLES
+// =====================================================================
 const styles = StyleSheet.create({
     container: {
         flex: 1,

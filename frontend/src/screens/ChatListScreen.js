@@ -1,3 +1,8 @@
+/**
+ * @file ChatListScreen.js
+ * @description Displays all user chats with filtering and unread message indicators
+ * @module screens/ChatListScreen
+ */
 import React, { useState, useEffect, useCallback, useRef, useContext } from "react";
 import {
     View,
@@ -15,10 +20,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from 'expo-notifications';
+import { LinearGradient } from "expo-linear-gradient";
 
 // Services
 import ChatService from "../services/ChatService";
-import SocketService from "../services/SocketService";
 import PetService from "../services/PetService";
 
 // Components
@@ -27,38 +32,51 @@ import FilterChip from "../components/chat/FilterChip";
 // Styles and Context
 import theme, { withOpacity } from "../styles/theme";
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
-import { LinearGradient } from "expo-linear-gradient";
+
+// Constants
+const STORAGE_KEYS = {
+    UNREAD_CHATS: 'unreadChats',
+};
 
 /**
- * ChatListScreen component displaying all user chats
- * Shows unread chats at the top, followed by recent messages
- * and then latest matches at the top (even without messages)
+ * ChatListScreen component
+ * 
+ * Displays all user chats with:
+ * - Unread chats at the top
+ * - Recent messages in the middle
+ * - Latest matches at the end (even without messages)
+ * 
+ * @param {Object} props - Component props
+ * @param {Object} props.navigation - React Navigation prop
  */
 const ChatListScreen = ({ navigation }) => {
-    // ====== STATE MANAGEMENT ======
+    // =====================================================================
+    // STATE MANAGEMENT
+    // =====================================================================
     const [chats, setChats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [unreadChats, setUnreadChats] = useState({});
     const [userPets, setUserPets] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null); // null means "All Pets"
-    const [petSelectorVisible, setPetSelectorVisible] = useState(false);
-    
-    // ====== REFS ======
+
+    // =====================================================================
+    // REFS & CONTEXT
+    // =====================================================================
     const appState = useRef(AppState.currentState);
-    const socketInitialized = useRef(false);
     const notificationListener = useRef();
     const responseListener = useRef();
-    
-    // ====== CONTEXT ======
     const { updateUnreadStatus } = useContext(ChatNotificationContext);
 
-    // ====== HELPER FUNCTIONS ======
+    // =====================================================================
+    // HELPER FUNCTIONS
+    // =====================================================================
     
     /**
-     * Sorts chats by priority:
-     * 1. Unread chats
-     * 2. Chats with recent messages
-     * 3. Latest matches without messages
+     * Sorts chats by priority
+     * 
+     * @param {Array} chatList - List of chats to sort
+     * @param {Object} unreadState - Object tracking unread status by chatId
+     * @returns {Array} Sorted array of chats
      */
     const sortChats = useCallback((chatList, unreadState) => {
         return [...chatList].sort((a, b) => {
@@ -81,9 +99,9 @@ const ChatListScreen = ({ navigation }) => {
             if (aHasMessages && !bHasMessages) return -1;
             if (!aHasMessages && bHasMessages) return 1;
             
-            // Priority 4: No messages on either - sort by match date (newest matches first)
-            const aMatchDate = a.match && a.match.matchDate ? new Date(a.match.matchDate) : new Date(a.createdAt);
-            const bMatchDate = b.match && b.match.matchDate ? new Date(b.match.matchDate) : new Date(b.createdAt);
+            // Priority 4: No messages - sort by match date (newest matches first)
+            const aMatchDate = a.match?.matchDate ? new Date(a.match.matchDate) : new Date(a.createdAt);
+            const bMatchDate = b.match?.matchDate ? new Date(b.match.matchDate) : new Date(b.createdAt);
             
             return bMatchDate - aMatchDate;
         });
@@ -91,15 +109,15 @@ const ChatListScreen = ({ navigation }) => {
     
     /**
      * Formats timestamp relative to current time
-     * Today: shows time (12:30 PM)
-     * This week: shows day (Mon, Tue)
-     * Older: shows date (Jan 12)
+     * 
+     * @param {string|Date} timestamp - Timestamp to format
+     * @returns {string} Formatted timestamp
      */
     const formatTimestamp = (timestamp) => {
         const date = new Date(timestamp);
         const now = new Date();
 
-        // If the message was sent today, show time only
+        // Today: show time only (12:30 PM)
         if (
             date.getDate() === now.getDate() &&
             date.getMonth() === now.getMonth() &&
@@ -111,24 +129,28 @@ const ChatListScreen = ({ navigation }) => {
             });
         }
 
-        // If the message was sent this week, show day of week
+        // This week: show day of week (Mon, Tue)
         const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
         if (diffDays < 7) {
             return date.toLocaleDateString([], { weekday: "short" });
         }
 
-        // Otherwise, show the date
+        // Older: show date (Jan 12)
         return date.toLocaleDateString([], { month: "short", day: "numeric" });
     };
 
-    // ====== DATA MANAGEMENT ======
+    // =====================================================================
+    // DATA MANAGEMENT
+    // =====================================================================
     
     /**
      * Load unread state from AsyncStorage
+     * 
+     * @returns {Object} Unread chats state object
      */
     const loadUnreadState = async () => {
         try {
-            const unreadData = await AsyncStorage.getItem('unreadChats');
+            const unreadData = await AsyncStorage.getItem(STORAGE_KEYS.UNREAD_CHATS);
             return unreadData ? JSON.parse(unreadData) : {};
         } catch (error) {
             console.error("Error loading unread state:", error);
@@ -138,10 +160,12 @@ const ChatListScreen = ({ navigation }) => {
     
     /**
      * Save unread state to AsyncStorage and update global context
+     * 
+     * @param {Object} unreadState - Unread chats state object
      */
     const saveUnreadState = async (unreadState) => {
         try {
-            await AsyncStorage.setItem('unreadChats', JSON.stringify(unreadState));
+            await AsyncStorage.setItem(STORAGE_KEYS.UNREAD_CHATS, JSON.stringify(unreadState));
             // Update the global unread status
             updateUnreadStatus(Object.keys(unreadState || {}).length > 0);
         } catch (error) {
@@ -150,31 +174,30 @@ const ChatListScreen = ({ navigation }) => {
     };
     
     /**
-     * Fetch all chats from API and sort them appropriately
+     * Fetch all chats from API
      */
     const fetchChats = useCallback(async () => {
         setLoading(true);
         try {
             const response = await ChatService.getChats();
             
-            // Load saved unread state which has now been updated by ChatService
+            // Load saved unread state
             const unreadState = await loadUnreadState();
             setUnreadChats(unreadState || {});
             
-            // Process API response to identify unread chats
+            // Process API response
             const updatedChats = (response.chats || []).map(chat => {
-                // If the backend indicates a message is unread, make sure it's marked in our state
                 if (chat.lastMessage && chat.lastMessage.unread) {
                     unreadState[chat._id] = true;
                 }
                 return chat;
             });
             
-            // Sort chats before setting state
+            // Sort and set chats state
             const sortedChats = sortChats(updatedChats, unreadState || {});
             setChats(sortedChats);
             
-            // Make sure the unread state is saved and global notification status is updated
+            // Update notification status
             saveUnreadState(unreadState);
         } catch (error) {
             console.error("Error fetching chats:", error);
@@ -192,7 +215,7 @@ const ChatListScreen = ({ navigation }) => {
             const pets = response.pets || [];
             setUserPets(pets);
             
-            // If we have pets and no pet is currently selected, select the first one
+            // Auto-select first pet if none selected
             if (pets.length > 0 && !selectedPetId) {
                 setSelectedPetId(pets[0]._id);
             }
@@ -201,15 +224,19 @@ const ChatListScreen = ({ navigation }) => {
         }
     }, [selectedPetId]);
 
-    // ====== EVENT HANDLERS ======
+    // =====================================================================
+    // EVENT HANDLERS
+    // =====================================================================
     
     /**
-     * Handle navigating to a specific chat and mark as read
+     * Handle navigation to chat and mark as read
+     * 
+     * @param {string} chatId - ID of chat to open
      */
     const handleChatPress = useCallback((chatId) => {
         navigation.navigate("Chat", { chatId });
         
-        // Mark as read
+        // Mark as read in state
         setUnreadChats(prev => {
             const newState = { ...prev };
             delete newState[chatId];
@@ -217,224 +244,75 @@ const ChatListScreen = ({ navigation }) => {
             return newState;
         });
         
-        // Update the local chat state to remove unread indicator
-        setChats(prevChats => {
-            return prevChats.map(chat => {
-                if (chat._id === chatId && chat.lastMessage) {
-                    return {
+        // Update UI to remove unread indicator
+        setChats(prevChats => 
+            prevChats.map(chat => 
+                chat._id === chatId && chat.lastMessage
+                    ? {
                         ...chat,
                         lastMessage: {
                             ...chat.lastMessage,
                             unread: false
                         }
-                    };
-                }
-                return chat;
-            });
-        });
-    }, [navigation]);
-    
-    /**
-     * Handle new incoming messages from socket
-     */
-    const handleNewMessage = useCallback((message) => {
-        // Log when the handler is called
-        console.log(
-            "[ChatListScreen LOG] handleNewMessage called with message:",
-            JSON.stringify(message, null, 2)
-        );
-
-        if (!message || !message.chatId) {
-            console.log("[ChatListScreen LOG] Received invalid message data", message);
-            return;
-        }
-
-        console.log("ChatListScreen: Handling new message for chat:", message.chatId);
-
-        // Check if the user is currently viewing this specific chat
-        // 1. First check the navigation state
-        const currentRoute = navigation.getState()?.routes.find(route => route.name === 'Chat');
-        // 2. Then also check the active chat ID stored in SocketService
-        const activeChatId = SocketService.getActiveChatId();
-        const isViewingThisChat = 
-            (currentRoute?.params?.chatId === message.chatId) || 
-            (activeChatId === message.chatId);
-
-        console.log(`[ChatListScreen LOG] Is viewing this chat? ${isViewingThisChat} (activeChatId: ${activeChatId})`);
-
-        // Update unread status only if not viewing the chat
-        if (!isViewingThisChat) {
-            setUnreadChats(prev => {
-                const newState = { ...prev, [message.chatId]: true };
-                saveUnreadState(newState);
-                console.log("ChatListScreen: Marked chat as unread:", message.chatId);
-                return newState;
-            });
-        } else {
-            console.log("ChatListScreen: User is viewing this chat, not marking as unread");
-        }
-
-        // Update chat list state
-        setChats(prevChats => {
-            const chatIndex = prevChats.findIndex(chat => chat._id === message.chatId);
-            let updatedChats = [...prevChats];
-
-            if (chatIndex !== -1) {
-                // Chat exists, update its last message and move to top
-                const existingChat = updatedChats[chatIndex];
-                const updatedChat = {
-                    ...existingChat,
-                    lastMessage: {
-                        content: message.content,
-                        createdAt: message.createdAt || new Date().toISOString(),
-                        unread: !isViewingThisChat
                     }
-                };
-                // Remove from current position and add to the beginning
-                updatedChats.splice(chatIndex, 1);
-                updatedChats.unshift(updatedChat);
-                console.log("ChatListScreen: Updated existing chat:", message.chatId);
-            } else {
-                // Chat doesn't exist, fetch all chats again to get the new one
-                console.log("ChatListScreen: New chat detected, refetching list.");
-                fetchChats();
-                return prevChats;
-            }
+                    : chat
+            )
+        );
+    }, [navigation]);
 
-            return updatedChats;
-        });
-    }, [navigation, fetchChats]);
-
-    // ====== SOCKET CONNECTION ======
+    // =====================================================================
+    // EFFECTS AND LIFECYCLE
+    // =====================================================================
     
-    /**
-     * Initialize socket connection and message listeners
-     */
-    const initializeSocket = useCallback(async () => {
-        console.log("[ChatListScreen LOG] Attempting to initialize socket and add listener.");
-        
-        if (socketInitialized.current) {
-            console.log("[ChatListScreen LOG] Socket already initialized.");
-            return;
-        }
-
-        try {
-            await SocketService.connect();
-            console.log("[ChatListScreen LOG] Calling SocketService.addGlobalMessageListener.");
-            SocketService.addGlobalMessageListener(handleNewMessage);
-            socketInitialized.current = true;
-            console.log("[ChatListScreen LOG] Socket initialized and global listener added successfully.");
-        } catch (error) {
-            console.error("[ChatListScreen LOG] Error initializing socket:", error);
-        }
-    }, [handleNewMessage]);
-
-    // Handle chat removal (when another user unmatches or deletes their pet)
-    const handleChatRemoval = useCallback((chatId) => {
-        console.log("[ChatListScreen LOG] Chat removal notification received for chat:", chatId);
-
-        // Remove the chat from the chats state
-        setChats(prevChats => prevChats.filter(chat => chat._id !== chatId));
-
-        // Remove from unread state
-        setUnreadChats(prev => {
-            const newState = { ...prev };
-            if (newState[chatId]) {
-                delete newState[chatId];
-                saveUnreadState(newState);
-                console.log("[ChatListScreen LOG] Removed unread status for chat:", chatId);
-            }
-            return newState;
-        });
-    }, []);
-
-    // ====== EFFECTS AND LIFECYCLE ======
-    
-    // Listen for new match notifications to refresh the chat list
     useEffect(() => {
-        const matchSubscription = SocketService.addMatchNotificationListener(() => {
-            console.log("Match notification received, refreshing chats");
-            fetchChats();
-        });
-        
-        // Listen for chat removal notifications
-        const chatRemovalSubscription = SocketService.addChatRemovalListener(handleChatRemoval);
-        
-        return () => {
-            if (matchSubscription) {
-                SocketService.removeMatchNotificationListener(matchSubscription);
-            }
-            
-            if (chatRemovalSubscription) {
-                SocketService.removeChatRemovalListener(chatRemovalSubscription);
-            }
-        };
-    }, [fetchChats, handleChatRemoval]);
-    
-    // Main effect for initializing sockets, handling app state changes, and cleanup
-    useEffect(() => {
-        // Initial fetch
+        // Initial data loading
         fetchChats();
         fetchUserPets();
         
-        // Set up socket listener
-        initializeSocket();
-        
-        // Handle app state changes to reconnect socket when app comes back to foreground
+        // App state change handling
         const appStateSubscription = AppState.addEventListener('change', nextAppState => {
             if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
                 console.log('ChatListScreen: App has come to the foreground!');
-                initializeSocket();
                 fetchChats();
             }
-            
             appState.current = nextAppState;
         });
         
-        // Refresh chats when the screen is focused
+        // Screen focus handling
         const focusSubscription = navigation.addListener("focus", () => {
-            console.log("ChatListScreen: Screen focused, fetching chats.");
             fetchChats();
             Notifications.setBadgeCountAsync(0);
         });
 
-        // Notification Interaction Handling
+        // Notification handling
         notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
             console.log('Notification received while app foregrounded:', notification);
         });
 
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-            console.log('Notification tapped:', response);
             const { chatId } = response.notification.request.content.data;
             if (chatId) {
-                console.log('Navigating to chat from notification:', chatId);
                 navigation.navigate('Chat', { chatId });
             }
         });
-
-        // Cleanup function
+        
+        // Cleanup
         return () => {
-            console.log("[ChatListScreen LOG] Cleaning up listeners.");
             appStateSubscription.remove();
             focusSubscription();
-
+            
             if (notificationListener.current) {
-                Notifications.removeNotificationSubscription(notificationListener.current);
+                notificationListener.current.remove();
             }
             if (responseListener.current) {
-                Notifications.removeNotificationSubscription(responseListener.current);
-            }
-
-            if (socketInitialized.current) {
-                console.log("[ChatListScreen LOG] Removing global message listener.");
-                SocketService.removeGlobalMessageListener(handleNewMessage);
-                socketInitialized.current = false;
-                console.log("[ChatListScreen LOG] Removed global message listener.");
+                responseListener.current.remove();
             }
         };
-    }, [navigation, fetchChats, initializeSocket, handleNewMessage]);
+    }, [navigation, fetchChats, fetchUserPets]);
 
-    // ====== RENDER FUNCTIONS ======
+    // =====================================================================
+    // RENDER HELPER FUNCTIONS
+    // =====================================================================
     
     /**
      * Renders a single chat item in the list
@@ -487,7 +365,7 @@ const ChatListScreen = ({ navigation }) => {
     };
 
     /**
-     * Renders the empty state when no chats exist
+     * Renders empty state when no chats exist
      */
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
@@ -498,8 +376,7 @@ const ChatListScreen = ({ navigation }) => {
             />
             <Text style={styles.emptyTitle}>No Messages Yet</Text>
             <Text style={styles.emptyDescription}>
-                Match with pets nearby to start chatting with their
-                owners
+                Match with pets nearby to start chatting with their owners
             </Text>
             <TouchableOpacity
                 style={styles.finderButton}
@@ -513,30 +390,28 @@ const ChatListScreen = ({ navigation }) => {
     );
 
     /**
-     * Renders the header component with gradient background
+     * Renders header with gradient
      */
-    const renderHeader = () => {
-        return (
-            <LinearGradient
-                colors={[theme.colors.primaryLight, theme.colors.background]}
-                style={styles.gradientHeader}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-            >
-                <View style={styles.headerContainer}>
-                    <View style={styles.headerTextContainer}>
-                        <Text style={styles.headerText}>Messages</Text>
-                        <Text style={styles.subHeaderText}>
-                            Connect with your pet's playmates
-                        </Text>
-                    </View>
+    const renderHeader = () => (
+        <LinearGradient
+            colors={[theme.colors.primaryLight, theme.colors.background]}
+            style={styles.gradientHeader}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+        >
+            <View style={styles.headerContainer}>
+                <View style={styles.headerTextContainer}>
+                    <Text style={styles.headerText}>Messages</Text>
+                    <Text style={styles.subHeaderText}>
+                        Connect with your pet's playmates
+                    </Text>
                 </View>
-            </LinearGradient>
-        );
-    };
+            </View>
+        </LinearGradient>
+    );
 
     /**
-     * Renders the pet selector component using FilterChips
+     * Renders pet selector using FilterChips
      */
     const renderPetSelector = () => {
         // Only render if user has multiple pets
@@ -552,7 +427,6 @@ const ChatListScreen = ({ navigation }) => {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.filterChipsContainer}
                 >                    
-                    {/* One chip for each pet */}
                     {userPets.map((pet) => (
                         <FilterChip
                             key={pet._id}
@@ -566,7 +440,9 @@ const ChatListScreen = ({ navigation }) => {
         );
     };
 
-    // ====== MAIN RENDER ======
+    // =====================================================================
+    // MAIN RENDER
+    // =====================================================================
     const filteredChats = selectedPetId
         ? chats.filter((chat) =>
             chat.participants.some(
@@ -599,7 +475,9 @@ const ChatListScreen = ({ navigation }) => {
     );
 };
 
-// ====== STYLES ======
+// =====================================================================
+// STYLES
+// =====================================================================
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -647,28 +525,11 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
         marginBottom: theme.spacing.xs,
     },
-    petSelectorButton: {
-        paddingVertical: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.surface,
-    },
-    petSelectorContent: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    selectedPetImage: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        marginRight: theme.spacing.sm,
-        borderWidth: 1,
-        borderColor: withOpacity(theme.colors.primary, 0.2),
-    },
-    selectedPetName: {
-        fontSize: theme.typography.fontSize.md,
-        fontWeight: theme.typography.fontWeight.medium,
-        color: theme.colors.textPrimary,
-        marginRight: theme.spacing.xs,
+    filterChipsContainer: {
+        paddingVertical: theme.spacing.sm,
+        paddingBottom: theme.spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     listContainer: {
         paddingVertical: theme.spacing.sm,
@@ -756,12 +617,6 @@ const styles = StyleSheet.create({
         color: theme.colors.onPrimary,
         fontSize: theme.typography.fontSize.md,
         fontWeight: theme.typography.fontWeight.semiBold,
-    },
-    filterChipsContainer: {
-        paddingVertical: theme.spacing.sm,
-        paddingBottom: theme.spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
     },
 });
 

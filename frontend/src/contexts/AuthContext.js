@@ -1,144 +1,98 @@
+/**
+ * Authentication Context - Manages user authentication state and operations
+ * This modular implementation separates concerns and improves readability
+ */
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 import AuthService from "../services/AuthService";
-import PetService from "../services/PetService";
-import SocketService from "../services/SocketService";
 import { useGoogleAuth } from "../services/GoogleAuthService";
+import { useLocationManager } from "../hooks/useLocationManager";
+import { useUnreadMessages } from "../hooks/useUnreadMessages";
 
+// Initialize WebBrowser for OAuth flows
 WebBrowser.maybeCompleteAuthSession();
 
+/**
+ * Authentication Context for managing user authentication state
+ * @type {React.Context}
+ */
 export const AuthContext = createContext();
 
+/**
+ * Authentication Provider Component
+ * Handles user authentication state and operations across the application
+ */
 export const AuthProvider = ({ children }) => {
+    // Core authentication state
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [authError, setAuthError] = useState(null);
-    const [locationPermissionStatus, setLocationPermissionStatus] = useState(null);
-    const [hasPets, setHasPets] = useState(false);
     
+    // External hooks for location, messages and Google authentication
+    const { 
+        locationPermissionStatus, 
+        requestAndUpdateLocation 
+    } = useLocationManager(user, setUser);
+    
+    const { checkAndUpdateUnreadMessages } = useUnreadMessages();
     const { signIn: googleSignIn } = useGoogleAuth();
 
+    /**
+     * Load user data from persistent storage on mount
+     */
     useEffect(() => {
-        const loadUser = async () => {
-            try {
-                const isAuth = await AuthService.isAuthenticated();
-
-                if (isAuth) {
-                    const userData = await AuthService.getCurrentUser();
-                    if (userData && userData.user) {
-                        setUser(userData.user);
-                        setIsAuthenticated(true);
-                        
-                        // Check if user has pets
-                        checkUserPets();
-                        
-                        // Check if we need to request location
-                        if (!userData.user.location || 
-                            (!userData.user.location.coordinates || 
-                             (userData.user.location.coordinates[0] === 0 && 
-                              userData.user.location.coordinates[1] === 0))) {
-                            requestAndUpdateLocation();
-                        }
-                    } else {
-                        // Invalid or expired token
-                        await AsyncStorage.removeItem("token");
-                        setIsAuthenticated(false);
-                        setUser(null);
-                    }
-                } else {
-                    setIsAuthenticated(false);
-                    setUser(null);
-                }
-            } catch (error) {
-                console.error("Error loading user:", error);
-                setAuthError(error.message);
-                setIsAuthenticated(false);
-                setUser(null);
-            } finally {
-                setTimeout(() => {
-                    setIsLoading(false);
-                }, 300);
-            }
-        };
-
-        loadUser();
+        loadUserData();
     }, []);
-    
-    const checkUserPets = async () => {
-        try {
-            const petsResponse = await PetService.getUserPets();
-            const hasUserPets = petsResponse.pets && petsResponse.pets.length > 0;
-            setHasPets(hasUserPets);
-            
-        } catch (error) {
-            console.error("Error checking pet status:", error);
-            setHasPets(false);
-            return false;
-        }
-    };
 
-    const requestAndUpdateLocation = async () => {
+    /**
+     * Load user data from storage and validate authentication
+     */
+    const loadUserData = async () => {
         try {
             setIsLoading(true);
+            const isAuth = await AuthService.isAuthenticated();
 
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            setLocationPermissionStatus(status);
-            
-            if (status !== 'granted') {
-                console.log('Location permission denied');
-                return false;
-            }
-            
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
-            
-            if (location && location.coords) {
-                const { latitude, longitude } = location.coords;
-                
-
-                const [addressInfo] = await Location.reverseGeocodeAsync({
-                    latitude,
-                    longitude
-                });
-                
-                const locationData = {
-                    location: {
-                        type: 'Point', // Required for GeoJSON
-                        coordinates: [longitude, latitude], // MongoDB uses [long, lat] format
-                        address: addressInfo ? 
-                            `${addressInfo.street || ''}, ${addressInfo.city || ''}` : 
-                            'Unknown location',
-                        city: addressInfo ? addressInfo.city : ''
-                    }
-                };
-                
-
-                const response = await AuthService.updateUserLocation(locationData);
-                
-                if (response.success) {
-                    setUser(prevUser => ({
-                        ...prevUser,
-                        ...locationData
-                    }));
+            if (isAuth) {
+                const userData = await AuthService.getCurrentUser();
+                if (userData?.user) {
+                    setUser(userData.user);
+                    setIsAuthenticated(true);
                     
-                    console.log('Location updated successfully');
-                    return true;
+                    // Check if location update is needed
+                    const needsLocationUpdate = !userData.user.location || 
+                        !userData.user.location.coordinates ||
+                        (userData.user.location.coordinates[0] === 0 && 
+                         userData.user.location.coordinates[1] === 0);
+                    
+                    if (needsLocationUpdate) {
+                        requestAndUpdateLocation();
+                    }
+                } else {
+                    // Invalid or expired token
+                    await handleLogout(false);
                 }
+            } else {
+                await handleLogout(false);
             }
-            
-            return false;
         } catch (error) {
-            console.error('Error updating location:', error);
-            return false;
+            console.error("Error loading user:", error);
+            setAuthError(error.message);
+            await handleLogout(false);
         } finally {
-            setIsLoading(false);
+            // Small delay for UI smoothness
+            setTimeout(() => {
+                setIsLoading(false);
+            }, 300);
         }
     };
 
+    /**
+     * Register a new user
+     * @param {Object} userData - User registration data
+     * @returns {Promise<Object>} Result object with success flag and user data or error
+     */
     const register = async (userData) => {
         setIsLoading(true);
         setAuthError(null);
@@ -160,44 +114,32 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    /**
+     * Login with email and password
+     * @param {string} email - User email
+     * @param {string} password - User password
+     * @returns {Promise<Object>} Result object with success flag and user data
+     */
     const login = async (email, password) => {
         setIsLoading(true);
         setAuthError(null);
 
         try {
             const response = await AuthService.login(email, password);
-            // Store user data but DON'T set isAuthenticated yet
             setUser(response.user);
             
-            // Check if user has pets after login - AWAIT for the status check to complete
-            await checkUserPets();
+            // Check if location update is needed
+            const needsLocationUpdate = !response.user.location || 
+                !response.user.location.coordinates ||
+                (response.user.location.coordinates[0] === 0 && 
+                 response.user.location.coordinates[1] === 0);
             
-            // Check if we need to request location after login
-            if (!response.user.location || 
-                (!response.user.location.coordinates || 
-                 (response.user.location.coordinates[0] === 0 && 
-                  response.user.location.coordinates[1] === 0))) {
+            if (needsLocationUpdate) {
                 await requestAndUpdateLocation();
             }
             
-            // Check for unread messages that arrived while offline
-            try {
-                // Fetch chats to update unread status
-                const chatService = require("../services/ChatService").default;
-                await chatService.getChats();
-                
-                // Directly check if there are unread messages after login
-                const unreadData = await AsyncStorage.getItem('unreadChats');
-                if (unreadData) {
-                    const unreadChats = JSON.parse(unreadData);
-                    const hasUnreadMessages = Object.keys(unreadChats).length > 0;
-                    
-                    // Directly set the flag in AsyncStorage to trigger notification badge
-                    await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnreadMessages));
-                }
-            } catch (error) {
-                console.error("Error checking for unread messages after login:", error);
-            }
+            // Check for unread messages
+            await checkAndUpdateUnreadMessages();
             
             setIsAuthenticated(true);
             
@@ -211,55 +153,44 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    /**
+     * Login with Google OAuth
+     * @returns {Promise<Object>} Result object with success flag and user data or error
+     */
     const loginWithGoogle = async () => {
         setIsLoading(true);
         setAuthError(null);
 
         try {
-            // Call our simplified Google Auth flow
+            // Use Google authentication flow
             const response = await googleSignIn();
             
             if (!response.success) {
                 throw new Error(response.error || "Google authentication failed");
             }
             
-            // Get the user data from our backend using the token that was stored during signIn
+            // Get user data from backend using the stored token
             const userData = await AuthService.getCurrentUser();
             
-            if (!userData || !userData.user) {
+            if (!userData?.user) {
                 throw new Error("Failed to get user data after Google authentication");
             }
             
-            // Store user data
             setUser(userData.user);
             
-            // Check if user has pets
-            await checkUserPets();
+            // Check if location update is needed
+            const needsLocationUpdate = !userData.user.location || 
+                !userData.user.location.coordinates ||
+                (userData.user.location.coordinates[0] === 0 && 
+                 userData.user.location.coordinates[1] === 0);
             
-            // Check if we need to request location
-            if (!userData.user.location || 
-                (!userData.user.location.coordinates || 
-                 (userData.user.location.coordinates[0] === 0 && 
-                  userData.user.location.coordinates[1] === 0))) {
+            if (needsLocationUpdate) {
                 await requestAndUpdateLocation();
             }
             
             // Check for unread messages
-            try {
-                const chatService = require("../services/ChatService").default;
-                await chatService.getChats();
-                
-                const unreadData = await AsyncStorage.getItem('unreadChats');
-                if (unreadData) {
-                    const unreadChats = JSON.parse(unreadData);
-                    const hasUnreadMessages = Object.keys(unreadChats).length > 0;
-                    await AsyncStorage.setItem('hasUnreadChats', JSON.stringify(hasUnreadMessages));
-                }
-            } catch (error) {
-                console.error("Error checking for unread messages after Google login:", error);
-            }
+            await checkAndUpdateUnreadMessages();
             
-            // Set authenticated after all checks are complete
             setIsAuthenticated(true);
             
             return { success: true, user: userData.user };
@@ -272,24 +203,27 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Logout user
-    const logout = async () => {
+    /**
+     * Logout the current user
+     * @param {boolean} callService - Whether to call the backend logout service
+     * @returns {Promise<Object>} Result object with success flag
+     */
+    const handleLogout = async (callService = true) => {
         setIsLoading(true);
 
         try {
-            // Log out from the auth service
-            await AuthService.logout();
-            
-            // Clean up socket connections and listeners
-            SocketService.cleanup();
+            // Only call logout service if explicitly requested
+            if (callService) {
+                await AuthService.logout();
+            }
             
             // Reset state
             setUser(null);
             setIsAuthenticated(false);
-            setHasPets(false);
             
-            // Clear any unread chat data
+            // Clear unread chat data
             await AsyncStorage.removeItem('unreadChats');
+            await AsyncStorage.removeItem('hasUnreadChats');
             
             return { success: true };
         } catch (error) {
@@ -301,43 +235,42 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Update user information
-    const updateUser = async (userData) => {
-        setUser({
-            ...user,
+    /**
+     * Update user profile information
+     * @param {Object} userData - Updated user data
+     */
+    const updateUser = (userData) => {
+        setUser(prevUser => ({
+            ...prevUser,
             ...userData,
-        });
+        }));
     };
 
-    // Update pets status after creating a new pet with a smooth transition
-    const updatePetStatus = (hasUserPets = true) => {
-        setHasPets(hasUserPets);
-    };
-
-    // Clear any auth errors
+    /**
+     * Clear any authentication errors
+     */
     const clearAuthError = () => {
         setAuthError(null);
     };
 
+    // Auth context value to be provided
+    const contextValue = {
+        user,
+        isAuthenticated,
+        isLoading,
+        authError,
+        register,
+        login,
+        logout: () => handleLogout(true),
+        loginWithGoogle,
+        updateUser,
+        clearAuthError,
+        requestAndUpdateLocation,
+        locationPermissionStatus,
+    };
+
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                isAuthenticated,
-                isLoading,
-                authError,
-                register,
-                login,
-                logout,
-                loginWithGoogle,
-                updateUser,
-                clearAuthError,
-                requestAndUpdateLocation,
-                locationPermissionStatus,
-                hasPets,
-                updatePetStatus,
-                checkUserPets,
-            }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
