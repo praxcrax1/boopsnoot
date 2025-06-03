@@ -217,6 +217,12 @@ export const SocketProvider = ({ children }) => {
      */
     const handleNewMatch = useCallback(
         async (matchData) => {
+            // More detailed logging to track the incoming data
+            console.log(
+                "SocketProvider: New match event received",
+                JSON.stringify(matchData, null, 2)
+            );
+
             if (!matchData || !user) {
                 console.log(
                     "SocketProvider: Skipping match notification - invalid data or no user",
@@ -225,13 +231,8 @@ export const SocketProvider = ({ children }) => {
                 return;
             }
 
-            console.log(
-                "SocketProvider: New match received",
-                JSON.stringify(matchData)
-            );
-
             try {
-                // Get match data
+                // Get match data with more robust fallbacks
                 const matchId = matchData._id || matchData.matchId;
                 const chatId = matchData.chatId;
 
@@ -243,19 +244,21 @@ export const SocketProvider = ({ children }) => {
                     return;
                 }
 
+                console.log(matchData)
+
                 // Extract pet names - be more fault tolerant
-                let petName = "Someone new";
-                if (matchData.matchedPet?.name) {
-                    petName = matchData.matchedPet.name;
-                } else if (matchData.pet?.name) {
+                let petName = "Someone new"
+
+                if(matchData?.pet?.name) {
                     petName = matchData.pet.name;
                 }
 
                 console.log(
-                    `SocketProvider: Showing notification for match with ${petName}`
+                    `SocketProvider: Preparing match notification for ${petName}`
                 );
 
-                // Schedule notification for the new match - with extra logging
+                // Always show match notifications, regardless of app state
+                // Schedule notification for the new match with enhanced details
                 await scheduleLocalNotification({
                     type: "match",
                     title: "🎉 New Match!",
@@ -264,6 +267,7 @@ export const SocketProvider = ({ children }) => {
                         type: "match",
                         matchId,
                         chatId,
+                        petName,
                         timestamp: new Date().toISOString(),
                     },
                 });
@@ -309,6 +313,7 @@ export const SocketProvider = ({ children }) => {
 
                     // After successful connection, verify the socket is registered on the server
                     socket.emit("authenticate", { userId: user._id });
+
                 })
                 .catch((error) => {
                     console.error(
@@ -337,8 +342,12 @@ export const SocketProvider = ({ children }) => {
             // Setup message listener at the top level
             socketService.on("receive_message", handleNewMessage);
 
-            // Setup match listener for new matches
-            socketService.on("match_created", handleNewMatch);
+            // Setup explicit match listener with additional logging
+            console.log("SocketProvider: Registering match_created listener");
+            socketService.on("match_created", (data) => {
+                console.log("SocketProvider: match_created event received", data);
+                handleNewMatch(data);
+            });
 
             // Setup chat removal listener
             socketService.on("chat_removed", (data) => {
@@ -352,7 +361,7 @@ export const SocketProvider = ({ children }) => {
             socketCleanup = () => {
                 socketService.off("receive_message", handleNewMessage);
                 socketService.off("match_created", handleNewMatch);
-                socketService.off("chat_removed", () => {});
+                socketService.off("chat_removed");
                 socketService.off("connect", handleConnect);
                 socketService.off("disconnect", handleDisconnect);
             };

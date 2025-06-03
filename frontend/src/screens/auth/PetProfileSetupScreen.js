@@ -45,7 +45,7 @@ const { width } = Dimensions.get("window");
 const photoSize = (width - 48) / 3;
 
 const PetProfileSetupScreen = ({ navigation }) => {
-    const { user, updatePetStatus } = useContext(AuthContext);
+    const { user } = useContext(AuthContext);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
     const [petData, setPetData] = useState({
@@ -291,9 +291,6 @@ const PetProfileSetupScreen = ({ navigation }) => {
                 ownerId: user.id,
             };
             await PetService.createPet(petWithOwner);
-
-            // First update the pet status in context
-            updatePetStatus(true);
 
             navigation.navigate("MainTabs");
         } catch (error) {
