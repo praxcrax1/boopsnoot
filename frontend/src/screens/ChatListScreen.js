@@ -32,6 +32,10 @@ import FilterChip from "../components/chat/FilterChip";
 // Styles and Context
 import theme, { withOpacity } from "../styles/theme";
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
+import { SocketContext } from "../contexts/SocketContext";
+
+// Custom Hooks
+import useSocketListener from "../hooks/useSocketListener";
 
 // Constants
 const STORAGE_KEYS = {
@@ -57,15 +61,15 @@ const ChatListScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [unreadChats, setUnreadChats] = useState({});
     const [userPets, setUserPets] = useState([]);
-    const [selectedPetId, setSelectedPetId] = useState(null); // null means "All Pets"
-
-    // =====================================================================
+    const [selectedPetId, setSelectedPetId] = useState(null); // null means "All Pets"    // =====================================================================
     // REFS & CONTEXT
     // =====================================================================
     const appState = useRef(AppState.currentState);
     const notificationListener = useRef();
     const responseListener = useRef();
+    const activeScreenRef = useRef('ChatList');
     const { updateUnreadStatus } = useContext(ChatNotificationContext);
+    const { emit, isConnected } = useContext(SocketContext);
 
     // =====================================================================
     // HELPER FUNCTIONS
@@ -263,8 +267,7 @@ const ChatListScreen = ({ navigation }) => {
     // =====================================================================
     // EFFECTS AND LIFECYCLE
     // =====================================================================
-    
-    useEffect(() => {
+      useEffect(() => {
         // Initial data loading
         fetchChats();
         fetchUserPets();
@@ -295,7 +298,7 @@ const ChatListScreen = ({ navigation }) => {
                 navigation.navigate('Chat', { chatId });
             }
         });
-        
+
         // Cleanup
         return () => {
             appStateSubscription.remove();
@@ -309,6 +312,119 @@ const ChatListScreen = ({ navigation }) => {
             }
         };
     }, [navigation, fetchChats, fetchUserPets]);
+
+    // =====================================================================
+    // SOCKET HANDLERS FOR REAL-TIME UPDATES
+    // =====================================================================
+    
+    /**
+     * Handle new message received via socket.io
+     * Updates the chat list to reflect new messages
+     */
+    const handleNewMessage = useCallback((messageData) => {
+        console.log('Socket: New message received', messageData);
+        
+        // Only process if we're not in the specific chat screen
+        // activeScreenRef helps determine if we're in the ChatList view
+        if (activeScreenRef.current !== 'ChatList') {
+            return;
+        }
+
+        const chatId = messageData.chatId;
+        
+        setChats(prevChats => {
+            // Find the chat to update
+            const chatIndex = prevChats.findIndex(chat => chat._id === chatId);
+            
+            if (chatIndex === -1) {
+                // Chat not found, it could be a new chat
+                // Fetch all chats to get the updated list
+                fetchChats();
+                return prevChats;
+            }
+            
+            // Create a new array with the updated chat
+            const updatedChats = [...prevChats];
+            const chat = updatedChats[chatIndex];
+            
+            // Update the lastMessage and unread status
+            updatedChats[chatIndex] = {
+                ...chat,
+                lastMessage: {
+                    ...messageData,
+                    unread: true
+                }
+            };
+            
+            // Mark as unread locally
+            setUnreadChats(prev => {
+                const newState = { ...prev, [chatId]: true };
+                saveUnreadState(newState);
+                return newState;
+            });
+            
+            // Return sorted chats
+            return sortChats(updatedChats, unreadChats);
+        });
+    }, [fetchChats, sortChats, unreadChats]);
+
+    /**
+     * Handle chat removed notification
+     * Remove the chat from the list
+     */
+    const handleChatRemoved = useCallback((data) => {
+        console.log('Socket: Chat removed notification received', data);
+        if (!data || !data.chatId) return;
+
+        setChats(prevChats => 
+            prevChats.filter(chat => chat._id !== data.chatId)
+        );
+        
+        // Also remove from unread chats if present
+        setUnreadChats(prev => {
+            if (prev[data.chatId]) {
+                const newState = { ...prev };
+                delete newState[data.chatId];
+                saveUnreadState(newState);
+                return newState;
+            }
+            return prev;
+        });
+    }, []);
+
+    /**
+     * Handle new match notification
+     * Adds the new match to the chat list
+     */
+    const handleMatchCreated = useCallback((matchData) => {
+        console.log('Socket: New match notification received', matchData);
+        
+        // Fetch all chats to refresh the list with the new match
+        fetchChats();
+    }, [fetchChats]);
+
+    // Register socket event listeners using our custom hook
+    useSocketListener('receive_message', handleNewMessage);
+    useSocketListener('chat_removed', handleChatRemoved);
+    useSocketListener('match_created', handleMatchCreated);
+
+    // Track active screen for message handling
+    useEffect(() => {
+        const unsubscribeFocus = navigation.addListener('focus', () => {
+            console.log('ChatListScreen focused');
+            activeScreenRef.current = 'ChatList';
+        });
+        
+        const unsubscribeBlur = navigation.addListener('blur', () => {
+            console.log('ChatListScreen blurred');
+            activeScreenRef.current = 'Other';
+        });
+        
+        return () => {
+            unsubscribeFocus();
+            unsubscribeBlur();
+        };
+    }, [navigation]);
 
     // =====================================================================
     // RENDER HELPER FUNCTIONS

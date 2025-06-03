@@ -3,7 +3,7 @@
  * @description Individual chat conversation screen with message list and input
  * @module screens/ChatScreen
  */
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext, useCallback } from "react";
 import {
     View,
     Text,
@@ -32,6 +32,10 @@ import theme, { withOpacity } from "../styles/theme";
 
 // Context
 import { ChatNotificationContext } from "../contexts/ChatNotificationContext";
+import { SocketContext } from "../contexts/SocketContext";
+
+// Custom Hooks
+import useSocketListener from "../hooks/useSocketListener";
 
 // Constants
 const STORAGE_KEYS = {
@@ -71,13 +75,12 @@ const ChatScreen = ({ route, navigation }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [menuVisible, setMenuVisible] = useState(false);
     const [otherPet, setOtherPet] = useState(null);
-    const [currentPet, setCurrentPet] = useState(null);
-
-    // =====================================================================
+    const [currentPet, setCurrentPet] = useState(null);    // =====================================================================
     // REFS & CONTEXT
     // =====================================================================
     const flatListRef = useRef();
     const { checkUnreadStatus } = useContext(ChatNotificationContext);
+    const { emit, isConnected } = useContext(SocketContext);
 
     // =====================================================================
     // HELPER FUNCTIONS
@@ -400,9 +403,7 @@ const ChatScreen = ({ route, navigation }) => {
 
             if (!response || !response.success) {
                 throw new Error("Failed to send message");
-            }
-
-            // Replace temp message with confirmed message
+            }            // Replace temp message with confirmed message
             const confirmedMessage = {
                 ...response.message,
                 sender: {
@@ -417,6 +418,16 @@ const ChatScreen = ({ route, navigation }) => {
                     msg._id === tempMessage._id ? confirmedMessage : msg
                 )
             );
+
+            // Also emit the message over the socket for real-time delivery
+            // This ensures other devices of the same user get the message too
+            if (isConnected) {
+                emit('send_message', {
+                    ...confirmedMessage,
+                    chatId,
+                    senderId: currentUserId,
+                });
+            }
 
             // Ensure we scroll to bottom after sending is complete
             setTimeout(() => scrollToBottom(), 200);
@@ -437,11 +448,59 @@ const ChatScreen = ({ route, navigation }) => {
         } finally {
             setIsSending(false);
         }
-    };
+    };    // =====================================================================
+    // SOCKET MESSAGE HANDLER
+    // =====================================================================
+
+    /**
+     * Handle incoming messages from socket
+     * 
+     * @param {Object} messageData - Message data from socket
+     */
+    const handleSocketMessage = useCallback((messageData) => {
+        // Skip if this message is from the current user or already exists
+        if (
+            (messageData.senderUserId && messageData.senderUserId === currentUserId) ||
+            messages.some(msg => msg._id === messageData._id)
+        ) {
+            return;
+        }
+
+        console.log('Received message via socket:', messageData);
+        
+        // Format the incoming message in the expected format
+        const formattedMessage = {
+            _id: messageData._id,
+            content: messageData.content,
+            createdAt: messageData.createdAt || new Date().toISOString(),
+            sender: {
+                isCurrentUser: false,
+                ...messageData.sender
+            },
+            read: false,
+        };
+
+        // Add message to the list
+        setMessages(prevMessages => [...prevMessages, formattedMessage]);
+        
+        // Scroll to bottom when a new message is received
+        setTimeout(() => scrollToBottom(), 100);
+    }, [messages, currentUserId]);
+
+    // Listen for incoming messages
+    useSocketListener('receive_message', handleSocketMessage, [handleSocketMessage]);
 
     // =====================================================================
     // EFFECTS AND LIFECYCLE
     // =====================================================================
+
+    // Join chat room when component mounts and socket is connected
+    useEffect(() => {
+        if (isConnected && chatId) {
+            console.log(`Joining chat room: ${chatId}`);
+            emit('join_chat', chatId);
+        }
+    }, [isConnected, chatId, emit]);
 
     useEffect(() => {
         // Setup back button in header
